@@ -36,7 +36,7 @@ test("library page shows cloud save entry point", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: /云端保存待连接|登录后保存到云端|已登录/ }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "我的路线" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我的路线", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "保存当前示例" })).toBeVisible();
 });
 
