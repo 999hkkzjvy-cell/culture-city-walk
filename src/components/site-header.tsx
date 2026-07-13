@@ -4,12 +4,12 @@ import { Bell, Bookmark, Menu, Search } from "lucide-react";
 export function SiteHeader() {
   return (
     <header className="site-header">
-      <Link aria-label="Citywalk AI 首页" className="brand" href="/">
+      <Link aria-label="Cultural Citywalk 首页" className="brand" href="/">
         <span className="brand-mark" aria-hidden="true">
           ✦
         </span>
         <span>
-          <strong>CITYWALK AI</strong>
+          <strong>CULTURAL CITYWALK</strong>
           <small>每一座城市都有很多种读法</small>
         </span>
       </Link>

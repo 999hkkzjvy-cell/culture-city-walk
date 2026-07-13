@@ -40,7 +40,7 @@ export type RoutePlan = RouteDraft & {
   stops: RouteStop[];
 };
 
-export const draftStorageKey = "citywalk-ai:draft";
+export const draftStorageKey = "cultural-citywalk:draft";
 
 export const defaultDraft: RouteDraft = {
   id: "demo",

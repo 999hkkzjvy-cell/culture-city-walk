@@ -1,4 +1,4 @@
-# Citywalk AI
+# Cultural Citywalk
 
 一个以城市文化、主题滤镜和路线时间轴为核心的私人城市漫游助手。
 

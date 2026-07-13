@@ -95,9 +95,9 @@ export default function Home() {
 
       <section className="quote-band">
         <blockquote>
-          城市是一本打开的书。从不同的页码开始，会读到不同的故事。
+          每一条路线，都是重新阅读一座城市的方式。
         </blockquote>
-        <p>—— 伊塔洛 · 卡尔维诺</p>
+        <p>Cultural Citywalk</p>
       </section>
 
       <footer className="site-footer">
