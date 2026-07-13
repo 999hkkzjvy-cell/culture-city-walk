@@ -1,3 +1,9 @@
+import type {
+  Coordinate,
+  CoordinateSystem,
+  PlaceVerificationStatus,
+} from "@/lib/maps/types";
+
 export type Theme = "历史" | "文学" | "建筑" | "音乐" | "书店" | "美食";
 
 export type PlanningMode = "discover" | "complete" | "refine";
@@ -10,14 +16,23 @@ export type Place = {
   themes: Theme[];
   mustVisit?: boolean;
   stayMinutes: number;
+  source?: "amap" | "manual" | "seed" | "demo";
+  sourcePlaceId?: string | null;
+  coordinate?: Coordinate | null;
+  coordinateSystem?: CoordinateSystem;
+  verificationStatus?: PlaceVerificationStatus;
 };
 
 export type RouteStop = Place & {
   time: string;
   note: string;
+  fixedTime?: boolean;
   walkingFromPrevious?: {
     minutes: number;
     distanceMeters: number;
+    source?: "provider" | "estimated";
+    provider?: "amap" | "local";
+    label?: string;
   };
 };
 
@@ -83,6 +98,8 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 12,
         distanceMeters: 750,
+        source: "estimated",
+        provider: "local",
       },
     },
     {
@@ -98,6 +115,8 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 15,
         distanceMeters: 1100,
+        source: "estimated",
+        provider: "local",
       },
     },
     {
@@ -112,6 +131,8 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 9,
         distanceMeters: 620,
+        source: "estimated",
+        provider: "local",
       },
     },
     {
@@ -126,6 +147,8 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 16,
         distanceMeters: 980,
+        source: "estimated",
+        provider: "local",
       },
     },
   ],

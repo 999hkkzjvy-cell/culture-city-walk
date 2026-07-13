@@ -34,7 +34,8 @@ as product/design reference material.
   tokens and `next/font` Noto Sans SC / Noto Serif SC.
 - Tests: Vitest for pure functions, Playwright for desktop/mobile smoke tests.
 - Data: local demo/localStorage fallback plus Supabase-backed auth, routes,
-  shares, and read-only share lookup.
+  shares, read-only share lookup, and the first Phase 3 route-kernel/map-provider
+  abstractions.
 - Icons: `lucide-react`.
 
 ## Important Next.js Note
@@ -70,6 +71,12 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
 - `src/components/routes/shared-route-reader.tsx` - read-only share loader.
 - `src/lib/route.ts` - route types and demo route data.
+- `src/lib/route-kernel.ts` - Phase 3 pure route timeline, totals, and
+  validation functions.
+- `src/lib/maps/types.ts` - map provider, coordinate, POI, and walking-leg
+  contracts.
+- `src/lib/maps/amap.ts` - AMap URI helpers and POI parsing helpers.
+- `src/lib/maps/fallback.ts` - local estimated walking-leg fallback.
 - `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
 - `src/lib/supabase/client.ts` - browser Supabase client.
 - `src/lib/supabase/database.types.ts` - generated/hand-maintained DB types.
@@ -147,6 +154,9 @@ GitHub Actions repository variables required for Pages build:
 - Home page has a featured card linking to the seeded南京 route.
 - Share links are direct URLs; there is no manual share-code input UI yet. This
   is intentional until a Xiaohongshu/poster/code-sharing use case exists.
+- Phase 3 has started on the route reader. It now shows whether walking legs are
+  provider-backed or locally estimated, and exposes AMap place/navigation links.
+  Current demo legs are still local estimates, not real AMap Web Service results.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.
@@ -176,10 +186,11 @@ Notes:
 
 Near-term likely work:
 
-- Finish Phase 2 polish: auth redirect verification, clearer auth UX, local
-  draft migration after login, route archive empty states.
-- Phase 3: map provider integration, POI verification, real route calculation,
-  and route editing primitives.
+- Phase 3 next: AMap Web Service proxy, live POI suggestions, confirmed POI
+  persistence, real walking route calculation, marker/polyline rendering, and
+  route editing primitives.
+- Finish remaining Phase 2 polish opportunistically: auth redirect verification,
+  clearer auth UX, local draft migration after login, route archive empty states.
 - Improve mobile fidelity against `ignore-files/UI-mobile.jpg`.
 - Keep static export constraints in mind until hosting strategy changes.
 
