@@ -29,17 +29,20 @@ test("route reader supports direct refresh with query string", async ({ page }) 
   await expect(page.getByLabel("路线地图示意图")).toBeVisible();
 });
 
-test("library page explains cloud save setup when Supabase is not configured", async ({ page }) => {
+test("library page shows cloud save entry point", async ({ page }) => {
   await page.goto("/library/");
 
   await expect(page.getByRole("heading", { name: "我的路线档案" })).toBeVisible();
-  await expect(page.getByText("云端保存待连接")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "书页与旧城之间" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /云端保存待连接|登录后保存到云端|已登录/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我的路线" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存当前示例" })).toBeVisible();
 });
 
 test("share page has a read-only fallback shell", async ({ page }) => {
   await page.goto("/share/?code=abc1234567");
 
   await expect(page.getByRole("heading", { name: "朋友发来的一段城市阅读" })).toBeVisible();
-  await expect(page.getByText("分享页待连接")).toBeVisible();
+  await expect(page.getByText(/分享页待连接|分享链接不可用/)).toBeVisible();
 });
