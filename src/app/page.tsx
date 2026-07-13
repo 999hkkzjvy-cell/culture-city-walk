@@ -1,0 +1,116 @@
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, BookOpen, Compass, MapPin } from "lucide-react";
+import { SiteHeader } from "@/components/site-header";
+
+const modes = [
+  {
+    title: "AI 帮我发现",
+    text: "我只有时间和兴趣，剩下交给 AI。",
+    href: "/plan/",
+    icon: Compass,
+  },
+  {
+    title: "我已有几个目标",
+    text: "告诉 AI 必去的地方，补全顺路路线。",
+    href: "/plan/",
+    icon: MapPin,
+  },
+  {
+    title: "我已有路线",
+    text: "导入或粘贴路线，帮我优化体验。",
+    href: "/route/?id=demo",
+    icon: BookOpen,
+  },
+];
+
+const themes = [
+  ["上海 1935", "时间切片漫游", "历史 · 建筑"],
+  ["武康路", "文学漫游", "文学 · 建筑"],
+  ["南京", "音乐地图", "音乐 · 历史"],
+  ["上海", "书店巡礼", "书店 · 生活"],
+];
+
+export default function Home() {
+  return (
+    <main>
+      <SiteHeader />
+
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="archive-stamp">THE CITY WITH AI</span>
+          <h1>今天，你想怎样认识一座城市？</h1>
+          <p>AI 与你一起，探索城市中的故事与连接。</p>
+        </div>
+        <Image
+          alt="带有档案质感的中国城市江岸历史建筑"
+          className="hero-image"
+          fill
+          priority
+          src="/images/city-archive-hero.png"
+        />
+      </section>
+
+      <section aria-label="规划模式" className="mode-panel">
+        {modes.map((mode) => {
+          const Icon = mode.icon;
+          return (
+            <Link className="mode-card" href={mode.href} key={mode.title}>
+              <Icon aria-hidden="true" size={42} strokeWidth={1.5} />
+              <span>
+                <strong>{mode.title}</strong>
+                <small>{mode.text}</small>
+              </span>
+              <ArrowRight aria-hidden="true" size={22} />
+            </Link>
+          );
+        })}
+      </section>
+
+      <section className="section">
+        <div className="section-heading">
+          <h2>精选主题</h2>
+          <Link href="/route/?id=demo">
+            查看全部
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        <div className="theme-grid">
+          {themes.map(([city, title, tags], index) => (
+            <article className="theme-card" key={title}>
+              <div className={`theme-image theme-image-${index + 1}`} />
+              <p>{city}</p>
+              <h3>{title}</h3>
+              <span>{tags}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="quote-band">
+        <blockquote>
+          城市是一本打开的书。从不同的页码开始，会读到不同的故事。
+        </blockquote>
+        <p>—— 伊塔洛 · 卡尔维诺</p>
+      </section>
+
+      <footer className="site-footer">
+        <nav aria-label="页脚导航">
+          <Link href="/">关于我们</Link>
+          <Link href="/">如何使用</Link>
+          <Link href="/plan/">开始规划</Link>
+        </nav>
+        <form>
+          <label htmlFor="newsletter">订阅灵感周报</label>
+          <div>
+            <input id="newsletter" placeholder="输入你的邮箱" type="email" />
+            <button aria-label="提交订阅" type="submit">
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </form>
+      </footer>
+    </main>
+  );
+}
