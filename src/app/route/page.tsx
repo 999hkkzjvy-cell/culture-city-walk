@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ArrowLeft, Bookmark, Clock, MapPin, Share2, Sparkles } from "lucide-react";
+import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { SiteHeader } from "@/components/site-header";
 import { calculateRouteTotals, demoRoute } from "@/lib/route";
 
@@ -55,6 +56,10 @@ export default function RoutePage() {
           <br />
           1935
         </div>
+      </section>
+
+      <section className="route-cloud-band">
+        <RouteCloudActions />
       </section>
 
       <section className="reader-layout">

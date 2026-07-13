@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { ArrowRight, BookOpen, Compass, MapPin } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { assetPath } from "@/lib/site";
+import { routeUrl } from "@/lib/urls";
 
 const modes = [
   {
@@ -20,7 +21,7 @@ const modes = [
   {
     title: "我已有路线",
     text: "导入或粘贴路线，帮我优化体验。",
-    href: "/route/?id=demo",
+    href: routeUrl("demo"),
     icon: BookOpen,
   },
 ];
@@ -72,7 +73,7 @@ export default function Home() {
       <section className="section">
         <div className="section-heading">
           <h2>精选主题</h2>
-          <Link href="/route/?id=demo">
+          <Link href={routeUrl("demo")}>
             查看全部
             <ArrowRight size={16} />
           </Link>

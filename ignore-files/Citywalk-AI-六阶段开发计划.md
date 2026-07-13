@@ -1,4 +1,4 @@
-# Citywalk AI 开发计划
+# Cultural Citywalk 开发计划
 
 > 计划版本：v1.0  
 > 推荐阶段数：6  

@@ -1,4 +1,4 @@
-# Citywalk AI UI 设计指导文档
+# Cultural Citywalk UI 设计指导文档
 
 > 适用范围：Web 桌面端 + 手机端  
 > 视觉方向：文化杂志 × 文学地图 × 城市档案  
@@ -9,7 +9,7 @@
 
 # 1. 设计定位
 
-Citywalk AI 不应被设计成：
+Cultural Citywalk 不应被设计成：
 
 - 传统旅游攻略网站
 - 地图导航工具
@@ -188,7 +188,7 @@ UI 上可使用主题标签：
 Logo 可使用衬线体大写：
 
 ```text
-CITYWALK AI
+CULTURAL CITYWALK
 ```
 
 ## 4.3 字号层级

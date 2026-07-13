@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Bell, Bookmark, Menu, Search } from "lucide-react";
+import { libraryUrl, routeUrl } from "@/lib/urls";
 
 export function SiteHeader() {
   return (
@@ -16,8 +17,8 @@ export function SiteHeader() {
 
       <nav aria-label="主导航" className="main-nav">
         <Link href="/">探索城市</Link>
-        <Link href="/plan/">我的路线</Link>
-        <Link href="/route/?id=demo">收藏</Link>
+        <Link href={libraryUrl()}>我的路线</Link>
+        <Link href={routeUrl("demo")}>收藏</Link>
         <Link href="/">主题</Link>
         <Link href="/">关于我们</Link>
       </nav>

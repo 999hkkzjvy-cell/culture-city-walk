@@ -5,6 +5,7 @@ import { ArrowRight, Check, MapPinned, Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 import { defaultDraft, getThemeSummary, type RouteDraft, type Theme } from "@/lib/route";
 import { readDraft, saveDraft } from "@/lib/storage";
+import { routeUrl } from "@/lib/urls";
 
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
 
@@ -137,7 +138,7 @@ export function PlanningDesk() {
             {saved ? "草稿已保存" : "保存草稿"}
             {saved ? <Check size={18} /> : <ArrowRight size={18} />}
           </button>
-          <Link className="secondary-link" href="/route/?id=demo">
+          <Link className="secondary-link" href={routeUrl("demo")}>
             查看生成路线
             <ArrowRight size={16} />
           </Link>
