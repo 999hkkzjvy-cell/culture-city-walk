@@ -1,0 +1,193 @@
+# AI Project Context
+
+Last updated: 2026-07-14
+
+This is the first document future AI agents should read before changing the
+Cultural Citywalk codebase. It summarizes product intent, architecture, current
+state, and the files that matter most.
+
+## Product In One Paragraph
+
+Cultural Citywalk is a private city-walk planning assistant for reading a city
+through history, literature, architecture, music, bookstores, food, and urban
+memory. The core principle from the product architecture is: geography first,
+theme enhanced, AI collaborative, facts verifiable. Routes must be realistically
+walkable before they are thematically rich.
+
+## Source Documents
+
+- Product architecture: `ignore-files/Citywalk-AI-完整产品与技术架构-v3.md`
+- UI references: `ignore-files/UI-web.jpg`, `ignore-files/UI-mobile.jpg`
+- Phase 1 audit: `docs/phase-1-audit.md`
+- Phase 2 status: `docs/phase-2-status.md`
+- User-facing setup: `README.md`
+- Agent rule: `AGENTS.md`
+
+Important: `ignore-files/` is intentionally ignored by git, but exists locally
+as product/design reference material.
+
+## Current Technical Shape
+
+- Framework: Next.js App Router, React, TypeScript.
+- Deployment: static export to GitHub Pages.
+- Styling: global CSS in `src/app/globals.css`, using paper/archive design
+  tokens and `next/font` Noto Sans SC / Noto Serif SC.
+- Tests: Vitest for pure functions, Playwright for desktop/mobile smoke tests.
+- Data: local demo/localStorage fallback plus Supabase-backed auth, routes,
+  shares, and read-only share lookup.
+- Icons: `lucide-react`.
+
+## Important Next.js Note
+
+This project uses a Next.js version with breaking changes relative to many
+pretrained assumptions. Before changing Next.js APIs, routing, static export, or
+font/image behavior, read the relevant docs in `node_modules/next/dist/docs/`.
+
+## Main Routes
+
+- `/` - home page with planning mode cards and featured themes.
+- `/plan/` - planning conversation mock and route summary.
+- `/route/?id=demo` - route reader for the local demo route.
+- `/library/` - auth panel plus user's cloud route archive.
+- `/share/?code=...` - read-only shared route loaded from Supabase Edge Function.
+
+Because the app is statically exported for GitHub Pages, dynamic route IDs are
+passed through query strings rather than dynamic App Router segments.
+
+## Key Files
+
+- `src/app/page.tsx` - home page and featured route entry.
+- `src/app/plan/page.tsx` - planning page shell.
+- `src/app/route/page.tsx` - route reader page and map/timeline layout.
+- `src/app/library/page.tsx` - auth and saved route archive page.
+- `src/app/share/page.tsx` - shared route page.
+- `src/app/globals.css` - design system, responsive layout, route reader UI.
+- `src/app/layout.tsx` - app metadata and font loading.
+- `src/components/site-header.tsx` - shared top navigation.
+- `src/components/planning-desk.tsx` - planning interaction mock.
+- `src/components/auth/auth-panel.tsx` - Supabase magic-link auth UI.
+- `src/components/routes/route-library.tsx` - saved route list.
+- `src/components/routes/route-cloud-actions.tsx` - save/share controls.
+- `src/components/routes/shared-route-reader.tsx` - read-only share loader.
+- `src/lib/route.ts` - route types and demo route data.
+- `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
+- `src/lib/supabase/client.ts` - browser Supabase client.
+- `src/lib/supabase/database.types.ts` - generated/hand-maintained DB types.
+- `src/lib/urls.ts` - static-export URL helpers.
+- `src/lib/storage.ts` - localStorage draft persistence.
+- `src/lib/validation/route-schemas.ts` - Zod URL/input validation.
+
+## Supabase State
+
+Remote project:
+
+- Name: `culture-city-walk`
+- Project ref: `wedwvcmdbrnbzjwlllgl`
+- Region: `ap-southeast-1`
+- URL: `https://wedwvcmdbrnbzjwlllgl.supabase.co`
+
+Implemented:
+
+- Migration: `supabase/migrations/20260713000100_phase2_routes_auth.sql`
+- Tables: `profiles`, `places`, `routes`, `route_stops`,
+  `route_constraints`, `route_snapshots`, `route_shares`
+- Storage bucket: private `route-media`
+- RLS: owner-only access for route data
+- Edge Function: `share-route`
+- Seed script: `supabase/seed.sql`
+- Public seed share code: `nanjing-minguo`
+- Seed share URL:
+  `https://999hkkzjvy-cell.github.io/culture-city-walk/share/?code=nanjing-minguo`
+
+The `share-route` function is deployed with `verify_jwt=false` because public
+share links are read by share code, expiry, and revoked-state checks in the
+function body.
+
+## Auth Behavior
+
+Auth is MVP-level email magic-link auth via Supabase:
+
+- The auth UI lives on `/library/`.
+- `AuthPanel` calls `supabase.auth.signInWithOtp`.
+- Registration and login are the same flow.
+- Sessions are persisted by Supabase JS in the browser.
+- After login, users can save demo route data, list their own cloud routes, and
+  generate share links.
+
+Supabase Auth URL configuration must allow GitHub Pages redirects:
+
+- Site URL: `https://999hkkzjvy-cell.github.io/culture-city-walk/`
+- Redirect URL: `https://999hkkzjvy-cell.github.io/culture-city-walk/**`
+- Local redirect URL: `http://localhost:3000/**`
+
+## Environment Variables
+
+Local `.env.local` is ignored by git. `.env.example` documents expected keys.
+
+Client-side:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_BASE_PATH` is set by GitHub Actions for Pages builds.
+
+Server-only / function-side:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SHARE_ALLOWED_ORIGINS`
+
+Never expose service role keys in browser or GitHub Pages variables.
+
+GitHub Actions repository variables required for Pages build:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+## Current UX Notes
+
+- Home page has a featured card linking to the seeded南京 route.
+- Share links are direct URLs; there is no manual share-code input UI yet. This
+  is intentional until a Xiaohongshu/poster/code-sharing use case exists.
+- Mobile fonts and route reader layout have been adjusted to more closely match
+  the UI reference. Route reader mobile uses a horizontal two-column reader so
+  timeline and map remain related instead of fully stacking.
+- UI is still not a pixel-perfect match to the design images. Known gaps:
+  homepage mode cards use line icons rather than rich object imagery; planning
+  page mobile summary is not yet the right-side paper card shown in the mock.
+
+## Validation Commands
+
+Use these before committing meaningful changes:
+
+```bash
+npx tsc --noEmit
+npm test
+npm run build
+npm run e2e
+```
+
+Notes:
+
+- In this environment, `npm run build` may need elevated permissions because
+  Turbopack creates local processes/binds ports.
+- `npm run e2e` starts or reuses a local dev server.
+- GitHub Pages workflow runs unit tests, Playwright, static build, and deploy.
+
+## Development Priorities
+
+Near-term likely work:
+
+- Finish Phase 2 polish: auth redirect verification, clearer auth UX, local
+  draft migration after login, route archive empty states.
+- Phase 3: map provider integration, POI verification, real route calculation,
+  and route editing primitives.
+- Improve mobile fidelity against `ignore-files/UI-mobile.jpg`.
+- Keep static export constraints in mind until hosting strategy changes.
+
+## Guardrails
+
+- Preserve local fallback behavior when Supabase is not configured.
+- Do not break GitHub Pages static export.
+- Do not put secrets into committed files or frontend env vars.
+- Keep RLS owner-only behavior for private routes.
+- Do not assume seeded data belongs in a user's `/library/`; it is primarily for
+  public share-page verification.

@@ -41,3 +41,5 @@ npm run e2e
 ## 参考资料
 
 产品文档和 UI 参考图保留在 `ignore-files/` 下。
+
+后续 AI 或协作者接手前，建议先读 `docs/ai-project-context.md`。
