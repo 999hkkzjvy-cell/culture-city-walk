@@ -7,6 +7,10 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await expect(page.getByRole("link", { name: /AI 帮我发现/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /我已有几个目标/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /我已有路线/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /南京 金陵城南 · 民国记忆/ })).toHaveAttribute(
+    "href",
+    /\/share\/\?code=nanjing-minguo/,
+  );
 });
 
 test("planning page can save a local draft and open route reader", async ({ page }) => {

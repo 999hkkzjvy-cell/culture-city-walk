@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { ArrowRight, BookOpen, Compass, MapPin } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { assetPath } from "@/lib/site";
-import { routeUrl } from "@/lib/urls";
+import { routeUrl, shareUrl } from "@/lib/urls";
 
 const modes = [
   {
@@ -27,10 +27,30 @@ const modes = [
 ];
 
 const themes = [
-  ["上海 1935", "时间切片漫游", "历史 · 建筑"],
-  ["武康路", "文学漫游", "文学 · 建筑"],
-  ["南京", "音乐地图", "音乐 · 历史"],
-  ["上海", "书店巡礼", "书店 · 生活"],
+  {
+    city: "上海 1935",
+    title: "时间切片漫游",
+    tags: "历史 · 建筑",
+    href: routeUrl("demo"),
+  },
+  {
+    city: "武康路",
+    title: "文学漫游",
+    tags: "文学 · 建筑",
+    href: routeUrl("demo"),
+  },
+  {
+    city: "南京",
+    title: "金陵城南 · 民国记忆",
+    tags: "历史 · 建筑 · 美食",
+    href: shareUrl("nanjing-minguo"),
+  },
+  {
+    city: "上海",
+    title: "书店巡礼",
+    tags: "书店 · 生活",
+    href: routeUrl("demo"),
+  },
 ];
 
 export default function Home() {
@@ -80,16 +100,16 @@ export default function Home() {
         </div>
 
         <div className="theme-grid">
-          {themes.map(([city, title, tags], index) => (
-            <article className="theme-card" key={title}>
+          {themes.map((theme, index) => (
+            <Link className="theme-card" href={theme.href} key={theme.title}>
               <div
                 className={`theme-image theme-image-${index + 1}`}
                 style={{ "--theme-image": `url("${heroImage}")` } as CSSProperties}
               />
-              <p>{city}</p>
-              <h3>{title}</h3>
-              <span>{tags}</span>
-            </article>
+              <p>{theme.city}</p>
+              <h3>{theme.title}</h3>
+              <span>{theme.tags}</span>
+            </Link>
           ))}
         </div>
       </section>
