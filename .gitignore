@@ -44,4 +44,5 @@ yarn-error.log*
 next-env.d.ts
 
 # 本地架构文件
-/ignore-files/*
+/ignore-files/
+
