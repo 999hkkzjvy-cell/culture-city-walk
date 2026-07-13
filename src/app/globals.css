@@ -10,8 +10,8 @@
   --border: #d8d0c3;
   --paper: #fbf7ef;
   --shadow: 0 18px 50px rgb(32 35 31 / 10%);
-  --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
-  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --sans: var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  --serif: var(--font-noto-serif-sc), "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
 }
 
 * {
@@ -106,6 +106,7 @@ button {
   font-family: var(--serif);
   font-size: 21px;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .brand small {
@@ -1166,18 +1167,32 @@ button {
   }
 
   .reader-layout {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    width: 100%;
+    margin: 0 0 56px;
+    grid-template-columns: minmax(360px, 56vw) minmax(320px, 44vw);
+    gap: 0;
+    align-items: stretch;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
   }
 
   .map-pane {
     width: 100%;
+    min-height: 100%;
     order: 2;
     padding-top: 0;
+    scroll-snap-align: start;
   }
 
   .timeline {
+    min-width: 0;
     order: 1;
+    padding: 26px 18px 18px;
+    scroll-snap-align: start;
   }
 
   .map-toggle {
@@ -1190,8 +1205,12 @@ button {
   }
 
   .paper-map {
-    min-height: 540px;
-    border-radius: 0 0 8px 8px;
+    min-height: 760px;
+    height: 100%;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 0;
   }
 
   .postmark {
@@ -1204,7 +1223,7 @@ button {
 
 @media (max-width: 640px) {
   .brand strong {
-    font-size: 21px;
+    font-size: 18px;
   }
 
   .brand small {
@@ -1255,6 +1274,31 @@ button {
   .theme-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+  }
+
+  .reader-layout {
+    grid-template-columns: minmax(330px, 84vw) minmax(300px, 78vw);
+  }
+
+  .route-hero h1 {
+    font-size: 38px;
+  }
+
+  .route-cloud-band {
+    margin-top: 18px;
+  }
+
+  .stop-card {
+    grid-template-columns: 34px 1fr;
+    gap: 12px;
+  }
+
+  .stop-body {
+    padding: 22px 20px;
+  }
+
+  .stop-body h2 {
+    font-size: 23px;
   }
 
   .theme-image {

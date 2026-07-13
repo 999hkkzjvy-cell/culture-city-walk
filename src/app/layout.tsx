@@ -1,5 +1,20 @@
 import type { Metadata } from "next";
+import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
+
+const notoSans = Noto_Sans_SC({
+  display: "swap",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-noto-sans-sc",
+});
+
+const notoSerif = Noto_Serif_SC({
+  display: "swap",
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "900"],
+  variable: "--font-noto-serif-sc",
+});
 
 export const metadata: Metadata = {
   title: "Cultural Citywalk",
@@ -12,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="h-full">
+    <html lang="zh-CN" className={`${notoSans.variable} ${notoSerif.variable} h-full`}>
       <body>{children}</body>
     </html>
   );
