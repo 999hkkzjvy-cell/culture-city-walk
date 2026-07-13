@@ -41,6 +41,8 @@ jobs:
 
       - name: Build static site
         run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /culture-city-walk
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

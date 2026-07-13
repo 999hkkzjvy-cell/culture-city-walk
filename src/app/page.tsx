@@ -1,7 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { ArrowRight, BookOpen, Compass, MapPin } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
+import { assetPath } from "@/lib/site";
 
 const modes = [
   {
@@ -32,6 +33,8 @@ const themes = [
 ];
 
 export default function Home() {
+  const heroImage = assetPath("/images/city-archive-hero.png");
+
   return (
     <main>
       <SiteHeader />
@@ -42,12 +45,11 @@ export default function Home() {
           <h1>今天，你想怎样认识一座城市？</h1>
           <p>AI 与你一起，探索城市中的故事与连接。</p>
         </div>
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           alt="带有档案质感的中国城市江岸历史建筑"
           className="hero-image"
-          fill
-          priority
-          src="/images/city-archive-hero.png"
+          src={heroImage}
         />
       </section>
 
@@ -79,7 +81,10 @@ export default function Home() {
         <div className="theme-grid">
           {themes.map(([city, title, tags], index) => (
             <article className="theme-card" key={title}>
-              <div className={`theme-image theme-image-${index + 1}`} />
+              <div
+                className={`theme-image theme-image-${index + 1}`}
+                style={{ "--theme-image": `url("${heroImage}")` } as CSSProperties}
+              />
               <p>{city}</p>
               <h3>{title}</h3>
               <span>{tags}</span>
