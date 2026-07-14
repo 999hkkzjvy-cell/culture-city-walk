@@ -21,10 +21,9 @@ test("home page exposes the three planning modes", async ({ page }) => {
     "href",
     "/guide/",
   );
-  await expect(page.getByRole("link", { name: "登录" }).first()).toHaveAttribute(
-    "href",
-    "/login/",
-  );
+  await expect(
+    page.getByRole("link", { name: "登录" }).first(),
+  ).toHaveAttribute("href", "/login/");
 });
 
 test("planning page can save a local draft and open route reader", async ({
@@ -56,9 +55,7 @@ test("planning page can edit city and must-visit places", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByLabel("路线预案站点")).toContainText("拙政园");
 
-  await page
-    .getByRole("button", { name: "移除地点 先锋书店" })
-    .click();
+  await page.getByRole("button", { name: "移除地点 先锋书店" }).click();
   await expect(
     page.getByRole("button", { name: "移除地点 先锋书店" }),
   ).toHaveCount(0);
@@ -73,9 +70,12 @@ test("planning page can add a candidate to the editable route preview", async ({
   await page.goto("/plan/");
 
   await page.getByRole("button", { name: /生成沿途候选/ }).click();
-  await expect(page.getByLabel("沿途可选点")).toContainText(
-    /拉贝故居|六朝博物馆|江宁织造博物馆|南京图书馆|南京 1912 街区/,
-  );
+  await expect(
+    page
+      .getByLabel("沿途可选点")
+      .getByRole("button", { name: "加入路线" })
+      .first(),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "加入路线" }).first().click();
   await expect(page.getByRole("heading", { name: "已处理" })).toBeVisible();
@@ -173,7 +173,9 @@ test("login and profile pages expose account flows", async ({ page }) => {
     page.getByRole("heading", { name: /登录账号|登录功能待连接/ }),
   ).toBeVisible();
 
-  if (await page.getByRole("button", { name: "注册", exact: true }).isVisible()) {
+  if (
+    await page.getByRole("button", { name: "注册", exact: true }).isVisible()
+  ) {
     await page.getByRole("button", { name: "注册", exact: true }).click();
     await expect(page.getByRole("heading", { name: "注册账号" })).toBeVisible();
     await expect(page.getByLabel("邮箱")).toBeVisible();

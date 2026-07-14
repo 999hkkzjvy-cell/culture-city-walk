@@ -152,19 +152,26 @@ export function generateRouteCandidates(
 ): RouteCandidate[] {
   const acceptedTypes = options.acceptedTypes ?? candidatePlaceTypes;
   const maxResults = options.maxResults ?? 6;
-  const existingPlaceIds = new Set(
-    route.stops.map((stop) => stop.sourcePlaceId ?? stop.id),
-  );
 
   return dedupeCandidates(LOCAL_NANJING_CANDIDATES)
-    .filter((candidate) => candidate.place.city === route.city)
+    .filter((candidate) => isSameCity(candidate.place.city, route.city))
     .filter((candidate) => acceptedTypes.includes(candidate.placeType))
-    .filter(
-      (candidate) =>
-        !existingPlaceIds.has(
-          candidate.place.sourcePlaceId ?? candidate.place.id,
-        ),
-    )
+    .map((candidate) => scoreCandidate(route, candidate, options.themes))
+    .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
+    .slice(0, maxResults);
+}
+
+export function generateRouteCandidatesFromPlaces(
+  route: RoutePlan,
+  places: PlaceCandidate[],
+  options: CandidateSearchOptions,
+): RouteCandidate[] {
+  const acceptedTypes = options.acceptedTypes ?? candidatePlaceTypes;
+  const maxResults = options.maxResults ?? 6;
+
+  return dedupeCandidates(places.map((place) => seedCandidateFromPlace(place)))
+    .filter((candidate) => isSameCity(candidate.place.city, route.city))
+    .filter((candidate) => acceptedTypes.includes(candidate.placeType))
     .map((candidate) => scoreCandidate(route, candidate, options.themes))
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
     .slice(0, maxResults);
@@ -279,6 +286,101 @@ function routeStopAsPlaceCandidate(
     id: stop.sourcePlaceId ?? stop.id,
     coordinate: stop.coordinate ?? null,
   };
+}
+
+function seedCandidateFromPlace(place: PlaceCandidate): SeedCandidate {
+  const placeType = inferPlaceType(place);
+
+  return {
+    place,
+    placeType,
+    themes: inferThemes(placeType, place.poiType),
+    stayMinutes: inferStayMinutes(placeType),
+  };
+}
+
+function inferPlaceType(place: PlaceCandidate): CandidatePlaceType {
+  const text = `${place.name} ${place.address ?? ""} ${place.poiType ?? ""}`;
+
+  if (matchesAny(text, ["博物馆", "展览馆", "纪念馆", "美术馆"])) {
+    return "博物馆";
+  }
+
+  if (matchesAny(text, ["旧址", "故居", "公馆", "历史", "文物", "建筑"])) {
+    return "历史建筑";
+  }
+
+  if (matchesAny(text, ["书店", "图书", "书局", "书房"])) {
+    return "书店";
+  }
+
+  if (matchesAny(text, ["咖啡"])) {
+    return "咖啡馆";
+  }
+
+  if (matchesAny(text, ["餐饮", "餐厅", "美食", "小吃", "饭店"])) {
+    return "餐厅";
+  }
+
+  if (matchesAny(text, ["公园", "园林", "绿地"])) {
+    return "公园";
+  }
+
+  return "景点";
+}
+
+function inferThemes(placeType: CandidatePlaceType, poiType: string | null) {
+  const themesByType: Record<CandidatePlaceType, Theme[]> = {
+    景点: ["历史", "建筑"],
+    博物馆: ["历史", "建筑"],
+    历史建筑: ["历史", "建筑"],
+    书店: ["文学", "书店"],
+    咖啡馆: ["文学", "美食"],
+    餐厅: ["美食"],
+    公园: ["历史", "建筑"],
+  };
+  const themes = new Set<Theme>(themesByType[placeType]);
+
+  if (poiType?.includes("音乐")) {
+    themes.add("音乐");
+  }
+
+  return [...themes];
+}
+
+function inferStayMinutes(placeType: CandidatePlaceType) {
+  switch (placeType) {
+    case "博物馆":
+      return 50;
+    case "历史建筑":
+      return 35;
+    case "书店":
+      return 35;
+    case "咖啡馆":
+      return 25;
+    case "餐厅":
+      return 45;
+    case "公园":
+      return 35;
+    case "景点":
+      return 40;
+  }
+}
+
+function matchesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function isSameCity(candidateCity: string, routeCity: string) {
+  const normalize = (city: string) => city.trim().replace(/市$/, "");
+  const normalizedCandidateCity = normalize(candidateCity);
+  const normalizedRouteCity = normalize(routeCity);
+
+  return (
+    normalizedCandidateCity === normalizedRouteCity ||
+    normalizedCandidateCity.includes(normalizedRouteCity) ||
+    normalizedRouteCity.includes(normalizedCandidateCity)
+  );
 }
 
 function dedupeCandidates(candidates: SeedCandidate[]) {

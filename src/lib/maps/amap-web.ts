@@ -52,6 +52,24 @@ export function createAmapWebServiceProvider(): MapProvider | null {
       return data.places.map(mapProxyPlaceToCandidate);
     },
 
+    async searchPlacesAround(input) {
+      const data = await invokeAmapProxy<{ places: AmapProxyPlace[] }>(
+        "place-around",
+        {
+          center: {
+            lng: input.center.lng,
+            lat: input.center.lat,
+          },
+          city: input.city,
+          types: input.types,
+          radiusMeters: input.radiusMeters,
+          limit: input.limit ?? 8,
+        },
+      );
+
+      return data.places.map(mapProxyPlaceToCandidate);
+    },
+
     async calculateWalkingRoute(input) {
       const origin = toAmapPoint(input.origin);
       const destination = toAmapPoint(input.destination);

@@ -23,11 +23,13 @@ import {
   demoRoute,
   getThemeSummary,
   type RouteDraft,
+  type RoutePlan,
   type Theme,
 } from "@/lib/route";
 import {
   candidatePlaceTypes,
   generateRouteCandidates,
+  generateRouteCandidatesFromPlaces,
   getCandidateBandLabel,
   type CandidateFitBand,
   type CandidatePlaceType,
@@ -52,7 +54,7 @@ import {
   createAmapWebServiceProvider,
   isAmapWebProxyConfigured,
 } from "@/lib/maps/amap-web";
-import type { PlaceCandidate } from "@/lib/maps/types";
+import type { Coordinate, PlaceCandidate } from "@/lib/maps/types";
 import {
   appendManualStopToRoute,
   appendPlaceCandidateToRoute,
@@ -93,6 +95,93 @@ const placeRoleOptions: Array<{ value: RouteStopPlacement; label: string }> = [
   { value: "end", label: "终点" },
 ];
 
+const amapCandidateTypesByPlaceType: Record<CandidatePlaceType, string[]> = {
+  景点: ["风景名胜"],
+  博物馆: ["科教文化服务"],
+  历史建筑: ["风景名胜", "科教文化服务"],
+  书店: ["购物服务", "科教文化服务"],
+  咖啡馆: ["餐饮服务"],
+  餐厅: ["餐饮服务"],
+  公园: ["风景名胜"],
+};
+
+function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
+  const centers: Coordinate[] = [];
+
+  route.stops.forEach((stop, index) => {
+    if (isGcj02Coordinate(stop.coordinate)) {
+      centers.push(stop.coordinate);
+    }
+
+    const previousStop = route.stops[index - 1];
+    if (previousStop && isGcj02Coordinate(previousStop.coordinate)) {
+      const midpoint = midpointCoordinate(
+        previousStop.coordinate,
+        stop.coordinate,
+      );
+      if (midpoint) {
+        centers.push(midpoint);
+      }
+    }
+
+    const polyline = stop.walkingFromPrevious?.polyline ?? [];
+    if (polyline.length >= 3) {
+      const middle = polyline[Math.floor(polyline.length / 2)];
+      if (isGcj02Coordinate(middle)) {
+        centers.push(middle);
+      }
+    }
+  });
+
+  return dedupeCoordinates(centers).slice(0, 8);
+}
+
+function midpointCoordinate(
+  origin: Coordinate,
+  destination?: Coordinate | null,
+): Coordinate | null {
+  if (!isGcj02Coordinate(destination)) {
+    return null;
+  }
+
+  return {
+    lng: (origin.lng + destination.lng) / 2,
+    lat: (origin.lat + destination.lat) / 2,
+    system: "gcj02",
+  };
+}
+
+function dedupeCoordinates(coordinates: Coordinate[]) {
+  const seen = new Set<string>();
+
+  return coordinates.filter((coordinate) => {
+    const key = `${coordinate.lng.toFixed(4)},${coordinate.lat.toFixed(4)}`;
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getAmapCandidateTypes(types: CandidatePlaceType[]) {
+  return [
+    ...new Set(types.flatMap((type) => amapCandidateTypesByPlaceType[type])),
+  ].join("|");
+}
+
+function isGcj02Coordinate(
+  coordinate?: Coordinate | null,
+): coordinate is Coordinate {
+  return Boolean(
+    coordinate &&
+    coordinate.system === "gcj02" &&
+    Number.isFinite(coordinate.lng) &&
+    Number.isFinite(coordinate.lat),
+  );
+}
+
 export function PlanningDesk() {
   const [draft, setDraft] = useState<RouteDraft>(() =>
     typeof window === "undefined" ? defaultDraft : readDraft(),
@@ -127,7 +216,10 @@ export function PlanningDesk() {
       return {};
     }
 
-    return readCurrentCandidateState().actions as Record<string, CandidateAction>;
+    return readCurrentCandidateState().actions as Record<
+      string,
+      CandidateAction
+    >;
   });
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);
@@ -205,7 +297,8 @@ export function PlanningDesk() {
 
     setSaved(false);
     const currentRoute = previewRoute;
-    const routeThemes = draft.themes.length > 0 ? draft.themes : (["历史"] as Theme[]);
+    const routeThemes =
+      draft.themes.length > 0 ? draft.themes : (["历史"] as Theme[]);
     const nextRoute = placeCandidate
       ? appendPlaceCandidateToRoute(currentRoute, {
           place: placeCandidate,
@@ -245,7 +338,9 @@ export function PlanningDesk() {
 
   function removeMustVisit(entryId: string) {
     const entry = plannedPlaces.find((item) => item.id === entryId);
-    const nextPlannedPlaces = plannedPlaces.filter((item) => item.id !== entryId);
+    const nextPlannedPlaces = plannedPlaces.filter(
+      (item) => item.id !== entryId,
+    );
 
     setSaved(false);
     setPlannedPlaces(nextPlannedPlaces);
@@ -296,7 +391,9 @@ export function PlanningDesk() {
       setMustVisitSuggestions(places);
       setMustVisitSearchState("ready");
       setMustVisitSearchMessage(
-        places.length > 0 ? `找到 ${places.length} 个地点。` : "没有找到匹配地点。",
+        places.length > 0
+          ? `找到 ${places.length} 个地点。`
+          : "没有找到匹配地点。",
       );
     } catch {
       setMustVisitSuggestions([]);
@@ -317,7 +414,9 @@ export function PlanningDesk() {
     nextRoute: typeof previewRoute,
   ) {
     const previousIds = new Set(previousRoute.stops.map((stop) => stop.id));
-    return nextRoute.stops.find((stop) => !previousIds.has(stop.id))?.id ?? null;
+    return (
+      nextRoute.stops.find((stop) => !previousIds.has(stop.id))?.id ?? null
+    );
   }
 
   function plannedPlaceId(name: string, index: number) {
@@ -329,7 +428,9 @@ export function PlanningDesk() {
   }
 
   function placeRoleLabel(role: RouteStopPlacement) {
-    return placeRoleOptions.find((option) => option.value === role)?.label ?? "必去";
+    return (
+      placeRoleOptions.find((option) => option.value === role)?.label ?? "必去"
+    );
   }
 
   function placeRoleNote(role: RouteStopPlacement) {
@@ -360,20 +461,102 @@ export function PlanningDesk() {
 
     try {
       const intent = await getPlanningIntent();
-      const localCandidates = generateRouteCandidates(previewRoute, {
+      const candidateResult = await getRouteAwareCandidates(previewRoute, {
         themes: intent.data.themeFilters,
         acceptedTypes: selectedCandidateTypes,
         maxResults: 5,
       });
-      const ranked = await rankCandidateSuggestions(localCandidates, intent.data);
+      const ranked = await rankCandidateSuggestions(
+        candidateResult.candidates,
+        intent.data,
+      );
 
       setCandidates(ranked.data);
       setCandidateActions({});
       persistCandidateActions({}, ranked.data);
-      setAiWarnings([...intent.warnings, ...ranked.warnings]);
+      setAiWarnings([
+        ...intent.warnings,
+        ...candidateResult.warnings,
+        ...ranked.warnings,
+      ]);
       setAiUsage(ranked.usage);
     } finally {
       setIsGeneratingCandidates(false);
+    }
+  }
+
+  async function getRouteAwareCandidates(
+    route: RoutePlan,
+    options: {
+      themes: Theme[];
+      acceptedTypes: CandidatePlaceType[];
+      maxResults: number;
+    },
+  ) {
+    const fallbackCandidates = () =>
+      generateRouteCandidates(route, {
+        themes: options.themes,
+        acceptedTypes: options.acceptedTypes,
+        maxResults: options.maxResults,
+      });
+
+    if (!isAmapWebProxyConfigured()) {
+      return { candidates: fallbackCandidates(), warnings: [] };
+    }
+
+    const provider = createAmapWebServiceProvider();
+
+    if (!provider?.searchPlacesAround) {
+      return { candidates: fallbackCandidates(), warnings: [] };
+    }
+
+    const centers = collectRouteSearchCenters(route);
+
+    if (centers.length === 0) {
+      return {
+        candidates: fallbackCandidates(),
+        warnings: ["当前路线缺少可用于高德沿线搜索的坐标，已使用本地候选。"],
+      };
+    }
+
+    try {
+      const places: PlaceCandidate[] = [];
+      const types = getAmapCandidateTypes(options.acceptedTypes);
+
+      for (const center of centers) {
+        const aroundPlaces = await provider.searchPlacesAround({
+          center,
+          city: route.city,
+          types,
+          radiusMeters: 1200,
+          limit: 8,
+        });
+        places.push(...aroundPlaces);
+      }
+
+      const providerCandidates = generateRouteCandidatesFromPlaces(
+        route,
+        places,
+        {
+          themes: options.themes,
+          acceptedTypes: options.acceptedTypes,
+          maxResults: options.maxResults,
+        },
+      );
+
+      if (providerCandidates.length > 0) {
+        return { candidates: providerCandidates, warnings: [] };
+      }
+
+      return {
+        candidates: fallbackCandidates(),
+        warnings: ["高德没有返回合适的沿途候选，已使用本地候选。"],
+      };
+    } catch {
+      return {
+        candidates: fallbackCandidates(),
+        warnings: ["高德沿途候选搜索失败，已使用本地候选。"],
+      };
     }
   }
 
@@ -389,7 +572,10 @@ export function PlanningDesk() {
 
       return {
         ...fallback,
-        warnings: ["DeepSeek 调用失败，已切回本地规则解析。", ...fallback.warnings],
+        warnings: [
+          "DeepSeek 调用失败，已切回本地规则解析。",
+          ...fallback.warnings,
+        ],
       };
     }
   }
@@ -409,7 +595,10 @@ export function PlanningDesk() {
 
       return {
         ...fallback,
-        warnings: ["DeepSeek 候选排序失败，已使用本地模板理由。", ...fallback.warnings],
+        warnings: [
+          "DeepSeek 候选排序失败，已使用本地模板理由。",
+          ...fallback.warnings,
+        ],
       };
     }
   }
@@ -532,7 +721,9 @@ export function PlanningDesk() {
                   onClick={() => removeMustVisit(place.id)}
                   type="button"
                 >
-                  <span className="chip-prefix">{placeRoleLabel(place.role)}</span>
+                  <span className="chip-prefix">
+                    {placeRoleLabel(place.role)}
+                  </span>
                   {place.name}
                   <X size={13} aria-hidden="true" />
                 </button>
@@ -587,7 +778,9 @@ export function PlanningDesk() {
               </div>
             </div>
             {mustVisitSearchMessage ? (
-              <span className={`must-visit-search-status ${mustVisitSearchState}`}>
+              <span
+                className={`must-visit-search-status ${mustVisitSearchState}`}
+              >
                 {mustVisitSearchMessage}
               </span>
             ) : null}

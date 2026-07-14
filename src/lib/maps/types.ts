@@ -57,6 +57,13 @@ export interface MapProvider {
     keyword: string;
     city?: string;
   }): Promise<PlaceCandidate[]>;
+  searchPlacesAround?(input: {
+    center: Coordinate;
+    city?: string;
+    types?: string;
+    radiusMeters?: number;
+    limit?: number;
+  }): Promise<PlaceCandidate[]>;
   calculateWalkingRoute(input: {
     origin: PlaceCandidate;
     destination: PlaceCandidate;

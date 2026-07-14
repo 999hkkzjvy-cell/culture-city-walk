@@ -16,6 +16,14 @@ type AmapProxyRequest =
       limit?: number;
     }
   | {
+      action: "place-around";
+      center: AmapPointInput;
+      city?: string;
+      types?: string;
+      radiusMeters?: number;
+      limit?: number;
+    }
+  | {
       action: "walking";
       origin: AmapPointInput;
       destination: AmapPointInput;
@@ -82,6 +90,10 @@ Deno.serve(async (request) => {
       return await handlePlaceText(body, amapKey);
     }
 
+    if (body.action === "place-around") {
+      return await handlePlaceAround(body, amapKey);
+    }
+
     if (body.action === "walking") {
       return await handleWalking(body, amapKey);
     }
@@ -121,6 +133,58 @@ async function handlePlaceText(
   }
 
   const response = await fetchAmap(`/v3/place/text?${params.toString()}`);
+
+  if (response.status !== "1") {
+    return json(
+      {
+        error: "amap_provider_error",
+        info: response.info ?? "UNKNOWN",
+        infocode: response.infocode ?? null,
+      },
+      502,
+    );
+  }
+
+  const pois = Array.isArray(response.pois) ? response.pois : [];
+
+  return json(
+    {
+      places: pois.map(normalizePoi).filter(Boolean),
+      count: Number(response.count ?? pois.length) || pois.length,
+    },
+    200,
+  );
+}
+
+async function handlePlaceAround(
+  input: Extract<AmapProxyRequest, { action: "place-around" }>,
+  amapKey: string,
+) {
+  if (!isValidPoint(input.center)) {
+    return json({ error: "invalid_coordinate" }, 400);
+  }
+
+  const params = new URLSearchParams({
+    key: amapKey,
+    location: formatPoint(input.center),
+    output: "JSON",
+    extensions: "base",
+    offset: String(normalizeLimit(input.limit)),
+    page: "1",
+    radius: String(normalizeRadius(input.radiusMeters)),
+    sortrule: "distance",
+  });
+
+  if (input.city?.trim()) {
+    params.set("city", input.city.trim());
+    params.set("citylimit", "true");
+  }
+
+  if (input.types?.trim()) {
+    params.set("types", input.types.trim());
+  }
+
+  const response = await fetchAmap(`/v3/place/around?${params.toString()}`);
 
   if (response.status !== "1") {
     return json(
@@ -286,6 +350,15 @@ function normalizeLimit(value: unknown) {
   }
 
   return Math.min(MAX_POI_LIMIT, Math.max(1, Math.round(parsed)));
+}
+
+function normalizeRadius(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 1200;
+  }
+
+  return Math.min(3000, Math.max(200, Math.round(parsed)));
 }
 
 function json(body: unknown, status: number) {
