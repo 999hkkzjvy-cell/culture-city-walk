@@ -15,8 +15,9 @@ import {
   Search,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import {
   defaultDraft,
   demoRoute,
@@ -83,6 +84,7 @@ export function PlanningDesk() {
   const [requestText, setRequestText] = useState(
     "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
   );
+  const [mustVisitInput, setMustVisitInput] = useState("");
   const [candidates, setCandidates] = useState<RouteCandidate[]>(() =>
     typeof window === "undefined" ? [] : readCurrentCandidateState().candidates,
   );
@@ -165,6 +167,52 @@ export function PlanningDesk() {
         themes,
       };
     });
+  }
+
+  function updateCity(city: string) {
+    setSaved(false);
+    setDraft((current) => ({
+      ...current,
+      city,
+    }));
+  }
+
+  function addMustVisit() {
+    const place = mustVisitInput.trim();
+
+    if (!place) {
+      return;
+    }
+
+    setSaved(false);
+    setDraft((current) => {
+      if (current.mustVisits.includes(place)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        mustVisits: [...current.mustVisits, place],
+      };
+    });
+    setMustVisitInput("");
+  }
+
+  function removeMustVisit(place: string) {
+    setSaved(false);
+    setDraft((current) => ({
+      ...current,
+      mustVisits: current.mustVisits.filter((item) => item !== place),
+    }));
+  }
+
+  function handleMustVisitKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    addMustVisit();
   }
 
   function persistDraft() {
@@ -383,10 +431,14 @@ export function PlanningDesk() {
           <span className="ai-dot">AI</span>
           <div>
             <p>今天去哪座城市？</p>
-            <button className="answer-pill" type="button">
-              {draft.city}
+            <label className="answer-input">
+              <input
+                aria-label="去哪座城市"
+                onChange={(event) => updateCity(event.target.value)}
+                value={draft.city}
+              />
               <Pencil size={14} aria-hidden="true" />
-            </button>
+            </label>
           </div>
         </div>
 
@@ -396,13 +448,30 @@ export function PlanningDesk() {
             <p>有一定要去的地方吗？</p>
             <div className="chip-row">
               {draft.mustVisits.map((place) => (
-                <span className="chip selected" key={place}>
+                <button
+                  aria-label={`移除必去地点 ${place}`}
+                  className="chip selected removable"
+                  key={place}
+                  onClick={() => removeMustVisit(place)}
+                  type="button"
+                >
                   {place}
-                </span>
+                  <X size={13} aria-hidden="true" />
+                </button>
               ))}
-              <button className="chip" type="button">
-                + 添加更多
-              </button>
+              <div className="must-visit-add">
+                <input
+                  aria-label="新增必去地点"
+                  onChange={(event) => setMustVisitInput(event.target.value)}
+                  onKeyDown={handleMustVisitKeyDown}
+                  placeholder="输入地点"
+                  value={mustVisitInput}
+                />
+                <button className="chip" onClick={addMustVisit} type="button">
+                  <Plus size={14} aria-hidden="true" />
+                  添加
+                </button>
+              </div>
             </div>
           </div>
         </div>

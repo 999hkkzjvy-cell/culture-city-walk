@@ -38,6 +38,29 @@ test("planning page can save a local draft and open route reader", async ({
   ).toBeVisible();
 });
 
+test("planning page can edit city and must-visit places", async ({ page }) => {
+  await page.goto("/plan/");
+
+  await page.getByLabel("去哪座城市").fill("苏州");
+  await expect(page.getByLabel("去哪座城市")).toHaveValue("苏州");
+
+  await page.getByLabel("新增必去地点").fill("拙政园");
+  await page.getByLabel("新增必去地点").press("Enter");
+  await expect(
+    page.getByRole("button", { name: "移除必去地点 拙政园" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("button", { name: "移除必去地点 先锋书店" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "移除必去地点 先锋书店" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(page.getByRole("button", { name: "草稿已保存" })).toBeVisible();
+});
+
 test("planning page can add a candidate to the editable route preview", async ({
   page,
 }) => {

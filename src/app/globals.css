@@ -878,7 +878,8 @@ button {
 }
 
 .chip,
-.answer-pill {
+.answer-pill,
+.answer-input {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
@@ -893,10 +894,59 @@ button {
 }
 
 .chip.selected,
-.answer-pill {
+.answer-pill,
+.answer-input {
   border-color: rgb(23 62 50 / 25%);
   background: var(--green-primary);
   color: #f8f1e5;
+}
+
+.answer-input {
+  width: min(260px, 100%);
+  justify-content: space-between;
+  padding-right: 14px;
+}
+
+.answer-input input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.answer-input input::placeholder {
+  color: rgb(248 241 229 / 68%);
+}
+
+.chip.removable {
+  padding-right: 12px;
+}
+
+.must-visit-add {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.must-visit-add input {
+  width: min(160px, 100%);
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: 0;
+  background: rgb(255 251 244 / 84%);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.must-visit-add input:focus,
+.answer-input:focus-within {
+  border-color: rgb(23 62 50 / 42%);
+  box-shadow: 0 0 0 3px rgb(23 62 50 / 10%);
 }
 
 .plan-actions {
