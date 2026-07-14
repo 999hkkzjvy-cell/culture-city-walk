@@ -7,6 +7,7 @@ import {
   moveRouteStop,
   removeRouteStop,
   updateStopStayMinutes,
+  updateStopNote,
 } from "./route-editing";
 
 describe("route editing", () => {
@@ -60,6 +61,13 @@ describe("route editing", () => {
     expect(calculateRouteKernel(edited).totalStayMinutes).toBeGreaterThan(
       calculateRouteKernel(demoRoute).totalStayMinutes,
     );
+  });
+
+  it("updates a stop note and recalculates the route", () => {
+    const edited = updateStopNote(demoRoute, "librairie", "新的个人备注");
+
+    expect(edited.stops[0].note).toBe("新的个人备注");
+    expect(edited.updatedAt).not.toBe(demoRoute.updatedAt);
   });
 
   it("removes a stop while preserving at least start and end", () => {

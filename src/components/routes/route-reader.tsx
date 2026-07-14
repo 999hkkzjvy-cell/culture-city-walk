@@ -2,23 +2,35 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
   Bookmark,
   Clock,
+  Edit3,
   MapPin,
   Navigation,
   Route,
+  Save,
   Share2,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import { demoRoute, type RoutePlan } from "@/lib/route";
+import {
+  removeRouteStop,
+  updateStopNote,
+  updateStopStayMinutes,
+} from "@/lib/route-editing";
 import { calculateRouteKernel } from "@/lib/route-kernel";
-import { readRoutePlan, routePlanStorageKey } from "@/lib/storage";
+import {
+  readRoutePlan,
+  routePlanStorageKey,
+  saveRoutePlan,
+} from "@/lib/storage";
 
 let cachedRouteSnapshot:
   | {
@@ -35,6 +47,7 @@ export function RouteReader() {
   );
 
   const routeKernel = calculateRouteKernel(route);
+  const [isEditing, setIsEditing] = useState(false);
   const sourceLabel =
     routeKernel.legSource === "provider"
       ? "高德真实步行数据"
@@ -48,7 +61,7 @@ export function RouteReader() {
         <div>
           <Link className="back-link" href="/plan/">
             <ArrowLeft size={16} />
-            返回
+            返回规划继续编辑
           </Link>
           <p>{route.title}</p>
           <h1>{route.city} · 文学漫游</h1>
@@ -83,6 +96,13 @@ export function RouteReader() {
           </div>
         </div>
         <div className="route-tools">
+          <button
+            onClick={() => setIsEditing((current) => !current)}
+            type="button"
+          >
+            {isEditing ? <Save size={17} /> : <Edit3 size={17} />}
+            {isEditing ? "完成编辑" : "编辑路线"}
+          </button>
           <button type="button">
             <Share2 size={17} />
             分享
@@ -190,6 +210,56 @@ export function RouteReader() {
                     {stop.mustVisit ? <em>必去</em> : null}
                   </h2>
                   <p>{stop.note}</p>
+                  {isEditing ? (
+                    <div className="stop-edit-panel">
+                      <label>
+                        停留分钟
+                        <input
+                          max={240}
+                          min={5}
+                          onChange={(event) =>
+                            persistRouteEdit(
+                              updateStopStayMinutes(
+                                route,
+                                stop.id,
+                                Number(event.target.value),
+                              ),
+                            )
+                          }
+                          step={5}
+                          type="number"
+                          value={stop.stayMinutes}
+                        />
+                      </label>
+                      <label>
+                        个人备注
+                        <textarea
+                          onChange={(event) =>
+                            persistRouteEdit(
+                              updateStopNote(
+                                route,
+                                stop.id,
+                                event.target.value,
+                              ),
+                            )
+                          }
+                          rows={3}
+                          value={stop.note}
+                        />
+                      </label>
+                      <button
+                        className="stop-edit-delete"
+                        disabled={route.stops.length <= 2}
+                        onClick={() =>
+                          persistRouteEdit(removeRouteStop(route, stop.id))
+                        }
+                        type="button"
+                      >
+                        <Trash2 size={15} />
+                        删除站点
+                      </button>
+                    </div>
+                  ) : null}
                   <div className="stop-tags">
                     {stop.themes.map((theme) => (
                       <span key={theme}>{theme}</span>
@@ -211,6 +281,13 @@ export function RouteReader() {
         </div>
       </section>
     </>
+  );
+}
+
+function persistRouteEdit(route: RoutePlan) {
+  saveRoutePlan(route);
+  window.dispatchEvent(
+    new StorageEvent("storage", { key: routePlanStorageKey }),
   );
 }
 

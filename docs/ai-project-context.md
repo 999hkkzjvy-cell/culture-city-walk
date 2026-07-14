@@ -75,7 +75,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/routes/route-library.tsx` - saved route list.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
 - `src/components/routes/route-reader.tsx` - client route reader that prefers
-  the locally saved planning preview and falls back to the demo route.
+  the locally saved planning preview and falls back to the demo route. It also
+  exposes local reader-side edit controls for stay time, notes, and deletion.
 - `src/components/routes/shared-route-reader.tsx` - read-only share loader.
 - `src/components/developer-status-panel.tsx` - planning-page status panel for
   local/API configuration state.
@@ -191,8 +192,9 @@ GitHub Actions repository variables required for Pages build:
   delete, and stay-time controls. Candidate lists support type filters and
   fit-band grouping. The route preview and candidate actions are persisted in
   localStorage, and `/route/?id=demo` reads that saved preview before falling
-  back to the demo route. AI collaboration currently uses schemas and
-  deterministic local fallback only; there is no live DeepSeek call yet.
+  back to the demo route. Signed-in users are prompted to sync unsynced local
+  previews. AI collaboration currently uses schemas and deterministic local
+  fallback only; there is no live DeepSeek call yet.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.

@@ -45,8 +45,14 @@ Phase 4/5 development has a key split:
   - route-page save/share actions now use the current local route preview
   - library-page save action now saves the current local route preview
   - signed-in auth panel can sync the current local preview to cloud storage
+  - signed-in auth panel prompts when the local preview has not been synced yet
   - route-candidate snapshots and `joined` / `backup` / `ignored` actions are
     saved through the route repository
+- Route reader editing:
+  - route reader exposes an edit mode
+  - stop stay time and note can be edited from the reader
+  - stops can be deleted from the reader while preserving the two-stop minimum
+  - edits are saved to the local route preview and survive refresh
 - Repository candidate persistence:
   - local repository stores candidate snapshots in localStorage
   - Supabase repository replaces the current route's `route_candidates` rows on
@@ -75,6 +81,7 @@ Phase 4/5 development has a key split:
   - candidate type-filter test
   - route candidate insertion, move, delete, and stay-time tests
   - local route plan and candidate-state storage tests
+  - route-reader local edit smoke test
   - local intent parsing test
   - invalid AI-created POI rejection test
   - fallback candidate ranking test

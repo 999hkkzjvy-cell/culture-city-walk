@@ -3,7 +3,12 @@
 import { LogIn, LogOut, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
-import { readCandidateState, readRoutePlan } from "@/lib/storage";
+import {
+  hasSyncedRoutePlan,
+  markRoutePlanSynced,
+  readCandidateState,
+  readRoutePlan,
+} from "@/lib/storage";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -18,6 +23,7 @@ export function AuthPanel() {
     isSupabaseConfigured() ? "loading" : "not-configured",
   );
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [hasPendingLocalPreview, setHasPendingLocalPreview] = useState(false);
 
   useEffect(() => {
     const client = createBrowserSupabaseClient();
@@ -35,6 +41,7 @@ export function AuthPanel() {
       const user = data.session?.user;
       setUserEmail(user?.email ?? null);
       setAuthState(user ? "signed-in" : "signed-out");
+      setHasPendingLocalPreview(Boolean(user) && !hasSyncedRoutePlan());
     });
 
     const { data: subscription } = client.auth.onAuthStateChange(
@@ -42,6 +49,7 @@ export function AuthPanel() {
         const user = session?.user;
         setUserEmail(user?.email ?? null);
         setAuthState(user ? "signed-in" : "signed-out");
+        setHasPendingLocalPreview(Boolean(user) && !hasSyncedRoutePlan());
       },
     );
 
@@ -88,6 +96,8 @@ export function AuthPanel() {
       const saved = await repository.save(route);
       const candidateState = readCandidateState(route.id);
       await repository.saveCandidates(saved.id, candidateState);
+      markRoutePlanSynced(route);
+      setHasPendingLocalPreview(false);
       setMessage(`已同步：${saved.title}`);
     } catch {
       setMessage("同步失败，请稍后重试。");
@@ -114,6 +124,12 @@ export function AuthPanel() {
       <section className="auth-panel">
         <h2>已登录</h2>
         <p>{userEmail}</p>
+        {hasPendingLocalPreview ? (
+          <div className="auth-sync-prompt">
+            <strong>发现本地预案</strong>
+            <span>同步后可以在“我的路线”中跨设备查看。</span>
+          </div>
+        ) : null}
         <div className="auth-action-row">
           <button
             className="secondary-button"

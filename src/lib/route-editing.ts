@@ -79,6 +79,19 @@ export function updateStopStayMinutes(
   );
 }
 
+export function updateStopNote(
+  route: RoutePlan,
+  stopId: string,
+  note: string,
+): RoutePlan {
+  return rebuildRouteFromStops(
+    route,
+    route.stops.map((stop) =>
+      stop.id === stopId ? { ...stop, note: note.trim() } : stop,
+    ),
+  );
+}
+
 export function rebuildRouteFromStops(
   route: RoutePlan,
   stops: RouteStop[],

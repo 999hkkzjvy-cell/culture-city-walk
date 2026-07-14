@@ -20,6 +20,8 @@ export type StoredCandidateState = {
 
 export const routePlanStorageKey = "cultural-citywalk:route-plan";
 export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
+export const syncedRouteSignatureStorageKey =
+  "cultural-citywalk:synced-route-signature";
 
 export function readDraft(): RouteDraft {
   try {
@@ -104,6 +106,31 @@ export function saveCandidateState(state: StoredCandidateState) {
       ...state,
       updatedAt: new Date().toISOString(),
     }),
+  );
+}
+
+export function getRoutePlanSignature(route = readRoutePlan()) {
+  return [
+    route.id,
+    route.updatedAt,
+    route.stops.length,
+    route.stops
+      .map((stop) => `${stop.id}:${stop.time}:${stop.stayMinutes}`)
+      .join("|"),
+  ].join("::");
+}
+
+export function hasSyncedRoutePlan(route = readRoutePlan()) {
+  return (
+    window.localStorage.getItem(syncedRouteSignatureStorageKey) ===
+    getRoutePlanSignature(route)
+  );
+}
+
+export function markRoutePlanSynced(route = readRoutePlan()) {
+  window.localStorage.setItem(
+    syncedRouteSignatureStorageKey,
+    getRoutePlanSignature(route),
   );
 }
 

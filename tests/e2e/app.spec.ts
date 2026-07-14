@@ -100,6 +100,17 @@ test("route reader supports direct refresh with query string", async ({
   ).toBeVisible();
 });
 
+test("route reader can edit stay time locally", async ({ page }) => {
+  await page.goto("/route/?id=demo");
+
+  await page.getByRole("button", { name: "编辑路线" }).click();
+  await page.getByLabel("停留分钟").first().fill("65");
+  await expect(page.getByLabel("停留分钟").first()).toHaveValue("65");
+  await page.reload();
+  await page.getByRole("button", { name: "编辑路线" }).click();
+  await expect(page.getByLabel("停留分钟").first()).toHaveValue("65");
+});
+
 test("library page shows cloud save entry point", async ({ page }) => {
   await page.goto("/library/");
 
