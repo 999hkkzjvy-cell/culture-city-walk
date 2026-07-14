@@ -36,6 +36,8 @@ export type ShareRecord = {
   url: string;
   expiresAt: string | null;
   allowCopy: boolean;
+  revokedAt?: string | null;
+  createdAt?: string;
 };
 
 export type RouteCandidateStatus = "suggested" | StoredCandidateAction;
@@ -82,6 +84,7 @@ export interface RouteRepository {
   readSnapshot(snapshotId: string): Promise<RouteSnapshotPayload | null>;
   delete(id: string): Promise<void>;
   createShare(routeId: string): Promise<ShareRecord>;
+  listShares(routeId: string): Promise<ShareRecord[]>;
   revokeShare(code: string): Promise<void>;
 }
 
@@ -185,6 +188,10 @@ class LocalRouteRepository implements RouteRepository {
 
   async createShare(): Promise<ShareRecord> {
     throw new Error("supabase_not_configured");
+  }
+
+  async listShares(): Promise<ShareRecord[]> {
+    return [];
   }
 
   async revokeShare(): Promise<void> {
@@ -478,7 +485,29 @@ class SupabaseRouteRepository implements RouteRepository {
       url: `/share/?code=${encodeURIComponent(data.share_code)}`,
       expiresAt: data.expires_at,
       allowCopy: data.allow_copy,
+      revokedAt: null,
     };
+  }
+
+  async listShares(routeId: string): Promise<ShareRecord[]> {
+    const { data, error } = await this.client
+      .from("route_shares")
+      .select("share_code,expires_at,allow_copy,revoked_at,created_at")
+      .eq("route_id", routeId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((share) => ({
+      code: share.share_code,
+      url: `/share/?code=${encodeURIComponent(share.share_code)}`,
+      expiresAt: share.expires_at,
+      allowCopy: share.allow_copy,
+      revokedAt: share.revoked_at,
+      createdAt: share.created_at,
+    }));
   }
 
   async revokeShare(code: string) {

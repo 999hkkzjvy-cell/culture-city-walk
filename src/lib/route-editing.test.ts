@@ -3,6 +3,7 @@ import { demoRoute } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
+  appendManualStopToRoute,
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
@@ -44,6 +45,27 @@ describe("route editing", () => {
     const twice = insertCandidateIntoRoute(once, candidate);
 
     expect(twice.stops).toHaveLength(once.stops.length);
+  });
+
+  it("appends a manual stop with user-confirmed provenance", () => {
+    const edited = appendManualStopToRoute(demoRoute, {
+      name: "临时集合点",
+      area: "鼓楼",
+      address: "地铁口附近",
+      stayMinutes: 20,
+      themes: ["历史"],
+    });
+    const stop = edited.stops.at(-1);
+
+    expect(stop).toEqual(
+      expect.objectContaining({
+        name: "临时集合点",
+        source: "manual",
+        verificationStatus: "user_confirmed",
+        stayMinutes: 20,
+      }),
+    );
+    expect(calculateRouteKernel(edited).legSource).toBe("estimated");
   });
 
   it("moves a stop and recalculates route distance", () => {

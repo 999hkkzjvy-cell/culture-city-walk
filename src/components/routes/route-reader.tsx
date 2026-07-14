@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
+import { RouteJourneyPanel } from "@/components/routes/route-journey-panel";
 import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import {
@@ -209,6 +210,8 @@ export function RouteReader() {
       </section>
 
       <RouteLoadStatus state={remoteRouteState} />
+
+      <RouteJourneyPanel route={route} />
 
       {routeKernel.issues.length > 0 ? (
         <section className="route-kernel-alerts" aria-label="路线校验提示">

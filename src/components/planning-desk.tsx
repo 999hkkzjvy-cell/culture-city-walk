@@ -42,6 +42,7 @@ import {
   parseTime,
 } from "@/lib/route-kernel";
 import {
+  appendManualStopToRoute,
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
@@ -91,6 +92,14 @@ export function PlanningDesk() {
   const [previewRoute, setPreviewRoute] = useState(() =>
     typeof window === "undefined" ? demoRoute : readRoutePlan(),
   );
+  const [manualStop, setManualStop] = useState({
+    name: "",
+    area: "",
+    address: "",
+    stayMinutes: 30,
+    themes: ["历史"] as Theme[],
+    note: "",
+  });
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
 
@@ -225,6 +234,38 @@ export function PlanningDesk() {
     setPreviewRoute((current) =>
       persistPreviewRoute(updateStopStayMinutes(current, stopId, stayMinutes)),
     );
+  }
+
+  function addManualStop() {
+    if (!manualStop.name.trim()) {
+      return;
+    }
+
+    setSaved(false);
+    setPreviewRoute((current) =>
+      persistPreviewRoute(appendManualStopToRoute(current, manualStop)),
+    );
+    setManualStop({
+      name: "",
+      area: "",
+      address: "",
+      stayMinutes: 30,
+      themes: manualStop.themes,
+      note: "",
+    });
+  }
+
+  function toggleManualTheme(theme: Theme) {
+    setManualStop((current) => {
+      const themes = current.themes.includes(theme)
+        ? current.themes.filter((item) => item !== theme)
+        : [...current.themes, theme];
+
+      return {
+        ...current,
+        themes: themes.length > 0 ? themes : [theme],
+      };
+    });
   }
 
   function toggleCandidateType(type: CandidatePlaceType) {
@@ -617,6 +658,105 @@ export function PlanningDesk() {
             </dd>
           </div>
         </dl>
+
+        <section className="manual-stop-panel" aria-label="手工加入站点">
+          <h3>手工加入站点</h3>
+          <label>
+            地点名称
+            <input
+              onChange={(event) =>
+                setManualStop((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              placeholder="酒店、集合点或临时路口"
+              type="text"
+              value={manualStop.name}
+            />
+          </label>
+          <label>
+            片区
+            <input
+              onChange={(event) =>
+                setManualStop((current) => ({
+                  ...current,
+                  area: event.target.value,
+                }))
+              }
+              placeholder={draft.city}
+              type="text"
+              value={manualStop.area}
+            />
+          </label>
+          <label>
+            地址备注
+            <input
+              onChange={(event) =>
+                setManualStop((current) => ({
+                  ...current,
+                  address: event.target.value,
+                }))
+              }
+              placeholder="可先写大致位置"
+              type="text"
+              value={manualStop.address}
+            />
+          </label>
+          <label>
+            停留时长
+            <input
+              aria-label="手工站点停留时长"
+              max={240}
+              min={5}
+              onChange={(event) =>
+                setManualStop((current) => ({
+                  ...current,
+                  stayMinutes: Number(event.target.value),
+                }))
+              }
+              step={5}
+              type="number"
+              value={manualStop.stayMinutes}
+            />
+          </label>
+          <div className="manual-theme-row">
+            {allThemes.map((theme, index) => (
+              <button
+                aria-label={`切换手工站点主题 ${index + 1}`}
+                className={manualStop.themes.includes(theme) ? "selected" : ""}
+                key={theme}
+                onClick={() => toggleManualTheme(theme)}
+                type="button"
+              >
+                {theme}
+              </button>
+            ))}
+          </div>
+          <label>
+            备注
+            <textarea
+              onChange={(event) =>
+                setManualStop((current) => ({
+                  ...current,
+                  note: event.target.value,
+                }))
+              }
+              placeholder="例如：朋友家集合，出发前确认门牌"
+              rows={2}
+              value={manualStop.note}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={!manualStop.name.trim()}
+            onClick={addManualStop}
+            type="button"
+          >
+            <Plus size={16} />
+            加入预案
+          </button>
+        </section>
 
         <div className="route-preview-list" aria-label="路线预案站点">
           {previewKernel.stops.map((stop, index) => (

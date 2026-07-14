@@ -27,9 +27,17 @@ export type StoredRouteSnapshot = {
   createdAt: string;
 };
 
+export type StoredJourneyState = {
+  routeId: string;
+  arrivedStopIds: string[];
+  skippedStopIds: string[];
+  updatedAt: string;
+};
+
 export const routePlanStorageKey = "cultural-citywalk:route-plan";
 export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
 export const routeSnapshotsStorageKey = "cultural-citywalk:route-snapshots";
+export const journeyStateStorageKey = "cultural-citywalk:journey-state";
 export const syncedRouteSignatureStorageKey =
   "cultural-citywalk:synced-route-signature";
 
@@ -173,6 +181,42 @@ export function createRouteSnapshot(
   return snapshot;
 }
 
+export function readJourneyState(routeId: string): StoredJourneyState {
+  try {
+    const raw = window.localStorage.getItem(journeyStateStorageKey);
+    const parsed = raw ? (JSON.parse(raw) as Partial<StoredJourneyState>) : {};
+
+    if (parsed.routeId !== routeId) {
+      return emptyJourneyState(routeId);
+    }
+
+    return {
+      routeId,
+      arrivedStopIds: Array.isArray(parsed.arrivedStopIds)
+        ? parsed.arrivedStopIds
+        : [],
+      skippedStopIds: Array.isArray(parsed.skippedStopIds)
+        ? parsed.skippedStopIds
+        : [],
+      updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return emptyJourneyState(routeId);
+  }
+}
+
+export function saveJourneyState(state: StoredJourneyState) {
+  window.localStorage.setItem(
+    journeyStateStorageKey,
+    JSON.stringify({
+      ...state,
+      arrivedStopIds: [...new Set(state.arrivedStopIds)],
+      skippedStopIds: [...new Set(state.skippedStopIds)],
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
 export function getRoutePlanSignature(route = readRoutePlan()) {
   return [
     route.id,
@@ -225,6 +269,15 @@ function emptyCandidateState(routeId: string): StoredCandidateState {
     routeId,
     candidates: [],
     actions: {},
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function emptyJourneyState(routeId: string): StoredJourneyState {
+  return {
+    routeId,
+    arrivedStopIds: [],
+    skippedStopIds: [],
     updatedAt: new Date().toISOString(),
   };
 }

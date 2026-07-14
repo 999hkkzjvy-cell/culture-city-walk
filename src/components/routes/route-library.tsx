@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Cloud, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { RouteShareManager } from "@/components/routes/route-share-manager";
 import {
   createRouteRepository,
   type SavedRouteSummary,
@@ -119,6 +120,7 @@ export function RouteLibrary() {
               >
                 <Trash2 size={17} />
               </button>
+              <RouteShareManager routeId={route.id} />
             </article>
           ))
         ) : (

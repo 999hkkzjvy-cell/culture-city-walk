@@ -3,11 +3,13 @@ import { demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   createRouteSnapshot,
+  readJourneyState,
   readCandidateState,
   readCurrentCandidateState,
   readRoutePlan,
   readRouteSnapshots,
   saveCandidateState,
+  saveJourneyState,
   saveRoutePlan,
 } from "./storage";
 
@@ -125,5 +127,22 @@ describe("local storage helpers", () => {
       expect.objectContaining({ version: 1 }),
     ]);
     expect(snapshots[0].route.title).toBe("更新后的路线");
+  });
+
+  it("saves and reads journey progress separately per route", () => {
+    saveJourneyState({
+      routeId: "demo",
+      arrivedStopIds: ["librairie"],
+      skippedStopIds: ["gym"],
+      updatedAt: "2026-07-14T00:00:00.000Z",
+    });
+
+    expect(readJourneyState("demo")).toEqual(
+      expect.objectContaining({
+        arrivedStopIds: ["librairie"],
+        skippedStopIds: ["gym"],
+      }),
+    );
+    expect(readJourneyState("other").arrivedStopIds).toEqual([]);
   });
 });

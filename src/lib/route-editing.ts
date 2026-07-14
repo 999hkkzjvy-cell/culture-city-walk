@@ -1,8 +1,17 @@
 import { estimateWalkingLeg } from "@/lib/maps/fallback";
 import type { PlaceCandidate } from "@/lib/maps/types";
 import type { RouteCandidate } from "@/lib/route-candidates";
-import type { RoutePlan, RouteStop } from "@/lib/route";
+import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+
+export type ManualRouteStopInput = {
+  name: string;
+  area: string;
+  address: string;
+  stayMinutes: number;
+  themes: Theme[];
+  note?: string;
+};
 
 export function insertCandidateIntoRoute(
   route: RoutePlan,
@@ -42,6 +51,38 @@ export function removeRouteStop(route: RoutePlan, stopId: string): RoutePlan {
   );
 }
 
+export function appendManualStopToRoute(
+  route: RoutePlan,
+  input: ManualRouteStopInput,
+): RoutePlan {
+  const name = input.name.trim();
+
+  if (!name) {
+    return route;
+  }
+
+  const stopId = manualStopId(name);
+  const manualStop: RouteStop = {
+    id: stopId,
+    name,
+    area: input.area.trim() || route.city,
+    address: input.address.trim() || "手工地点，地址待补充",
+    themes: input.themes.length > 0 ? input.themes : route.themes.slice(0, 1),
+    stayMinutes: Math.min(240, Math.max(5, Math.round(input.stayMinutes))),
+    source: "manual",
+    sourcePlaceId: stopId,
+    coordinate: null,
+    coordinateSystem: "gcj02",
+    verificationStatus: "user_confirmed",
+    time: "09:00",
+    note:
+      input.note?.trim() ||
+      "手工确认地点。接入高德后可再补充坐标、开放状态和真实步行路线。",
+  };
+
+  return rebuildRouteFromStops(route, [...route.stops, manualStop]);
+}
+
 export function moveRouteStop(
   route: RoutePlan,
   fromIndex: number,
@@ -62,6 +103,21 @@ export function moveRouteStop(
   stops.splice(toIndex, 0, moved);
 
   return rebuildRouteFromStops(route, stops);
+}
+
+function manualStopId(name: string) {
+  const slug =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 36) || "manual-stop";
+
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `manual-${slug}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  return `manual-${slug}-${Date.now().toString(36)}`;
 }
 
 export function updateStopStayMinutes(
