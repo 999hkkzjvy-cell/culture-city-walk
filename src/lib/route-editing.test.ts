@@ -4,6 +4,7 @@ import { calculateRouteKernel } from "@/lib/route-kernel";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   appendManualStopToRoute,
+  appendPlaceCandidateToRoute,
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
@@ -66,6 +67,54 @@ describe("route editing", () => {
       }),
     );
     expect(calculateRouteKernel(edited).legSource).toBe("estimated");
+  });
+
+  it("appends a verified AMap place with provider identity", () => {
+    const edited = appendPlaceCandidateToRoute(demoRoute, {
+      place: {
+        id: "amap:B001905YQ1",
+        source: "amap",
+        sourcePlaceId: "B001905YQ1",
+        name: "先锋书店(五台山总店)",
+        address: "广州路173号",
+        city: "南京市",
+        district: "鼓楼区",
+        adcode: "320106",
+        coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
+        poiType: "购物服务;专卖店;书店",
+        verificationStatus: "verified",
+      },
+      stayMinutes: 40,
+      themes: ["书店", "文学"],
+    });
+    const stop = edited.stops.at(-1);
+
+    expect(stop).toEqual(
+      expect.objectContaining({
+        id: "amap:B001905YQ1",
+        source: "amap",
+        sourcePlaceId: "B001905YQ1",
+        verificationStatus: "verified",
+        coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
+      }),
+    );
+    expect(appendPlaceCandidateToRoute(edited, {
+      place: {
+        id: "amap:B001905YQ1",
+        source: "amap",
+        sourcePlaceId: "B001905YQ1",
+        name: "先锋书店(五台山总店)",
+        address: "广州路173号",
+        city: "南京市",
+        district: "鼓楼区",
+        adcode: "320106",
+        coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
+        poiType: "购物服务;专卖店;书店",
+        verificationStatus: "verified",
+      },
+      stayMinutes: 40,
+      themes: ["书店", "文学"],
+    }).stops).toHaveLength(edited.stops.length);
   });
 
   it("moves a stop and recalculates route distance", () => {

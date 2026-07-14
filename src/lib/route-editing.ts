@@ -13,6 +13,13 @@ export type ManualRouteStopInput = {
   note?: string;
 };
 
+export type PlaceRouteStopInput = {
+  place: PlaceCandidate;
+  stayMinutes: number;
+  themes: Theme[];
+  note?: string;
+};
+
 export function insertCandidateIntoRoute(
   route: RoutePlan,
   candidate: RouteCandidate,
@@ -81,6 +88,40 @@ export function appendManualStopToRoute(
   };
 
   return rebuildRouteFromStops(route, [...route.stops, manualStop]);
+}
+
+export function appendPlaceCandidateToRoute(
+  route: RoutePlan,
+  input: PlaceRouteStopInput,
+): RoutePlan {
+  const existingPlaceIds = new Set(
+    route.stops.map((stop) => stop.sourcePlaceId ?? stop.id),
+  );
+  const placeId = input.place.sourcePlaceId ?? input.place.id;
+
+  if (existingPlaceIds.has(placeId)) {
+    return route;
+  }
+
+  const placeStop: RouteStop = {
+    id: input.place.id,
+    name: input.place.name,
+    area: input.place.district ?? input.place.city,
+    address: input.place.address ?? "地址待高德复核",
+    themes: input.themes.length > 0 ? input.themes : route.themes.slice(0, 1),
+    stayMinutes: Math.min(240, Math.max(5, Math.round(input.stayMinutes))),
+    source: input.place.source === "amap" ? "amap" : "manual",
+    sourcePlaceId: input.place.sourcePlaceId ?? input.place.id,
+    coordinate: input.place.coordinate,
+    coordinateSystem: input.place.coordinate?.system ?? "gcj02",
+    verificationStatus: input.place.verificationStatus,
+    time: "09:00",
+    note:
+      input.note?.trim() ||
+      "高德已确认地点。出发前仍建议核验开放时间、预约和现场状态。",
+  };
+
+  return rebuildRouteFromStops(route, [...route.stops, placeStop]);
 }
 
 export function moveRouteStop(

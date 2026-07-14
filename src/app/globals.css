@@ -1837,6 +1837,75 @@ button {
   resize: vertical;
 }
 
+.place-search-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.place-search-actions button {
+  display: inline-flex;
+  min-height: 34px;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--green-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.place-search-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.place-search-actions span {
+  color: #59645b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.place-search-actions span.error {
+  color: #7a5a27;
+}
+
+.place-suggestion-list {
+  display: grid;
+  gap: 7px;
+}
+
+.place-suggestion-list button {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid rgb(216 208 195 / 84%);
+  border-radius: 7px;
+  background: rgb(251 247 239 / 72%);
+  text-align: left;
+}
+
+.place-suggestion-list button.selected {
+  border-color: var(--green-primary);
+  background: rgb(23 62 50 / 8%);
+}
+
+.place-suggestion-list strong {
+  color: var(--green-primary);
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.place-suggestion-list span {
+  color: #5f675f;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .manual-theme-row {
   display: flex;
   flex-wrap: wrap;

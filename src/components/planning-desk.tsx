@@ -12,6 +12,7 @@ import {
   MapPinned,
   Pencil,
   Plus,
+  Search,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -42,7 +43,13 @@ import {
   parseTime,
 } from "@/lib/route-kernel";
 import {
+  createAmapWebServiceProvider,
+  isAmapWebProxyConfigured,
+} from "@/lib/maps/amap-web";
+import type { PlaceCandidate } from "@/lib/maps/types";
+import {
   appendManualStopToRoute,
+  appendPlaceCandidateToRoute,
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
@@ -61,6 +68,7 @@ import { routeUrl } from "@/lib/urls";
 
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
 type CandidateAction = "joined" | "backup" | "ignored";
+type PlaceSearchState = "idle" | "loading" | "ready" | "error";
 const candidateBands: CandidateFitBand[] = [
   "very_along",
   "recommended",
@@ -100,6 +108,15 @@ export function PlanningDesk() {
     themes: ["历史"] as Theme[],
     note: "",
   });
+  const [placeSearchState, setPlaceSearchState] =
+    useState<PlaceSearchState>("idle");
+  const [placeSearchMessage, setPlaceSearchMessage] = useState("");
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceCandidate[]>(
+    [],
+  );
+  const [selectedPlace, setSelectedPlace] = useState<PlaceCandidate | null>(
+    null,
+  );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
 
@@ -242,9 +259,18 @@ export function PlanningDesk() {
     }
 
     setSaved(false);
-    setPreviewRoute((current) =>
-      persistPreviewRoute(appendManualStopToRoute(current, manualStop)),
-    );
+    setPreviewRoute((current) => {
+      const route = selectedPlace
+        ? appendPlaceCandidateToRoute(current, {
+            place: selectedPlace,
+            stayMinutes: manualStop.stayMinutes,
+            themes: manualStop.themes,
+            note: manualStop.note,
+          })
+        : appendManualStopToRoute(current, manualStop);
+
+      return persistPreviewRoute(route);
+    });
     setManualStop({
       name: "",
       area: "",
@@ -253,6 +279,59 @@ export function PlanningDesk() {
       themes: manualStop.themes,
       note: "",
     });
+    setSelectedPlace(null);
+    setPlaceSuggestions([]);
+    setPlaceSearchState("idle");
+    setPlaceSearchMessage("");
+  }
+
+  async function searchAmapPlaces() {
+    const keyword = manualStop.name.trim();
+
+    if (keyword.length < 2) {
+      setPlaceSearchState("error");
+      setPlaceSearchMessage("请输入至少两个字再搜索。");
+      return;
+    }
+
+    const provider = createAmapWebServiceProvider();
+
+    if (!provider) {
+      setPlaceSearchState("error");
+      setPlaceSearchMessage("Supabase 尚未配置，暂时不能搜索高德地点。");
+      return;
+    }
+
+    setPlaceSearchState("loading");
+    setPlaceSearchMessage("正在搜索高德地点...");
+    setSelectedPlace(null);
+
+    try {
+      const places = await provider.suggestPlaces({
+        keyword,
+        city: draft.city,
+      });
+      setPlaceSuggestions(places);
+      setPlaceSearchState("ready");
+      setPlaceSearchMessage(
+        places.length > 0 ? `找到 ${places.length} 个地点。` : "没有找到匹配地点。",
+      );
+    } catch {
+      setPlaceSuggestions([]);
+      setPlaceSearchState("error");
+      setPlaceSearchMessage("高德地点搜索失败，可先使用手工地点。");
+    }
+  }
+
+  function selectAmapPlace(place: PlaceCandidate) {
+    setSelectedPlace(place);
+    setManualStop((current) => ({
+      ...current,
+      name: place.name,
+      area: place.district ?? place.city,
+      address: place.address ?? "",
+    }));
+    setPlaceSearchMessage(`${place.name} 已选用，加入后会保存高德 POI ID。`);
   }
 
   function toggleManualTheme(theme: Theme) {
@@ -659,8 +738,8 @@ export function PlanningDesk() {
           </div>
         </dl>
 
-        <section className="manual-stop-panel" aria-label="手工加入站点">
-          <h3>手工加入站点</h3>
+        <section className="manual-stop-panel" aria-label="地点确认与加入">
+          <h3>地点确认与加入</h3>
           <label>
             地点名称
             <input
@@ -675,6 +754,38 @@ export function PlanningDesk() {
               value={manualStop.name}
             />
           </label>
+          <div className="place-search-actions">
+            <button
+              disabled={
+                placeSearchState === "loading" || !isAmapWebProxyConfigured()
+              }
+              onClick={searchAmapPlaces}
+              type="button"
+            >
+              <Search size={15} />
+              {placeSearchState === "loading" ? "搜索中" : "搜索高德地点"}
+            </button>
+            {placeSearchMessage ? (
+              <span className={placeSearchState}>{placeSearchMessage}</span>
+            ) : null}
+          </div>
+          {placeSuggestions.length > 0 ? (
+            <div className="place-suggestion-list">
+              {placeSuggestions.map((place) => (
+                <button
+                  className={selectedPlace?.id === place.id ? "selected" : ""}
+                  key={place.id}
+                  onClick={() => selectAmapPlace(place)}
+                  type="button"
+                >
+                  <strong>{place.name}</strong>
+                  <span>
+                    {[place.district, place.address].filter(Boolean).join(" · ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label>
             片区
             <input
@@ -754,7 +865,7 @@ export function PlanningDesk() {
             type="button"
           >
             <Plus size={16} />
-            加入预案
+            {selectedPlace ? "加入高德地点" : "加入手工地点"}
           </button>
         </section>
 
