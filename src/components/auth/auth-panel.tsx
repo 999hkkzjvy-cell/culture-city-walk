@@ -3,7 +3,7 @@
 import { LogIn, LogOut, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
-import { readRoutePlan } from "@/lib/storage";
+import { readCandidateState, readRoutePlan } from "@/lib/storage";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -84,7 +84,10 @@ export function AuthPanel() {
 
     try {
       const repository = createRouteRepository();
-      const saved = await repository.save(readRoutePlan());
+      const route = readRoutePlan();
+      const saved = await repository.save(route);
+      const candidateState = readCandidateState(route.id);
+      await repository.saveCandidates(saved.id, candidateState);
       setMessage(`已同步：${saved.title}`);
     } catch {
       setMessage("同步失败，请稍后重试。");

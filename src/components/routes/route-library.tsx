@@ -7,7 +7,7 @@ import {
   createRouteRepository,
   type SavedRouteSummary,
 } from "@/lib/repositories/route-repository";
-import { readRoutePlan } from "@/lib/storage";
+import { readCandidateState, readRoutePlan } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 type LoadState = "loading" | "ready" | "error";
@@ -47,7 +47,10 @@ export function RouteLibrary() {
     const repository = createRouteRepository();
 
     try {
-      const saved = await repository.save(readRoutePlan());
+      const route = readRoutePlan();
+      const saved = await repository.save(route);
+      const candidateState = readCandidateState(route.id);
+      await repository.saveCandidates(saved.id, candidateState);
       setRoutes((current) => [
         saved,
         ...current.filter((route) => route.id !== saved.id),

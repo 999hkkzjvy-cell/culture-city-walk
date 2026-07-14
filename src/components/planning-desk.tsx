@@ -74,14 +74,18 @@ export function PlanningDesk() {
   const [requestText, setRequestText] = useState(
     "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
   );
-  const [candidates, setCandidates] = useState<RouteCandidate[]>([]);
+  const [candidates, setCandidates] = useState<RouteCandidate[]>(() =>
+    typeof window === "undefined" ? [] : readCandidateState().candidates,
+  );
   const [candidateActions, setCandidateActions] = useState<
     Record<string, CandidateAction>
-  >(() =>
-    typeof window === "undefined"
-      ? {}
-      : (readCandidateState().actions as Record<string, CandidateAction>),
-  );
+  >(() => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+
+    return readCandidateState().actions as Record<string, CandidateAction>;
+  });
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);
   const [previewRoute, setPreviewRoute] = useState(() =>
@@ -91,6 +95,7 @@ export function PlanningDesk() {
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
 
   const summary = useMemo(() => getThemeSummary(draft.themes), [draft.themes]);
+  const activeCandidates = candidates;
   const baseKernel = useMemo(() => calculateRouteKernel(demoRoute), []);
   const previewKernel = useMemo(
     () => calculateRouteKernel(previewRoute),
@@ -101,7 +106,7 @@ export function PlanningDesk() {
   const routeImpactMeters =
     previewKernel.totalWalkingMeters - baseKernel.totalWalkingMeters;
   const previewEndTime = getRouteEndTime(previewKernel.stops);
-  const visibleCandidates = candidates.filter(
+  const visibleCandidates = activeCandidates.filter(
     (candidate) =>
       candidateActions[candidate.id] !== "ignored" &&
       selectedCandidateTypes.includes(candidate.placeType),
@@ -132,6 +137,7 @@ export function PlanningDesk() {
     saveRoutePlan(previewRoute);
     saveCandidateState({
       routeId: previewRoute.id,
+      candidates: activeCandidates,
       actions: candidateActions as Record<string, StoredCandidateAction>,
       updatedAt: new Date().toISOString(),
     });
@@ -149,7 +155,7 @@ export function PlanningDesk() {
 
     setCandidates(ranked.data);
     setCandidateActions({});
-    persistCandidateActions({});
+    persistCandidateActions({}, ranked.data);
     setAiWarnings([...intent.warnings, ...ranked.warnings]);
     setAiUsage(ranked.usage);
   }
@@ -161,7 +167,7 @@ export function PlanningDesk() {
     };
 
     setCandidateActions(nextActions);
-    persistCandidateActions(nextActions);
+    persistCandidateActions(nextActions, activeCandidates);
   }
 
   function clearCandidateAction(candidateId: string) {
@@ -229,9 +235,13 @@ export function PlanningDesk() {
     return route;
   }
 
-  function persistCandidateActions(actions: Record<string, CandidateAction>) {
+  function persistCandidateActions(
+    actions: Record<string, CandidateAction>,
+    nextCandidates = activeCandidates,
+  ) {
     saveCandidateState({
       routeId: previewRoute.id,
+      candidates: nextCandidates,
       actions: actions as Record<string, StoredCandidateAction>,
       updatedAt: new Date().toISOString(),
     });

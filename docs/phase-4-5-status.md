@@ -45,6 +45,14 @@ Phase 4/5 development has a key split:
   - route-page save/share actions now use the current local route preview
   - library-page save action now saves the current local route preview
   - signed-in auth panel can sync the current local preview to cloud storage
+  - route-candidate snapshots and `joined` / `backup` / `ignored` actions are
+    saved through the route repository
+- Repository candidate persistence:
+  - local repository stores candidate snapshots in localStorage
+  - Supabase repository replaces the current route's `route_candidates` rows on
+    save
+  - candidate rows include source, source POI ID, score, fit band, insertion
+    point, detour, stay time, reasons, risks, cache key, and status
 - Developer status panel:
   - Supabase client configuration state
   - AMap JS key configuration state
@@ -84,6 +92,8 @@ Phase 4/5 development has a key split:
 - Persisting confirmed AMap POIs into `places`.
 - Replacing estimated preview legs with provider-backed leg recalculation after
   each edit.
+- Loading cloud route detail directly into `/route/?id=...`; the route reader
+  currently prefers local preview and demo fallback.
 
 ## Still Requires AI API Configuration
 

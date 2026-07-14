@@ -94,6 +94,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/maps/amap.ts` - AMap URI helpers and POI parsing helpers.
 - `src/lib/maps/fallback.ts` - local estimated walking-leg fallback.
 - `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
+  It also persists route-candidate snapshots and candidate action states through
+  localStorage or the `route_candidates` table.
 - `src/lib/supabase/client.ts` - browser Supabase client.
 - `src/lib/supabase/database.types.ts` - generated/hand-maintained DB types.
 - `src/lib/urls.ts` - static-export URL helpers.

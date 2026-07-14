@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { demoRoute } from "@/lib/route";
+import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   readCandidateState,
   readRoutePlan,
@@ -60,17 +61,28 @@ describe("local storage helpers", () => {
   });
 
   it("saves and reads candidate action state for a route", () => {
+    const [candidate] = generateRouteCandidates(demoRoute, {
+      themes: ["文学"],
+      maxResults: 1,
+    });
+
     saveCandidateState({
       routeId: "demo",
+      candidates: [candidate],
       actions: {
-        "local:nanjing-library": "backup",
+        [candidate.id]: "backup",
       },
       updatedAt: "2026-07-14T00:00:00.000Z",
     });
 
-    expect(readCandidateState("demo").actions).toEqual({
-      "local:nanjing-library": "backup",
-    });
+    expect(readCandidateState("demo")).toEqual(
+      expect.objectContaining({
+        candidates: [candidate],
+        actions: {
+          [candidate.id]: "backup",
+        },
+      }),
+    );
     expect(readCandidateState("other").actions).toEqual({});
   });
 });

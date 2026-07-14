@@ -7,11 +7,13 @@ import {
   type RouteDraft,
   type RoutePlan,
 } from "./route";
+import type { RouteCandidate } from "./route-candidates";
 
 export type StoredCandidateAction = "joined" | "backup" | "ignored";
 
 export type StoredCandidateState = {
   routeId: string;
+  candidates: RouteCandidate[];
   actions: Record<string, StoredCandidateAction>;
   updatedAt: string;
 };
@@ -86,6 +88,7 @@ export function readCandidateState(
 
     return {
       routeId,
+      candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
       actions: parsed.actions,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
@@ -119,6 +122,7 @@ function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {
 function emptyCandidateState(routeId: string): StoredCandidateState {
   return {
     routeId,
+    candidates: [],
     actions: {},
     updatedAt: new Date().toISOString(),
   };
