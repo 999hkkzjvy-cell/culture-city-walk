@@ -3,6 +3,7 @@ import { defaultDraft, demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   generateRouteSummaryWithFallback,
+  generateStopThemeContentWithFallback,
   parseIntentWithFallback,
   rankCandidatesWithFallback,
   validateRouteProposal,
@@ -70,6 +71,20 @@ describe("route collaboration fallback", () => {
       expect.objectContaining({
         title: "南京 · 文学、历史漫游",
         sourceStatus: "template",
+      }),
+    );
+  });
+
+  it("pads short stop notes for fallback content", () => {
+    expect(
+      generateStopThemeContentWithFallback({
+        ...demoRoute.stops[0],
+        note: "短备注",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        sourceStatus: "unverified",
+        shortIntro: expect.stringContaining("适合作为"),
       }),
     );
   });

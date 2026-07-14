@@ -26,6 +26,8 @@ Phase 4/5 development has a key split:
   - generate along-route candidates
   - candidate type filters
   - grouped candidate bands
+  - separate pending, processed, and ignored candidate sections
+  - restore ignored candidates and withdraw processed candidate decisions
   - add to route plan, mark as backup, or ignore
   - undo candidate insertion
   - editable route preview with move, delete, and stay-time controls
@@ -53,6 +55,16 @@ Phase 4/5 development has a key split:
   - stop stay time and note can be edited from the reader
   - stops can be deleted from the reader while preserving the two-stop minimum
   - edits are saved to the local route preview and survive refresh
+- Route reader fallback content:
+  - route title and summary can be generated from deterministic templates
+  - stop-level history/literature style content uses template fallback
+  - fallback story content is labeled as source-pending
+  - expandable deep-read sections show placeholder theme connections and
+    practical verification tips
+- Share experience:
+  - route-page share button scrolls to cloud share actions
+  - generated share links can be copied
+  - share reader shows expiry state and source-verification note when connected
 - Repository candidate persistence:
   - local repository stores candidate snapshots in localStorage
   - Supabase repository replaces the current route's `route_candidates` rows on
@@ -82,6 +94,8 @@ Phase 4/5 development has a key split:
   - route candidate insertion, move, delete, and stay-time tests
   - local route plan and candidate-state storage tests
   - route-reader local edit smoke test
+  - candidate processed-state smoke test
+  - route-reader fallback story smoke test
   - local intent parsing test
   - invalid AI-created POI rejection test
   - fallback candidate ranking test

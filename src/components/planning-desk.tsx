@@ -111,9 +111,18 @@ export function PlanningDesk() {
       candidateActions[candidate.id] !== "ignored" &&
       selectedCandidateTypes.includes(candidate.placeType),
   );
+  const pendingCandidates = visibleCandidates.filter(
+    (candidate) => !candidateActions[candidate.id],
+  );
+  const processedCandidates = visibleCandidates.filter(
+    (candidate) => candidateActions[candidate.id],
+  );
+  const ignoredCandidates = activeCandidates.filter(
+    (candidate) => candidateActions[candidate.id] === "ignored",
+  );
   const groupedCandidates = candidateBands.map((band) => ({
     band,
-    candidates: visibleCandidates.filter(
+    candidates: pendingCandidates.filter(
       (candidate) => candidate.fitBand === band,
     ),
   }));
@@ -414,7 +423,7 @@ export function PlanningDesk() {
           ) : null}
 
           <div className="candidate-list">
-            {visibleCandidates.length > 0 ? (
+            {pendingCandidates.length > 0 ? (
               groupedCandidates.map(({ band, candidates: bandCandidates }) =>
                 bandCandidates.length > 0 ? (
                   <section className="candidate-group" key={band}>
@@ -494,10 +503,58 @@ export function PlanningDesk() {
             ) : (
               <div className="candidate-empty">
                 <MapPinned size={22} />
-                <span>先生成候选点，再决定加入、备用或忽略。</span>
+                <span>
+                  {activeCandidates.length > 0
+                    ? "当前筛选下没有未处理候选点。"
+                    : "先生成候选点，再决定加入、备用或忽略。"}
+                </span>
               </div>
             )}
           </div>
+
+          {processedCandidates.length > 0 ? (
+            <section className="candidate-state-section">
+              <h3>已处理</h3>
+              {processedCandidates.map((candidate) => (
+                <article className="candidate-state-item" key={candidate.id}>
+                  <div>
+                    <strong>{candidate.place.name}</strong>
+                    <span>
+                      {candidateActions[candidate.id] === "joined"
+                        ? "已加入路线"
+                        : "备用点"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => clearCandidateAction(candidate.id)}
+                    type="button"
+                  >
+                    撤回
+                  </button>
+                </article>
+              ))}
+            </section>
+          ) : null}
+
+          {ignoredCandidates.length > 0 ? (
+            <section className="candidate-state-section muted">
+              <h3>已忽略</h3>
+              {ignoredCandidates.map((candidate) => (
+                <article className="candidate-state-item" key={candidate.id}>
+                  <div>
+                    <strong>{candidate.place.name}</strong>
+                    <span>{candidate.placeType}</span>
+                  </div>
+                  <button
+                    onClick={() => clearCandidateAction(candidate.id)}
+                    type="button"
+                  >
+                    恢复
+                  </button>
+                </article>
+              ))}
+            </section>
+          ) : null}
         </section>
 
         <div className="plan-actions">

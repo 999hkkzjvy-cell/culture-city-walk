@@ -160,10 +160,14 @@ export function generateStopThemeContentWithFallback(
   stop: RouteStop,
 ): StopThemeContent {
   const theme = stop.themes[0] ?? "历史";
+  const shortIntro =
+    stop.note.trim().length >= 20
+      ? stop.note.trim().slice(0, 170)
+      : `${stop.name} 适合作为这条路线中的${theme}观察点，具体故事和来源后续需要继续核验。`;
 
   return stopThemeContentSchema.parse({
     placeId: stop.sourcePlaceId ?? stop.id,
-    shortIntro: stop.note.slice(0, 170),
+    shortIntro,
     themeConnections: [
       {
         theme,

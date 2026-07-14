@@ -9,6 +9,7 @@ import {
   Bookmark,
   Clock,
   Edit3,
+  FileText,
   MapPin,
   Navigation,
   Route,
@@ -19,6 +20,10 @@ import {
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
+import {
+  generateRouteSummaryWithFallback,
+  generateStopThemeContentWithFallback,
+} from "@/lib/ai/route-collaboration";
 import { demoRoute, type RoutePlan } from "@/lib/route";
 import {
   removeRouteStop,
@@ -48,6 +53,10 @@ export function RouteReader() {
 
   const routeKernel = calculateRouteKernel(route);
   const [isEditing, setIsEditing] = useState(false);
+  const [expandedStories, setExpandedStories] = useState<
+    Record<string, boolean>
+  >({});
+  const routeSummary = generateRouteSummaryWithFallback(route);
   const sourceLabel =
     routeKernel.legSource === "provider"
       ? "高德真实步行数据"
@@ -63,7 +72,7 @@ export function RouteReader() {
             <ArrowLeft size={16} />
             返回规划继续编辑
           </Link>
-          <p>{route.title}</p>
+          <p>{routeSummary.summary}</p>
           <h1>{route.city} · 文学漫游</h1>
           <div className="route-meta">
             <span>
@@ -103,7 +112,14 @@ export function RouteReader() {
             {isEditing ? <Save size={17} /> : <Edit3 size={17} />}
             {isEditing ? "完成编辑" : "编辑路线"}
           </button>
-          <button type="button">
+          <button
+            onClick={() =>
+              document
+                .querySelector<HTMLElement>("[data-route-cloud-actions]")
+                ?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }
+            type="button"
+          >
             <Share2 size={17} />
             分享
           </button>
@@ -166,6 +182,8 @@ export function RouteReader() {
         <div className="timeline">
           {routeKernel.stops.map((stop, index) => {
             const previousStop = routeKernel.stops[index - 1];
+            const story = generateStopThemeContentWithFallback(stop);
+            const isStoryExpanded = expandedStories[stop.id] ?? false;
             const navigationUrl =
               index === 0
                 ? amapPlaceSearchUrl({
@@ -210,6 +228,39 @@ export function RouteReader() {
                     {stop.mustVisit ? <em>必去</em> : null}
                   </h2>
                   <p>{stop.note}</p>
+                  <div className="stop-story">
+                    <div>
+                      <span>模板讲解 · 来源待核验</span>
+                      <strong>{story.shortIntro}</strong>
+                    </div>
+                    {isStoryExpanded ? (
+                      <div className="stop-story-more">
+                        {story.themeConnections.map((connection) => (
+                          <p key={`${stop.id}-${connection.theme}`}>
+                            <FileText size={14} />
+                            {connection.theme}：{connection.text}
+                          </p>
+                        ))}
+                        {story.practicalTips.map((tip) => (
+                          <p key={tip}>
+                            <Clock size={14} />
+                            {tip}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                    <button
+                      onClick={() =>
+                        setExpandedStories((current) => ({
+                          ...current,
+                          [stop.id]: !isStoryExpanded,
+                        }))
+                      }
+                      type="button"
+                    >
+                      {isStoryExpanded ? "收起深读" : "展开深读"}
+                    </button>
+                  </div>
                   {isEditing ? (
                     <div className="stop-edit-panel">
                       <label>

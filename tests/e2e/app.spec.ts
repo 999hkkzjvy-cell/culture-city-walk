@@ -49,8 +49,9 @@ test("planning page can add a candidate to the editable route preview", async ({
   );
 
   await page.getByRole("button", { name: "加入路线" }).first().click();
+  await expect(page.getByRole("heading", { name: "已处理" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "撤销加入" }).first(),
+    page.getByRole("button", { name: "撤回" }).first(),
   ).toBeVisible();
   await expect(page.getByLabel("路线预案站点")).toContainText(/预案|停留/);
 
@@ -60,7 +61,7 @@ test("planning page can add a candidate to the editable route preview", async ({
     .fill("55");
   await expect(page.getByLabel("路线预案站点")).toContainText("停留 55 分钟");
 
-  await page.getByRole("button", { name: "撤销加入" }).first().click();
+  await page.getByRole("button", { name: "撤回" }).first().click();
   await expect(
     page.getByRole("button", { name: "加入路线" }).first(),
   ).toBeVisible();
@@ -77,6 +78,7 @@ test("saved planning preview appears in the route reader", async ({ page }) => {
     .innerText();
 
   await page.getByRole("button", { name: "加入路线" }).first().click();
+  await expect(page.getByLabel("路线预案站点")).toContainText(candidateName);
   await page.getByRole("button", { name: "保存草稿" }).click();
   await page.getByRole("link", { name: /查看生成路线/ }).click();
 
@@ -97,6 +99,11 @@ test("route reader supports direct refresh with query string", async ({
   await expect(page.getByText("本地估算，待高德复核")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "在高德查看地点" }),
+  ).toBeVisible();
+  await expect(page.getByText("模板讲解 · 来源待核验").first()).toBeVisible();
+  await page.getByRole("button", { name: "展开深读" }).first().click();
+  await expect(
+    page.getByText(/出发前请再次核验|阅读角度/).first(),
   ).toBeVisible();
 });
 

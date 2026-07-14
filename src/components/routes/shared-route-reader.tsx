@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, Clock } from "lucide-react";
-import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  createBrowserSupabaseClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/client";
 import { readShareCode } from "@/lib/urls";
 
 type SharedStop = {
@@ -33,7 +36,9 @@ export function SharedRouteReader() {
   const [payload, setPayload] = useState<SharedRoutePayload | null>(null);
 
   useEffect(() => {
-    const shareCode = readShareCode(new URLSearchParams(window.location.search));
+    const shareCode = readShareCode(
+      new URLSearchParams(window.location.search),
+    );
 
     if (!shareCode) {
       queueMicrotask(() => setState("empty"));
@@ -92,17 +97,32 @@ export function SharedRouteReader() {
     <section className="shared-route">
       <div className="section-heading">
         <h2>{payload.route.title}</h2>
-        <span>{payload.route.city}</span>
+        <span>
+          {payload.route.city} ·{" "}
+          {payload.share.expires_at
+            ? `有效至 ${payload.share.expires_at.slice(0, 10)}`
+            : "长期有效"}
+        </span>
+      </div>
+      <div className="shared-source-note">
+        <strong>只读分享</strong>
+        <p>
+          站点、步行时间和讲解可能包含本地估算或待核验内容；出发前请再次确认开放时间、预约和交通情况。
+        </p>
       </div>
       <div className="route-list">
         {payload.stops.map((stop) => (
-          <article className="route-list-item" key={`${payload.share.code}-${stop.sort_order}`}>
+          <article
+            className="route-list-item"
+            key={`${payload.share.code}-${stop.sort_order}`}
+          >
             <BookOpen size={22} aria-hidden="true" />
             <div>
               <h3>{stop.title_snapshot}</h3>
               <p>
                 <Clock size={13} />
-                {stop.arrival_time?.slice(0, 5) ?? "时间待定"} · 停留 {stop.stay_minutes} 分钟
+                {stop.arrival_time?.slice(0, 5) ?? "时间待定"} · 停留{" "}
+                {stop.stay_minutes} 分钟
               </p>
               {stop.note?.text ? <p>{stop.note.text}</p> : null}
             </div>

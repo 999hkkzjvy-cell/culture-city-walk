@@ -61,7 +61,11 @@ export function RouteCloudActions() {
   }
 
   return (
-    <section className="cloud-actions" aria-label="云端路线操作">
+    <section
+      className="cloud-actions"
+      data-route-cloud-actions
+      aria-label="云端路线操作"
+    >
       <button className="secondary-button" onClick={saveToCloud} type="button">
         <Cloud size={17} />
         {saveState === "saving"
@@ -87,6 +91,9 @@ export function RouteCloudActions() {
             <Copy size={16} />
             复制
           </button>
+          <p>
+            分享链接默认不设置过期时间；后续可在路线库中增加撤销和过期设置。
+          </p>
         </>
       ) : null}
       {message ? <p>{message}</p> : null}
