@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Bell, Bookmark, Menu, Search } from "lucide-react";
+import { AuthNav } from "@/components/auth/auth-nav";
 import { libraryUrl, routeUrl } from "@/lib/urls";
 
 export function SiteHeader() {
@@ -29,6 +30,7 @@ export function SiteHeader() {
           <span className="sr-only">搜索城市、主题或地点</span>
           <input placeholder="搜索城市、主题或地点" />
         </label>
+        <AuthNav />
         <button aria-label="通知" className="icon-button" type="button">
           <Bell size={18} />
         </button>
@@ -37,9 +39,12 @@ export function SiteHeader() {
         </button>
       </div>
 
-      <button aria-label="打开菜单" className="mobile-menu" type="button">
-        <Menu size={24} />
-      </button>
+      <div className="mobile-header-actions">
+        <AuthNav />
+        <button aria-label="打开菜单" className="mobile-menu" type="button">
+          <Menu size={24} />
+        </button>
+      </div>
     </header>
   );
 }

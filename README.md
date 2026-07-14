@@ -74,6 +74,13 @@ supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-
 supabase functions deploy deepseek-proxy
 ```
 
+账号功能：
+
+- 导航栏右侧显示登录入口。
+- `/login/` 支持邮箱密码登录与注册。
+- `/profile/` 支持修改昵称、所在地、微信号、个人签名和头像图片 URL。
+- 个人资料字段由 `20260715000100_profile_details.sql` 迁移扩展。
+
 ## 参考资料
 
 产品文档和 UI 参考图保留在 `ignore-files/` 下。

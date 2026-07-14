@@ -4,7 +4,7 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: /怎样认识一座城/ }),
+    page.getByRole("heading", { name: /认识一座城|怎样认识一座城/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /AI 帮我发现/ })).toBeVisible();
   await expect(
@@ -20,6 +20,10 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await expect(page.getByRole("link", { name: "如何使用" })).toHaveAttribute(
     "href",
     "/guide/",
+  );
+  await expect(page.getByRole("link", { name: "登录" }).first()).toHaveAttribute(
+    "href",
+    "/login/",
   );
 });
 
@@ -158,6 +162,21 @@ test("library page shows cloud save entry point", async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "保存当前预案" }),
+  ).toBeVisible();
+});
+
+test("login and profile pages expose account flows", async ({ page }) => {
+  await page.goto("/login/");
+
+  await expect(page.getByRole("heading", { name: "登录账号" })).toBeVisible();
+  await page.getByRole("button", { name: "注册", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "注册账号" })).toBeVisible();
+  await expect(page.getByLabel("邮箱")).toBeVisible();
+  await expect(page.getByLabel("密码")).toBeVisible();
+
+  await page.goto("/profile/");
+  await expect(
+    page.getByRole("heading", { name: /请先登录|个人中心待连接/ }),
   ).toBeVisible();
 });
 

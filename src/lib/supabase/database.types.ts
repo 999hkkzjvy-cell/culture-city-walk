@@ -14,6 +14,9 @@ export type Database = {
           id: string;
           display_name: string | null;
           avatar_url: string | null;
+          location: string | null;
+          wechat_id: string | null;
+          bio: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -21,12 +24,18 @@ export type Database = {
           id: string;
           display_name?: string | null;
           avatar_url?: string | null;
+          location?: string | null;
+          wechat_id?: string | null;
+          bio?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           display_name?: string | null;
           avatar_url?: string | null;
+          location?: string | null;
+          wechat_id?: string | null;
+          bio?: string | null;
           updated_at?: string;
         };
         Relationships: [];

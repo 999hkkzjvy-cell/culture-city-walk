@@ -51,6 +51,9 @@ font/image behavior, read the relevant docs in `node_modules/next/dist/docs/`.
 - `/plan/` - planning conversation mock and route summary.
 - `/route/?id=demo` - route reader for the local demo route.
 - `/library/` - auth panel plus user's cloud route archive.
+- `/login/` - standalone login/register page for Supabase email-password auth.
+- `/profile/` - signed-in profile center for display name, location, WeChat,
+  signature, and avatar URL.
 - `/share/?code=...` - read-only shared route loaded from Supabase Edge Function.
 - `/about/` - product purpose and principles page.
 - `/guide/` - short usage guide for planning, candidates, editing, and sharing.
@@ -64,6 +67,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/app/plan/page.tsx` - planning page shell.
 - `src/app/route/page.tsx` - route reader page and map/timeline layout.
 - `src/app/library/page.tsx` - auth and saved route archive page.
+- `src/app/login/page.tsx` - login/register page.
+- `src/app/profile/page.tsx` - profile center page.
 - `src/app/share/page.tsx` - shared route page.
 - `src/app/about/page.tsx` - about page.
 - `src/app/guide/page.tsx` - usage guide page.
@@ -72,6 +77,9 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/site-header.tsx` - shared top navigation.
 - `src/components/planning-desk.tsx` - planning interaction mock.
 - `src/components/auth/auth-panel.tsx` - Supabase magic-link auth UI.
+- `src/components/auth/auth-nav.tsx` - header login/avatar entry.
+- `src/components/auth/login-form.tsx` - email-password login/register form.
+- `src/components/auth/profile-center.tsx` - profile editing form.
 - `src/components/routes/route-library.tsx` - saved route list.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
 - `src/components/routes/route-reader.tsx` - client route reader that prefers
@@ -121,6 +129,7 @@ Implemented:
 
 - Migration: `supabase/migrations/20260713000100_phase2_routes_auth.sql`
 - Migration: `supabase/migrations/20260714000100_phase4_candidates_ai_runs.sql`
+- Migration: `supabase/migrations/20260715000100_profile_details.sql`
 - Tables: `profiles`, `places`, `routes`, `route_stops`,
   `route_constraints`, `route_snapshots`, `route_shares`,
   `route_candidates`, `route_ai_runs`
@@ -142,10 +151,14 @@ function body.
 
 ## Auth Behavior
 
-Auth is MVP-level email magic-link auth via Supabase:
+Auth is MVP-level Supabase Auth:
 
-- The auth UI lives on `/library/`.
-- `AuthPanel` calls `supabase.auth.signInWithOtp`.
+- The legacy sync auth panel lives on `/library/` and calls
+  `supabase.auth.signInWithOtp`.
+- The main header also exposes `/login/` and `/profile/`.
+- `/login/` supports email-password login/register through Supabase Auth.
+- `/profile/` updates `profiles.display_name`, `avatar_url`, `location`,
+  `wechat_id`, and `bio`.
 - Registration and login are the same flow.
 - Sessions are persisted by Supabase JS in the browser.
 - After login, users can save demo route data, list their own cloud routes, and
