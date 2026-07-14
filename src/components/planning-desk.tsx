@@ -48,7 +48,7 @@ import {
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import {
-  readCandidateState,
+  readCurrentCandidateState,
   readDraft,
   readRoutePlan,
   saveCandidateState,
@@ -75,7 +75,7 @@ export function PlanningDesk() {
     "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
   );
   const [candidates, setCandidates] = useState<RouteCandidate[]>(() =>
-    typeof window === "undefined" ? [] : readCandidateState().candidates,
+    typeof window === "undefined" ? [] : readCurrentCandidateState().candidates,
   );
   const [candidateActions, setCandidateActions] = useState<
     Record<string, CandidateAction>
@@ -84,7 +84,7 @@ export function PlanningDesk() {
       return {};
     }
 
-    return readCandidateState().actions as Record<string, CandidateAction>;
+    return readCurrentCandidateState().actions as Record<string, CandidateAction>;
   });
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);

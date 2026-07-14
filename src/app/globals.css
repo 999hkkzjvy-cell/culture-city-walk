@@ -1429,8 +1429,24 @@ button {
 }
 
 .route-cloud-band {
+  display: grid;
   width: min(1240px, calc(100% - 48px));
   margin: 24px auto 0;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.route-load-status {
+  width: min(1240px, calc(100% - 48px));
+  margin: 14px auto 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(142 118 87 / 28%);
+  border-radius: 6px;
+  background: rgb(255 251 244 / 72%);
+  color: #59645b;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .route-kernel-alerts {
@@ -1465,6 +1481,84 @@ button {
 .cloud-actions p {
   flex-basis: 100%;
   margin: 0;
+}
+
+.route-snapshot-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgb(251 247 239 / 82%);
+  box-shadow: var(--shadow);
+}
+
+.route-snapshot-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.route-snapshot-panel > div:first-child span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green-primary);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.route-snapshot-panel p,
+.snapshot-empty {
+  margin: 0;
+  color: #536057;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.route-snapshot-panel > .secondary-button {
+  justify-self: start;
+}
+
+.snapshot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgb(216 208 195 / 80%);
+  border-radius: 7px;
+  background: rgb(255 251 244 / 68%);
+}
+
+.snapshot-item div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.snapshot-item strong {
+  color: var(--green-primary);
+  font-family: var(--serif);
+}
+
+.snapshot-item span {
+  color: #5f675f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.snapshot-item button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
 }
 
 .paperclip {
@@ -2274,6 +2368,7 @@ button {
   }
 
   .route-cloud-band {
+    grid-template-columns: 1fr;
     margin-top: 18px;
   }
 

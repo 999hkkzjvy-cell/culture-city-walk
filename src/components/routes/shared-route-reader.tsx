@@ -36,6 +36,7 @@ export function SharedRouteReader() {
   const [payload, setPayload] = useState<SharedRoutePayload | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const shareCode = readShareCode(
       new URLSearchParams(window.location.search),
     );
@@ -53,11 +54,14 @@ export function SharedRouteReader() {
     }
 
     const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/share-route?code=${encodeURIComponent(shareCode)}`;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
 
     fetch(functionUrl, {
       headers: {
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       },
+      signal: controller.signal,
     })
       .then((response) => {
         if (!response.ok) {
@@ -66,10 +70,24 @@ export function SharedRouteReader() {
         return response.json() as Promise<SharedRoutePayload>;
       })
       .then((data) => {
+        if (!isMounted) {
+          return;
+        }
         setPayload(data);
         setState("ready");
       })
-      .catch(() => setState("error"));
+      .catch(() => {
+        if (isMounted) {
+          setState("error");
+        }
+      })
+      .finally(() => window.clearTimeout(timeoutId));
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   if (state === "empty") {

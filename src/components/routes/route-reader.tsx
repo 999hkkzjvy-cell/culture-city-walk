@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
+import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import {
   generateRouteSummaryWithFallback,
@@ -31,11 +32,15 @@ import {
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+import { createRouteRepository } from "@/lib/repositories/route-repository";
 import {
   readRoutePlan,
   routePlanStorageKey,
+  saveCandidateState,
   saveRoutePlan,
+  type StoredCandidateAction,
 } from "@/lib/storage";
+import { readRouteId } from "@/lib/urls";
 
 let cachedRouteSnapshot:
   | {
@@ -51,6 +56,8 @@ export function RouteReader() {
     () => demoRoute,
   );
 
+  const [remoteRouteState, setRemoteRouteState] =
+    useState<RemoteRouteState>("idle");
   const routeKernel = calculateRouteKernel(route);
   const [isEditing, setIsEditing] = useState(false);
   const [expandedStories, setExpandedStories] = useState<
@@ -63,6 +70,67 @@ export function RouteReader() {
       : routeKernel.legSource === "estimated"
         ? "本地估算，待高德复核"
         : "缺少步行数据";
+
+  useEffect(() => {
+    const routeId = readRouteId(new URLSearchParams(window.location.search));
+
+    if (!routeId || routeId === demoRoute.id || routeId === route.id) {
+      return;
+    }
+
+    let isMounted = true;
+    const repository = createRouteRepository();
+    queueMicrotask(() => {
+      if (isMounted) {
+        setRemoteRouteState("loading");
+      }
+    });
+
+    repository
+      .get(routeId)
+      .then(async (loadedRoute) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (!loadedRoute) {
+          setRemoteRouteState("not-found");
+          return;
+        }
+
+        saveRoutePlan(loadedRoute);
+
+        const savedCandidates = await repository
+          .listCandidates(loadedRoute.id)
+          .catch(() => []);
+        const actions = Object.fromEntries(
+          savedCandidates
+            .filter(({ status }) => status !== "suggested")
+            .map(({ candidate, status }) => [
+              candidate.id,
+              status as StoredCandidateAction,
+            ]),
+        ) as Record<string, StoredCandidateAction>;
+
+        saveCandidateState({
+          routeId: loadedRoute.id,
+          candidates: savedCandidates.map(({ candidate }) => candidate),
+          actions,
+          updatedAt: new Date().toISOString(),
+        });
+        dispatchRouteStorageChange();
+        setRemoteRouteState("ready");
+      })
+      .catch(() => {
+        if (isMounted) {
+          setRemoteRouteState("error");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [route.id]);
 
   return (
     <>
@@ -137,7 +205,10 @@ export function RouteReader() {
 
       <section className="route-cloud-band">
         <RouteCloudActions />
+        <RouteSnapshotPanel route={route} />
       </section>
+
+      <RouteLoadStatus state={remoteRouteState} />
 
       {routeKernel.issues.length > 0 ? (
         <section className="route-kernel-alerts" aria-label="路线校验提示">
@@ -335,11 +406,26 @@ export function RouteReader() {
   );
 }
 
+type RemoteRouteState = "idle" | "loading" | "ready" | "not-found" | "error";
+
+function RouteLoadStatus({ state }: { state: RemoteRouteState }) {
+  if (state === "idle") {
+    return null;
+  }
+
+  const copy: Record<Exclude<RemoteRouteState, "idle">, string> = {
+    loading: "正在读取云端路线与候选点状态...",
+    ready: "云端路线已恢复为当前本地预案，可返回规划页继续编辑。",
+    "not-found": "没有找到这条云端路线，已保留当前本地预案。",
+    error: "云端路线暂时无法读取，已保留当前本地预案。",
+  };
+
+  return <p className="route-load-status">{copy[state]}</p>;
+}
+
 function persistRouteEdit(route: RoutePlan) {
   saveRoutePlan(route);
-  window.dispatchEvent(
-    new StorageEvent("storage", { key: routePlanStorageKey }),
-  );
+  dispatchRouteStorageChange();
 }
 
 function readRoutePlanForReader(): RoutePlan {
@@ -369,4 +455,10 @@ function subscribeToLocalRoutePlan(onStoreChange: () => void) {
   window.addEventListener("storage", onStoreChange);
 
   return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function dispatchRouteStorageChange() {
+  window.dispatchEvent(
+    new StorageEvent("storage", { key: routePlanStorageKey }),
+  );
 }

@@ -6,11 +6,15 @@ import {
   type RouteStop,
 } from "@/lib/route";
 import {
+  createRouteSnapshot,
   readCandidateState,
   readDraft,
+  readRouteSnapshot,
+  readRouteSnapshots,
   saveCandidateState,
   saveDraft,
   type StoredCandidateAction,
+  type StoredCandidateState,
 } from "@/lib/storage";
 import {
   createBrowserSupabaseClient,
@@ -46,6 +50,21 @@ export type SaveRouteCandidatesInput = {
   actions: Record<string, StoredCandidateAction>;
 };
 
+export type RouteSnapshotPayload = {
+  route: RoutePlan;
+  candidateState: StoredCandidateState;
+};
+
+export type RouteSnapshotSummary = {
+  id: string;
+  routeId: string;
+  version: number;
+  title: string;
+  stopCount: number;
+  candidateCount: number;
+  createdAt: string;
+};
+
 export interface RouteRepository {
   list(): Promise<SavedRouteSummary[]>;
   get(id: string): Promise<RoutePlan | null>;
@@ -55,6 +74,12 @@ export interface RouteRepository {
     input: SaveRouteCandidatesInput,
   ): Promise<void>;
   listCandidates(routeId: string): Promise<SavedRouteCandidate[]>;
+  createSnapshot(
+    route: RoutePlan,
+    candidateState: StoredCandidateState,
+  ): Promise<RouteSnapshotSummary>;
+  listSnapshots(routeId: string): Promise<RouteSnapshotSummary[]>;
+  readSnapshot(snapshotId: string): Promise<RouteSnapshotPayload | null>;
   delete(id: string): Promise<void>;
   createShare(routeId: string): Promise<ShareRecord>;
   revokeShare(code: string): Promise<void>;
@@ -133,6 +158,25 @@ class LocalRouteRepository implements RouteRepository {
       candidate,
       status: state.actions[candidate.id] ?? "suggested",
     }));
+  }
+
+  async createSnapshot(route: RoutePlan, candidateState: StoredCandidateState) {
+    return mapStoredSnapshotToSummary(createRouteSnapshot(route, candidateState));
+  }
+
+  async listSnapshots(routeId: string) {
+    return readRouteSnapshots(routeId).map(mapStoredSnapshotToSummary);
+  }
+
+  async readSnapshot(snapshotId: string) {
+    const snapshot = readRouteSnapshot(snapshotId);
+
+    return snapshot
+      ? {
+          route: snapshot.route,
+          candidateState: snapshot.candidateState,
+        }
+      : null;
   }
 
   async delete() {
@@ -314,6 +358,85 @@ class SupabaseRouteRepository implements RouteRepository {
     return (data ?? []).map(mapCandidateFromRow);
   }
 
+  async createSnapshot(
+    route: RoutePlan,
+    candidateState: StoredCandidateState,
+  ): Promise<RouteSnapshotSummary> {
+    const userId = await requireUserId(this.client);
+    let routeId = route.id;
+    let snapshotRoute = route;
+
+    if (route.id === demoRoute.id) {
+      const saved = await this.save(route);
+      routeId = saved.id;
+      snapshotRoute = {
+        ...route,
+        id: saved.id,
+        updatedAt: saved.updatedAt,
+      };
+      await this.saveCandidates(saved.id, {
+        candidates: candidateState.candidates,
+        actions: candidateState.actions,
+      });
+    }
+
+    const nextVersion = await this.getNextSnapshotVersion(routeId);
+    const payload = toSnapshotPayload(snapshotRoute, {
+      ...candidateState,
+      routeId,
+    });
+    const { data, error } = await this.client
+      .from("route_snapshots")
+      .insert({
+        route_id: routeId,
+        version: nextVersion,
+        snapshot: payload as unknown as Json,
+        created_by: userId,
+      })
+      .select("id,route_id,version,snapshot,created_at")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return mapSnapshotRowToSummary(data);
+  }
+
+  async listSnapshots(routeId: string): Promise<RouteSnapshotSummary[]> {
+    if (routeId === demoRoute.id) {
+      return [];
+    }
+
+    const { data, error } = await this.client
+      .from("route_snapshots")
+      .select("id,route_id,version,snapshot,created_at")
+      .eq("route_id", routeId)
+      .order("version", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapSnapshotRowToSummary);
+  }
+
+  async readSnapshot(
+    snapshotId: string,
+  ): Promise<RouteSnapshotPayload | null> {
+    const { data, error } = await this.client
+      .from("route_snapshots")
+      .select("snapshot")
+      .eq("id", snapshotId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data ? parseSnapshotPayload(data.snapshot) : null;
+  }
+
   async delete(id: string) {
     const { error } = await this.client.from("routes").delete().eq("id", id);
 
@@ -406,6 +529,86 @@ class SupabaseRouteRepository implements RouteRepository {
       throw error;
     }
   }
+
+  private async getNextSnapshotVersion(routeId: string) {
+    const { data, error } = await this.client
+      .from("route_snapshots")
+      .select("version")
+      .eq("route_id", routeId)
+      .order("version", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data?.[0]?.version ?? 0) + 1;
+  }
+}
+
+function mapStoredSnapshotToSummary(snapshot: {
+  id: string;
+  routeId: string;
+  version: number;
+  route: RoutePlan;
+  candidateState: StoredCandidateState;
+  createdAt: string;
+}): RouteSnapshotSummary {
+  return {
+    id: snapshot.id,
+    routeId: snapshot.routeId,
+    version: snapshot.version,
+    title: snapshot.route.title,
+    stopCount: snapshot.route.stops.length,
+    candidateCount: snapshot.candidateState.candidates.length,
+    createdAt: snapshot.createdAt,
+  };
+}
+
+function toSnapshotPayload(
+  route: RoutePlan,
+  candidateState: StoredCandidateState,
+): RouteSnapshotPayload {
+  return {
+    route,
+    candidateState,
+  };
+}
+
+function parseSnapshotPayload(value: Json): RouteSnapshotPayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const payload = value as Partial<RouteSnapshotPayload>;
+  if (!payload.route || !payload.candidateState) {
+    return null;
+  }
+
+  return {
+    route: payload.route,
+    candidateState: payload.candidateState,
+  };
+}
+
+function mapSnapshotRowToSummary(row: {
+  id: string;
+  route_id: string;
+  version: number;
+  snapshot: Json;
+  created_at: string;
+}): RouteSnapshotSummary {
+  const payload = parseSnapshotPayload(row.snapshot);
+
+  return {
+    id: row.id,
+    routeId: row.route_id,
+    version: row.version,
+    title: payload?.route.title ?? "未命名路线",
+    stopCount: payload?.route.stops.length ?? 0,
+    candidateCount: payload?.candidateState.candidates.length ?? 0,
+    createdAt: row.created_at,
+  };
 }
 
 function routeCandidateToInsert(

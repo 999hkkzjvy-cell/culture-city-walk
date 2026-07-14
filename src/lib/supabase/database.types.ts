@@ -164,6 +164,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["route_shares"]["Insert"]>;
         Relationships: [];
       };
+      route_snapshots: {
+        Row: {
+          id: string;
+          route_id: string;
+          version: number;
+          snapshot: Json;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          route_id: string;
+          version: number;
+          snapshot: Json;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["route_snapshots"]["Insert"]
+        >;
+        Relationships: [];
+      };
       route_ai_runs: {
         Row: {
           id: string;

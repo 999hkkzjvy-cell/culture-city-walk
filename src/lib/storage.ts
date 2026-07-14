@@ -18,8 +18,18 @@ export type StoredCandidateState = {
   updatedAt: string;
 };
 
+export type StoredRouteSnapshot = {
+  id: string;
+  routeId: string;
+  version: number;
+  route: RoutePlan;
+  candidateState: StoredCandidateState;
+  createdAt: string;
+};
+
 export const routePlanStorageKey = "cultural-citywalk:route-plan";
 export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
+export const routeSnapshotsStorageKey = "cultural-citywalk:route-snapshots";
 export const syncedRouteSignatureStorageKey =
   "cultural-citywalk:synced-route-signature";
 
@@ -109,6 +119,60 @@ export function saveCandidateState(state: StoredCandidateState) {
   );
 }
 
+export function readCurrentCandidateState() {
+  return readCandidateState(readRoutePlan().id);
+}
+
+export function readRouteSnapshots(routeId: string): StoredRouteSnapshot[] {
+  try {
+    const raw = window.localStorage.getItem(routeSnapshotsStorageKey);
+    const snapshots = raw ? (JSON.parse(raw) as StoredRouteSnapshot[]) : [];
+
+    return snapshots
+      .filter((snapshot) => snapshot.routeId === routeId)
+      .sort((a, b) => b.version - a.version);
+  } catch {
+    return [];
+  }
+}
+
+export function readRouteSnapshot(snapshotId: string) {
+  return readAllRouteSnapshots().find((snapshot) => snapshot.id === snapshotId);
+}
+
+export function createRouteSnapshot(
+  route: RoutePlan,
+  candidateState = readCandidateState(route.id),
+): StoredRouteSnapshot {
+  const snapshots = readAllRouteSnapshots();
+  const latestVersion = snapshots
+    .filter((snapshot) => snapshot.routeId === route.id)
+    .reduce((max, snapshot) => Math.max(max, snapshot.version), 0);
+  const createdAt = new Date().toISOString();
+  const snapshot: StoredRouteSnapshot = {
+    id: `${route.id}-${latestVersion + 1}-${Date.now()}`,
+    routeId: route.id,
+    version: latestVersion + 1,
+    route: {
+      ...route,
+      updatedAt: createdAt,
+    },
+    candidateState: {
+      ...candidateState,
+      routeId: route.id,
+      updatedAt: createdAt,
+    },
+    createdAt,
+  };
+
+  window.localStorage.setItem(
+    routeSnapshotsStorageKey,
+    JSON.stringify([snapshot, ...snapshots]),
+  );
+
+  return snapshot;
+}
+
 export function getRoutePlanSignature(route = readRoutePlan()) {
   return [
     route.id,
@@ -132,6 +196,16 @@ export function markRoutePlanSynced(route = readRoutePlan()) {
     syncedRouteSignatureStorageKey,
     getRoutePlanSignature(route),
   );
+}
+
+function readAllRouteSnapshots(): StoredRouteSnapshot[] {
+  try {
+    const raw = window.localStorage.getItem(routeSnapshotsStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {

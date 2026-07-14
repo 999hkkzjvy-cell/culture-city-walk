@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
+  createRouteSnapshot,
   readCandidateState,
+  readCurrentCandidateState,
   readRoutePlan,
+  readRouteSnapshots,
   saveCandidateState,
   saveRoutePlan,
 } from "./storage";
@@ -84,5 +87,43 @@ describe("local storage helpers", () => {
       }),
     );
     expect(readCandidateState("other").actions).toEqual({});
+  });
+
+  it("reads candidate state for the current saved route", () => {
+    saveRoutePlan({
+      ...demoRoute,
+      id: "cloud-route",
+    });
+
+    saveCandidateState({
+      routeId: "cloud-route",
+      candidates: [],
+      actions: {
+        "manual-stop": "joined",
+      },
+      updatedAt: "2026-07-14T00:00:00.000Z",
+    });
+
+    expect(readCurrentCandidateState().actions).toEqual({
+      "manual-stop": "joined",
+    });
+  });
+
+  it("creates versioned route snapshots", () => {
+    const first = createRouteSnapshot(demoRoute);
+    const second = createRouteSnapshot({
+      ...demoRoute,
+      title: "更新后的路线",
+    });
+
+    expect(first.version).toBe(1);
+    expect(second.version).toBe(2);
+    const snapshots = readRouteSnapshots("demo");
+
+    expect(snapshots).toEqual([
+      expect.objectContaining({ version: 2 }),
+      expect.objectContaining({ version: 1 }),
+    ]);
+    expect(snapshots[0].route.title).toBe("更新后的路线");
   });
 });
