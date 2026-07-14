@@ -33,6 +33,7 @@ export type RouteStop = Place & {
     source?: "provider" | "estimated";
     provider?: "amap" | "local";
     label?: string;
+    polyline?: Coordinate[];
   };
 };
 

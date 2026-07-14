@@ -22,6 +22,8 @@ import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { RouteJourneyPanel } from "@/components/routes/route-journey-panel";
 import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
+import { createAmapWebServiceProvider } from "@/lib/maps/amap-web";
+import { recalculateRouteWithProvider } from "@/lib/maps/route-recalculation";
 import {
   generateRouteSummaryWithFallback,
   generateStopThemeContentWithFallback,
@@ -59,6 +61,9 @@ export function RouteReader() {
 
   const [remoteRouteState, setRemoteRouteState] =
     useState<RemoteRouteState>("idle");
+  const [mapRecalculationState, setMapRecalculationState] =
+    useState<MapRecalculationState>("idle");
+  const [mapRecalculationMessage, setMapRecalculationMessage] = useState("");
   const routeKernel = calculateRouteKernel(route);
   const [isEditing, setIsEditing] = useState(false);
   const [expandedStories, setExpandedStories] = useState<
@@ -132,6 +137,37 @@ export function RouteReader() {
       isMounted = false;
     };
   }, [route.id]);
+
+  async function recalculateWithAmap() {
+    const provider = createAmapWebServiceProvider();
+
+    if (!provider) {
+      setMapRecalculationState("error");
+      setMapRecalculationMessage("Supabase 尚未配置，暂时不能调用高德 Web 代理。");
+      return;
+    }
+
+    setMapRecalculationState("loading");
+    setMapRecalculationMessage("正在用高德复核步行距离和耗时...");
+
+    try {
+      const result = await recalculateRouteWithProvider(route, provider);
+      persistRouteEdit(result.route);
+      setMapRecalculationState(
+        result.providerLegs > 0 && result.estimatedLegs === 0
+          ? "ready"
+          : "partial",
+      );
+      setMapRecalculationMessage(
+        result.estimatedLegs > 0
+          ? `已复核 ${result.providerLegs} 段，${result.estimatedLegs} 段保留本地估算。`
+          : `已用高德复核 ${result.providerLegs} 段步行路线。`,
+      );
+    } catch {
+      setMapRecalculationState("error");
+      setMapRecalculationMessage("高德复核失败，当前路线仍保留原有步行数据。");
+    }
+  }
 
   return (
     <>
@@ -247,9 +283,26 @@ export function RouteReader() {
           <div className="map-source-note">
             <strong>地图内核</strong>
             <p>
-              当前站点顺序和步行段来自本地预案或示例数据。接入高德 Web
-              服务后，这里会展示真实步行 polyline、耗时和距离。
+              当前站点顺序来自本地预案。可用高德 Web 服务复核步行距离、耗时和
+              polyline；失败的路段会保留本地估算。
             </p>
+            <div className="map-source-actions">
+              <button
+                disabled={mapRecalculationState === "loading"}
+                onClick={recalculateWithAmap}
+                type="button"
+              >
+                <Route size={15} />
+                {mapRecalculationState === "loading"
+                  ? "复核中"
+                  : "用高德复核步行"}
+              </button>
+              {mapRecalculationMessage ? (
+                <span className={mapRecalculationState}>
+                  {mapRecalculationMessage}
+                </span>
+              ) : null}
+            </div>
           </div>
         </aside>
 
@@ -410,6 +463,7 @@ export function RouteReader() {
 }
 
 type RemoteRouteState = "idle" | "loading" | "ready" | "not-found" | "error";
+type MapRecalculationState = "idle" | "loading" | "ready" | "partial" | "error";
 
 function RouteLoadStatus({ state }: { state: RemoteRouteState }) {
   if (state === "idle") {

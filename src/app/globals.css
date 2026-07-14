@@ -2115,6 +2115,48 @@ button {
   line-height: 1.65;
 }
 
+.map-source-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.map-source-actions button {
+  display: inline-flex;
+  min-height: 34px;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--green-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.map-source-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.map-source-actions span {
+  color: #59645b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.map-source-actions span.ready {
+  color: var(--green-primary);
+}
+
+.map-source-actions span.partial,
+.map-source-actions span.error {
+  color: #7a5a27;
+}
+
 .timeline {
   display: grid;
   gap: 0;
