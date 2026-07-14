@@ -1,10 +1,26 @@
 # AI Project Context
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 This is the first document future AI agents should read before changing the
 Cultural Citywalk codebase. It summarizes product intent, architecture, current
 state, and the files that matter most.
+
+## Agent Workflow Rules
+
+- Read this file before product, data, auth, Supabase, deployment, or UI
+  changes.
+- Commit messages must be written in Chinese.
+- Before every commit, update `ignore-files/项目提交日志.md` with a Chinese
+  summary of the changes and update this file when the project state,
+  architecture, setup, or priorities changed.
+- `ignore-files/项目提交日志.md` is intentionally tracked even though
+  `ignore-files/` is ignored, so future agents can quickly understand the
+  project's commit history. Do not force-add other files from `ignore-files/`
+  unless the user explicitly asks.
+- There is currently one known local user edit outside the latest submitted
+  work: `src/app/page.tsx` homepage title text may be modified locally. Do not
+  revert or stage it unless the user asks.
 
 ## Product In One Paragraph
 
@@ -18,6 +34,7 @@ walkable before they are thematically rich.
 
 - Product architecture: `ignore-files/Citywalk-AI-完整产品与技术架构-v3.md`
 - UI references: `ignore-files/UI-web.jpg`, `ignore-files/UI-mobile.jpg`
+- Commit/change log: `ignore-files/项目提交日志.md`
 - Phase 1 audit: `docs/phase-1-audit.md`
 - Phase 2 status: `docs/phase-2-status.md`
 - Phase 4/5 status: `docs/phase-4-5-status.md`
@@ -92,7 +109,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/route-kernel.ts` - Phase 3 pure route timeline, totals, and
   validation functions.
 - `src/lib/route-candidates.ts` - Phase 4 candidate scoring, detour estimation,
-  dedupe, and fallback provenance labels.
+  AMap POI-to-candidate conversion, type inference, dedupe, and fallback
+  provenance labels.
 - `src/lib/route-editing.ts` - pre-API route editing primitives for candidate
   insertion, stop deletion, moving, stay-time edits, and estimated leg
   recalculation.
@@ -136,8 +154,9 @@ Implemented:
 - Storage bucket: private `route-media`
 - RLS: owner-only access for route data
 - Edge Function: `share-route`
-- Edge Function: `amap-proxy` for AMap POI keyword search and walking-route
-  proxy calls. Keep `AMAP_WEB_SERVICE_KEY` in Supabase Function secrets only.
+- Edge Function: `amap-proxy` for AMap POI keyword search, nearby POI search,
+  and walking-route proxy calls. Keep `AMAP_WEB_SERVICE_KEY` in Supabase
+  Function secrets only.
 - Edge Function: `deepseek-proxy` for DeepSeek JSON-mode intent parsing and
   candidate ranking. Keep `DEEPSEEK_API_KEY` in Supabase Function secrets only.
 - Seed script: `supabase/seed.sql`
@@ -208,19 +227,34 @@ GitHub Actions repository variables required for Pages build:
 - Share links are direct URLs; there is no manual share-code input UI yet. This
   is intentional until a Xiaohongshu/poster/code-sharing use case exists.
 - Phase 3 has started on the route reader. It now shows whether walking legs are
-  provider-backed or locally estimated, and exposes AMap place/navigation links.
-  Current demo legs are still local estimates, not real AMap Web Service results.
-- Phase 4/5 pre-API development has started on `/plan/`: Complete mode can
-  generate locally seeded along-route candidates, score and classify them, and
-  apply add/backup/ignore decisions. Candidate insertion now updates an editable
-  route preview with locally estimated leg recalculation, end-time impact, move,
-  delete, and stay-time controls. Candidate lists support type filters and
-  fit-band grouping. The route preview and candidate actions are persisted in
-  localStorage, and `/route/?id=demo` reads that saved preview before falling
-  back to the demo route. Signed-in users are prompted to sync unsynced local
-  previews. AI collaboration can call the Supabase `deepseek-proxy` Edge
-  Function when `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps
-  deterministic local fallback behavior.
+  provider-backed or locally estimated, exposes AMap place/navigation links, and
+  can recalculate walking legs through the `amap-proxy` Edge Function when
+  coordinates and Supabase configuration are available. Local estimates remain
+  the fallback.
+- Phase 4/5 development has started on `/plan/`: Complete mode can generate
+  along-route candidates, score and classify them, and apply add/backup/ignore
+  decisions. When `amap-proxy` is configured, candidate generation samples route
+  stops, midpoints, and provider polyline points, searches nearby AMap POIs, maps
+  them into route candidates, and then scores them by detour and theme fit. If
+  AMap is unavailable or returns no suitable POIs, the app falls back to local
+  seeded candidates.
+- Candidate insertion updates an editable route preview with leg recalculation,
+  end-time impact, move, delete, and stay-time controls. Candidate lists support
+  type filters and fit-band grouping. The route preview and candidate actions
+  are persisted in localStorage, and `/route/?id=demo` reads that saved preview
+  before falling back to the demo route. Signed-in users are prompted to sync
+  unsynced local previews.
+- The planning page's must-visit flow now lives in the left conversation column:
+  users can select `出发`, `必去`, or `终点`, search AMap or manually add a place,
+  and the chosen place automatically appears in the right-side route preview.
+  Duplicate occurrences of the same place are allowed so loop routes are not
+  constrained by de-duplication.
+- AI collaboration can call the Supabase `deepseek-proxy` Edge Function when
+  `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps deterministic
+  local fallback behavior.
+- Auth MVP is present: header login/avatar entry, `/login/` email-password
+  login/register, `/profile/` profile editing, and cloud route save/list/share
+  flows after login.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.
@@ -250,14 +284,14 @@ Notes:
 
 Near-term likely work:
 
-- Phase 3 next: AMap Web Service proxy, live POI suggestions, confirmed POI
-  persistence, real walking route calculation, marker/polyline rendering, and
-  route editing primitives.
-- Phase 4/5 next: replace local candidate source with AMap sampled-route POI
-  search, add DeepSeek adapter with JSON mode and repair retry, and persist AI
-  usage/cost records.
+- Phase 3 next: marker/polyline rendering, richer map viewport behavior, and
+  confirmed POI persistence beyond local route previews.
+- Phase 4/5 next: improve sampled-route candidate quality with route polyline
+  density controls, add candidate opening-hours/facts verification, and persist
+  richer AI usage/cost records.
 - Finish remaining Phase 2 polish opportunistically: auth redirect verification,
-  clearer auth UX, local draft migration after login, route archive empty states.
+  clearer auth UX, local draft migration after login, route archive empty states,
+  and avatar upload instead of avatar URL only.
 - Improve mobile fidelity against `ignore-files/UI-mobile.jpg`.
 - Keep static export constraints in mind until hosting strategy changes.
 
