@@ -59,6 +59,7 @@ import {
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
+  type RouteStopPlacement,
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import {
@@ -75,10 +76,21 @@ import { routeUrl } from "@/lib/urls";
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
 type CandidateAction = "joined" | "backup" | "ignored";
 type PlaceSearchState = "idle" | "loading" | "ready" | "error";
+type PlannedPlaceEntry = {
+  id: string;
+  name: string;
+  role: RouteStopPlacement;
+  routeStopId: string | null;
+};
 const candidateBands: CandidateFitBand[] = [
   "very_along",
   "recommended",
   "optional",
+];
+const placeRoleOptions: Array<{ value: RouteStopPlacement; label: string }> = [
+  { value: "start", label: "出发" },
+  { value: "middle", label: "必去" },
+  { value: "end", label: "终点" },
 ];
 
 export function PlanningDesk() {
@@ -89,7 +101,16 @@ export function PlanningDesk() {
   const [requestText, setRequestText] = useState(
     "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
   );
+  const [placeRole, setPlaceRole] = useState<RouteStopPlacement>("middle");
   const [mustVisitInput, setMustVisitInput] = useState("");
+  const [plannedPlaces, setPlannedPlaces] = useState<PlannedPlaceEntry[]>(() =>
+    draft.mustVisits.map((name, index) => ({
+      id: `stored-${index}-${name}`,
+      name,
+      role: "middle",
+      routeStopId: null,
+    })),
+  );
   const [mustVisitSearchState, setMustVisitSearchState] =
     useState<PlaceSearchState>("idle");
   const [mustVisitSearchMessage, setMustVisitSearchMessage] = useState("");
@@ -113,23 +134,6 @@ export function PlanningDesk() {
   const [isGeneratingCandidates, setIsGeneratingCandidates] = useState(false);
   const [previewRoute, setPreviewRoute] = useState(() =>
     typeof window === "undefined" ? demoRoute : readRoutePlan(),
-  );
-  const [manualStop, setManualStop] = useState({
-    name: "",
-    area: "",
-    address: "",
-    stayMinutes: 30,
-    themes: ["历史"] as Theme[],
-    note: "",
-  });
-  const [placeSearchState, setPlaceSearchState] =
-    useState<PlaceSearchState>("idle");
-  const [placeSearchMessage, setPlaceSearchMessage] = useState("");
-  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceCandidate[]>(
-    [],
-  );
-  const [selectedPlace, setSelectedPlace] = useState<PlaceCandidate | null>(
-    null,
   );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
@@ -189,7 +193,10 @@ export function PlanningDesk() {
     }));
   }
 
-  function addMustVisit(placeName = mustVisitInput) {
+  function addMustVisit(
+    placeName = mustVisitInput,
+    placeCandidate?: PlaceCandidate,
+  ) {
     const place = placeName.trim();
 
     if (!place) {
@@ -197,28 +204,58 @@ export function PlanningDesk() {
     }
 
     setSaved(false);
-    setDraft((current) => {
-      if (current.mustVisits.includes(place)) {
-        return current;
-      }
+    const currentRoute = previewRoute;
+    const routeThemes = draft.themes.length > 0 ? draft.themes : (["历史"] as Theme[]);
+    const nextRoute = placeCandidate
+      ? appendPlaceCandidateToRoute(currentRoute, {
+          place: placeCandidate,
+          stayMinutes: placeRole === "middle" ? 30 : 5,
+          themes: routeThemes.slice(0, 2),
+          placement: placeRole,
+          note: placeRoleNote(placeRole),
+        })
+      : appendManualStopToRoute(currentRoute, {
+          name: place,
+          area: draft.city,
+          address: "手工地点，地址待高德确认",
+          stayMinutes: placeRole === "middle" ? 30 : 5,
+          themes: routeThemes.slice(0, 2),
+          placement: placeRole,
+          note: placeRoleNote(placeRole),
+        });
+    const routeStopId = findAddedStopId(currentRoute, nextRoute);
+    const nextPlannedPlaces = [
+      ...plannedPlaces,
+      {
+        id: plannedPlaceId(place, plannedPlaces.length),
+        name: place,
+        role: placeRole,
+        routeStopId,
+      },
+    ];
 
-      return {
-        ...current,
-        mustVisits: [...current.mustVisits, place],
-      };
-    });
+    setPreviewRoute(persistPreviewRoute(nextRoute));
+    setPlannedPlaces(nextPlannedPlaces);
+    syncDraftMustVisits(nextPlannedPlaces);
     setMustVisitInput("");
     setMustVisitSuggestions([]);
     setMustVisitSearchState("idle");
     setMustVisitSearchMessage("");
   }
 
-  function removeMustVisit(place: string) {
+  function removeMustVisit(entryId: string) {
+    const entry = plannedPlaces.find((item) => item.id === entryId);
+    const nextPlannedPlaces = plannedPlaces.filter((item) => item.id !== entryId);
+
     setSaved(false);
-    setDraft((current) => ({
-      ...current,
-      mustVisits: current.mustVisits.filter((item) => item !== place),
-    }));
+    setPlannedPlaces(nextPlannedPlaces);
+    syncDraftMustVisits(nextPlannedPlaces);
+
+    if (entry?.routeStopId) {
+      setPreviewRoute((current) =>
+        persistPreviewRoute(removeRouteStop(current, entry.routeStopId ?? "")),
+      );
+    }
   }
 
   function handleMustVisitKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -265,6 +302,44 @@ export function PlanningDesk() {
       setMustVisitSuggestions([]);
       setMustVisitSearchState("error");
       setMustVisitSearchMessage("高德地点搜索失败，可先手工添加。");
+    }
+  }
+
+  function syncDraftMustVisits(entries: PlannedPlaceEntry[]) {
+    setDraft((current) => ({
+      ...current,
+      mustVisits: entries.map((entry) => entry.name),
+    }));
+  }
+
+  function findAddedStopId(
+    previousRoute: typeof previewRoute,
+    nextRoute: typeof previewRoute,
+  ) {
+    const previousIds = new Set(previousRoute.stops.map((stop) => stop.id));
+    return nextRoute.stops.find((stop) => !previousIds.has(stop.id))?.id ?? null;
+  }
+
+  function plannedPlaceId(name: string, index: number) {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return `place-${crypto.randomUUID()}`;
+    }
+
+    return `place-${index}-${name}`;
+  }
+
+  function placeRoleLabel(role: RouteStopPlacement) {
+    return placeRoleOptions.find((option) => option.value === role)?.label ?? "必去";
+  }
+
+  function placeRoleNote(role: RouteStopPlacement) {
+    switch (role) {
+      case "start":
+        return "用户指定为出发点。";
+      case "end":
+        return "用户指定为终点。";
+      case "middle":
+        return "用户指定为必去点。";
     }
   }
 
@@ -397,100 +472,6 @@ export function PlanningDesk() {
     );
   }
 
-  function addManualStop() {
-    if (!manualStop.name.trim()) {
-      return;
-    }
-
-    setSaved(false);
-    setPreviewRoute((current) => {
-      const route = selectedPlace
-        ? appendPlaceCandidateToRoute(current, {
-            place: selectedPlace,
-            stayMinutes: manualStop.stayMinutes,
-            themes: manualStop.themes,
-            note: manualStop.note,
-          })
-        : appendManualStopToRoute(current, manualStop);
-
-      return persistPreviewRoute(route);
-    });
-    setManualStop({
-      name: "",
-      area: "",
-      address: "",
-      stayMinutes: 30,
-      themes: manualStop.themes,
-      note: "",
-    });
-    setSelectedPlace(null);
-    setPlaceSuggestions([]);
-    setPlaceSearchState("idle");
-    setPlaceSearchMessage("");
-  }
-
-  async function searchAmapPlaces() {
-    const keyword = manualStop.name.trim();
-
-    if (keyword.length < 2) {
-      setPlaceSearchState("error");
-      setPlaceSearchMessage("请输入至少两个字再搜索。");
-      return;
-    }
-
-    const provider = createAmapWebServiceProvider();
-
-    if (!provider) {
-      setPlaceSearchState("error");
-      setPlaceSearchMessage("Supabase 尚未配置，暂时不能搜索高德地点。");
-      return;
-    }
-
-    setPlaceSearchState("loading");
-    setPlaceSearchMessage("正在搜索高德地点...");
-    setSelectedPlace(null);
-
-    try {
-      const places = await provider.suggestPlaces({
-        keyword,
-        city: draft.city,
-      });
-      setPlaceSuggestions(places);
-      setPlaceSearchState("ready");
-      setPlaceSearchMessage(
-        places.length > 0 ? `找到 ${places.length} 个地点。` : "没有找到匹配地点。",
-      );
-    } catch {
-      setPlaceSuggestions([]);
-      setPlaceSearchState("error");
-      setPlaceSearchMessage("高德地点搜索失败，可先使用手工地点。");
-    }
-  }
-
-  function selectAmapPlace(place: PlaceCandidate) {
-    setSelectedPlace(place);
-    setManualStop((current) => ({
-      ...current,
-      name: place.name,
-      area: place.district ?? place.city,
-      address: place.address ?? "",
-    }));
-    setPlaceSearchMessage(`${place.name} 已选用，加入后会保存高德 POI ID。`);
-  }
-
-  function toggleManualTheme(theme: Theme) {
-    setManualStop((current) => {
-      const themes = current.themes.includes(theme)
-        ? current.themes.filter((item) => item !== theme)
-        : [...current.themes, theme];
-
-      return {
-        ...current,
-        themes: themes.length > 0 ? themes : [theme],
-      };
-    });
-  }
-
   function toggleCandidateType(type: CandidatePlaceType) {
     setSelectedCandidateTypes((current) => {
       if (current.length === 1 && current.includes(type)) {
@@ -543,18 +524,33 @@ export function PlanningDesk() {
           <div>
             <p>有一定要去的地方吗？</p>
             <div className="chip-row">
-              {draft.mustVisits.map((place) => (
+              {plannedPlaces.map((place) => (
                 <button
-                  aria-label={`移除必去地点 ${place}`}
+                  aria-label={`移除地点 ${place.name}`}
                   className="chip selected removable"
-                  key={place}
-                  onClick={() => removeMustVisit(place)}
+                  key={place.id}
+                  onClick={() => removeMustVisit(place.id)}
                   type="button"
                 >
-                  {place}
+                  <span className="chip-prefix">{placeRoleLabel(place.role)}</span>
+                  {place.name}
                   <X size={13} aria-hidden="true" />
                 </button>
               ))}
+            </div>
+            <div className="place-role-row" aria-label="地点分类">
+              {placeRoleOptions.map((option) => (
+                <button
+                  className={placeRole === option.value ? "selected" : ""}
+                  key={option.value}
+                  onClick={() => setPlaceRole(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="chip-row">
               <div className="must-visit-add">
                 <input
                   aria-label="新增必去地点"
@@ -600,7 +596,7 @@ export function PlanningDesk() {
                 {mustVisitSuggestions.map((place) => (
                   <button
                     key={place.id}
-                    onClick={() => addMustVisit(place.name)}
+                    onClick={() => addMustVisit(place.name, place)}
                     type="button"
                   >
                     <strong>{place.name}</strong>
@@ -951,137 +947,6 @@ export function PlanningDesk() {
             </dd>
           </div>
         </dl>
-
-        <section className="manual-stop-panel" aria-label="地点确认与加入">
-          <h3>地点确认与加入</h3>
-          <label>
-            地点名称
-            <input
-              onChange={(event) =>
-                setManualStop((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-              placeholder="酒店、集合点或临时路口"
-              type="text"
-              value={manualStop.name}
-            />
-          </label>
-          <div className="place-search-actions">
-            <button
-              disabled={
-                placeSearchState === "loading" || !isAmapWebProxyConfigured()
-              }
-              onClick={searchAmapPlaces}
-              type="button"
-            >
-              <Search size={15} />
-              {placeSearchState === "loading" ? "搜索中" : "搜索高德地点"}
-            </button>
-            {placeSearchMessage ? (
-              <span className={placeSearchState}>{placeSearchMessage}</span>
-            ) : null}
-          </div>
-          {placeSuggestions.length > 0 ? (
-            <div className="place-suggestion-list">
-              {placeSuggestions.map((place) => (
-                <button
-                  className={selectedPlace?.id === place.id ? "selected" : ""}
-                  key={place.id}
-                  onClick={() => selectAmapPlace(place)}
-                  type="button"
-                >
-                  <strong>{place.name}</strong>
-                  <span>
-                    {[place.district, place.address].filter(Boolean).join(" · ")}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <label>
-            片区
-            <input
-              onChange={(event) =>
-                setManualStop((current) => ({
-                  ...current,
-                  area: event.target.value,
-                }))
-              }
-              placeholder={draft.city}
-              type="text"
-              value={manualStop.area}
-            />
-          </label>
-          <label>
-            地址备注
-            <input
-              onChange={(event) =>
-                setManualStop((current) => ({
-                  ...current,
-                  address: event.target.value,
-                }))
-              }
-              placeholder="可先写大致位置"
-              type="text"
-              value={manualStop.address}
-            />
-          </label>
-          <label>
-            停留时长
-            <input
-              aria-label="手工站点停留时长"
-              max={240}
-              min={5}
-              onChange={(event) =>
-                setManualStop((current) => ({
-                  ...current,
-                  stayMinutes: Number(event.target.value),
-                }))
-              }
-              step={5}
-              type="number"
-              value={manualStop.stayMinutes}
-            />
-          </label>
-          <div className="manual-theme-row">
-            {allThemes.map((theme, index) => (
-              <button
-                aria-label={`切换手工站点主题 ${index + 1}`}
-                className={manualStop.themes.includes(theme) ? "selected" : ""}
-                key={theme}
-                onClick={() => toggleManualTheme(theme)}
-                type="button"
-              >
-                {theme}
-              </button>
-            ))}
-          </div>
-          <label>
-            备注
-            <textarea
-              onChange={(event) =>
-                setManualStop((current) => ({
-                  ...current,
-                  note: event.target.value,
-                }))
-              }
-              placeholder="例如：朋友家集合，出发前确认门牌"
-              rows={2}
-              value={manualStop.note}
-            />
-          </label>
-          <button
-            className="secondary-button"
-            disabled={!manualStop.name.trim()}
-            onClick={addManualStop}
-            type="button"
-          >
-            <Plus size={16} />
-            {selectedPlace ? "加入高德地点" : "加入手工地点"}
-          </button>
-        </section>
 
         <div className="route-preview-list" aria-label="路线预案站点">
           {previewKernel.stops.map((stop, index) => (

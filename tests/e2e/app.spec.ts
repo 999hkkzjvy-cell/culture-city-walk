@@ -52,14 +52,15 @@ test("planning page can edit city and must-visit places", async ({ page }) => {
   await expect(page.getByRole("button", { name: "搜高德" })).toBeVisible();
   await page.getByLabel("新增必去地点").press("Enter");
   await expect(
-    page.getByRole("button", { name: "移除必去地点 拙政园" }),
+    page.getByRole("button", { name: "移除地点 拙政园" }),
   ).toBeVisible();
+  await expect(page.getByLabel("路线预案站点")).toContainText("拙政园");
 
   await page
-    .getByRole("button", { name: "移除必去地点 先锋书店" })
+    .getByRole("button", { name: "移除地点 先锋书店" })
     .click();
   await expect(
-    page.getByRole("button", { name: "移除必去地点 先锋书店" }),
+    page.getByRole("button", { name: "移除地点 先锋书店" }),
   ).toHaveCount(0);
 
   await page.getByRole("button", { name: "保存草稿" }).click();

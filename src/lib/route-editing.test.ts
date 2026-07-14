@@ -37,7 +37,7 @@ describe("route editing", () => {
     );
   });
 
-  it("does not insert the same candidate twice", () => {
+  it("allows the same candidate to appear twice when explicitly inserted", () => {
     const [candidate] = generateRouteCandidates(demoRoute, {
       themes: ["历史"],
       maxResults: 1,
@@ -45,7 +45,10 @@ describe("route editing", () => {
     const once = insertCandidateIntoRoute(demoRoute, candidate);
     const twice = insertCandidateIntoRoute(once, candidate);
 
-    expect(twice.stops).toHaveLength(once.stops.length);
+    expect(twice.stops).toHaveLength(once.stops.length + 1);
+    expect(calculateRouteKernel(twice).issues).not.toContainEqual(
+      expect.objectContaining({ code: "duplicate_poi" }),
+    );
   });
 
   it("appends a manual stop with user-confirmed provenance", () => {
@@ -91,7 +94,6 @@ describe("route editing", () => {
 
     expect(stop).toEqual(
       expect.objectContaining({
-        id: "amap:B001905YQ1",
         source: "amap",
         sourcePlaceId: "B001905YQ1",
         verificationStatus: "verified",
@@ -114,7 +116,35 @@ describe("route editing", () => {
       },
       stayMinutes: 40,
       themes: ["书店", "文学"],
-    }).stops).toHaveLength(edited.stops.length);
+    }).stops).toHaveLength(edited.stops.length + 1);
+  });
+
+  it("can insert a confirmed place as the route start", () => {
+    const edited = appendPlaceCandidateToRoute(demoRoute, {
+      place: {
+        id: "amap:start",
+        source: "amap",
+        sourcePlaceId: "start",
+        name: "酒店",
+        address: "集合点",
+        city: "南京市",
+        district: "鼓楼区",
+        adcode: "320106",
+        coordinate: { lng: 118.77, lat: 32.05, system: "gcj02" },
+        poiType: "住宿服务",
+        verificationStatus: "verified",
+      },
+      stayMinutes: 5,
+      themes: ["历史"],
+      placement: "start",
+    });
+
+    expect(edited.stops[0]).toEqual(
+      expect.objectContaining({
+        name: "酒店",
+        sourcePlaceId: "start",
+      }),
+    );
   });
 
   it("moves a stop and recalculates route distance", () => {

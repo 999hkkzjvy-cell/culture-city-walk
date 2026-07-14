@@ -15,7 +15,7 @@ Phase 4/5 development has a key split:
 
 - Complete-mode route candidate pipeline:
   - candidate type taxonomy
-  - duplicate POI exclusion
+  - repeated route POIs are allowed so loops and return-to-origin routes can be planned
   - best insertion-point estimation
   - detour, theme, and diversity scoring
   - `非常顺路` / `推荐` / `可考虑` bands
@@ -37,7 +37,7 @@ Phase 4/5 development has a key split:
 - Route editing foundation:
   - pure candidate insertion function
   - estimated leg recalculation after insert, delete, move, or stay-time edits
-  - duplicate insertion guard
+  - repeated POI support with distinct route-stop identities
   - minimum two-stop route guard
 - Route reader local preview:
   - route reader prefers the locally saved planning preview

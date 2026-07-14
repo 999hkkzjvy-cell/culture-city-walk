@@ -13,7 +13,7 @@ labels, and manual route editing.
 - Route kernel pure functions:
   - timeline recalculation from walking legs and stay time
   - total walking distance, walking time, stay time, and route duration
-  - duplicate POI detection
+  - repeated POIs are allowed for loops and return routes
   - fixed appointment conflict detection
   - missing start/end and missing leg warnings
 - Map provider boundary:
@@ -30,7 +30,7 @@ labels, and manual route editing.
 - Tests:
   - timeline pure-function test
   - fixed appointment conflict test
-  - duplicate POI test
+  - repeated POI loop test
   - start/end requirement test
   - estimated-vs-provider source test
   - AMap URL and POI parsing tests

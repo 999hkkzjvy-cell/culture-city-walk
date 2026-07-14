@@ -94,7 +94,7 @@ describe("route kernel", () => {
     );
   });
 
-  it("reports duplicate POIs", () => {
+  it("allows duplicate POIs for loops and return routes", () => {
     const issues = validateRouteStops([
       stop({ id: "a", name: "A", sourcePlaceId: "amap-1" }),
       stop({
@@ -110,12 +110,8 @@ describe("route kernel", () => {
       }),
     ]);
 
-    expect(issues).toContainEqual(
-      expect.objectContaining({
-        code: "duplicate_poi",
-        stopId: "b",
-        severity: "error",
-      }),
+    expect(issues).not.toContainEqual(
+      expect.objectContaining({ code: "duplicate_poi" }),
     );
   });
 

@@ -4,12 +4,15 @@ import type { RouteCandidate } from "@/lib/route-candidates";
 import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 
+export type RouteStopPlacement = "start" | "middle" | "end";
+
 export type ManualRouteStopInput = {
   name: string;
   area: string;
   address: string;
   stayMinutes: number;
   themes: Theme[];
+  placement?: RouteStopPlacement;
   note?: string;
 };
 
@@ -17,6 +20,7 @@ export type PlaceRouteStopInput = {
   place: PlaceCandidate;
   stayMinutes: number;
   themes: Theme[];
+  placement?: RouteStopPlacement;
   note?: string;
 };
 
@@ -24,15 +28,6 @@ export function insertCandidateIntoRoute(
   route: RoutePlan,
   candidate: RouteCandidate,
 ): RoutePlan {
-  const existingPlaceIds = new Set(
-    route.stops.map((stop) => stop.sourcePlaceId ?? stop.id),
-  );
-  const candidatePlaceId = candidate.place.sourcePlaceId ?? candidate.place.id;
-
-  if (existingPlaceIds.has(candidatePlaceId)) {
-    return route;
-  }
-
   const insertionIndex = Math.min(
     Math.max(candidate.insertionIndex + 1, 1),
     route.stops.length,
@@ -87,24 +82,18 @@ export function appendManualStopToRoute(
       "手工确认地点。接入高德后可再补充坐标、开放状态和真实步行路线。",
   };
 
-  return rebuildRouteFromStops(route, [...route.stops, manualStop]);
+  return rebuildRouteFromStops(
+    route,
+    insertStopByPlacement(route.stops, manualStop, input.placement ?? "middle"),
+  );
 }
 
 export function appendPlaceCandidateToRoute(
   route: RoutePlan,
   input: PlaceRouteStopInput,
 ): RoutePlan {
-  const existingPlaceIds = new Set(
-    route.stops.map((stop) => stop.sourcePlaceId ?? stop.id),
-  );
-  const placeId = input.place.sourcePlaceId ?? input.place.id;
-
-  if (existingPlaceIds.has(placeId)) {
-    return route;
-  }
-
   const placeStop: RouteStop = {
-    id: input.place.id,
+    id: uniqueStopId(input.place.id),
     name: input.place.name,
     area: input.place.district ?? input.place.city,
     address: input.place.address ?? "地址待高德复核",
@@ -121,7 +110,22 @@ export function appendPlaceCandidateToRoute(
       "高德已确认地点。出发前仍建议核验开放时间、预约和现场状态。",
   };
 
-  return rebuildRouteFromStops(route, [...route.stops, placeStop]);
+  return rebuildRouteFromStops(
+    route,
+    insertStopByPlacement(route.stops, placeStop, input.placement ?? "middle"),
+  );
+}
+
+function insertStopByPlacement(
+  stops: RouteStop[],
+  stop: RouteStop,
+  placement: RouteStopPlacement,
+) {
+  if (placement === "start") {
+    return [stop, ...stops];
+  }
+
+  return [...stops, stop];
 }
 
 export function moveRouteStop(
@@ -159,6 +163,14 @@ function manualStopId(name: string) {
   }
 
   return `manual-${slug}-${Date.now().toString(36)}`;
+}
+
+function uniqueStopId(baseId: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${baseId}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  return `${baseId}-${Date.now().toString(36)}`;
 }
 
 export function updateStopStayMinutes(

@@ -80,7 +80,6 @@ export function calculateTimeline(stops: RouteStop[]): TimelineStop[] {
 
 export function validateRouteStops(stops: RouteStop[]): RouteKernelIssue[] {
   const issues: RouteKernelIssue[] = [];
-  const seenPlaceIds = new Map<string, string>();
 
   if (stops.length < 2) {
     issues.push({
@@ -91,20 +90,6 @@ export function validateRouteStops(stops: RouteStop[]): RouteKernelIssue[] {
   }
 
   stops.forEach((stop, index) => {
-    const uniquePlaceId = stop.sourcePlaceId ?? stop.id;
-    const previousStopName = seenPlaceIds.get(uniquePlaceId);
-
-    if (previousStopName) {
-      issues.push({
-        code: "duplicate_poi",
-        severity: "error",
-        stopId: stop.id,
-        message: `${stop.name} 与 ${previousStopName} 指向同一个地点，需要删除重复站点。`,
-      });
-    } else {
-      seenPlaceIds.set(uniquePlaceId, stop.name);
-    }
-
     if (index > 0 && !stop.walkingFromPrevious) {
       issues.push({
         code: "missing_route_leg",
