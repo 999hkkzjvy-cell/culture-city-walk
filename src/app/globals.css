@@ -133,9 +133,14 @@ button {
   font-size: 14px;
 }
 
+.main-nav a {
+  color: inherit;
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
 .main-nav a:first-child {
   color: var(--green-primary);
-  font-weight: 700;
 }
 
 .header-actions {

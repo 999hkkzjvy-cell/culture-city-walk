@@ -93,6 +93,9 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/maps/types.ts` - map provider, coordinate, POI, and walking-leg
   contracts.
 - `src/lib/maps/amap.ts` - AMap URI helpers and POI parsing helpers.
+- `src/lib/maps/amap-web.ts` - browser-side AMap Web Service provider that
+  calls the Supabase `amap-proxy` Edge Function instead of exposing the Web
+  Service key.
 - `src/lib/maps/fallback.ts` - local estimated walking-leg fallback.
 - `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
   It also persists route-candidate snapshots and candidate action states through
@@ -124,6 +127,8 @@ Implemented:
 - Storage bucket: private `route-media`
 - RLS: owner-only access for route data
 - Edge Function: `share-route`
+- Edge Function: `amap-proxy` for AMap POI keyword search and walking-route
+  proxy calls. Keep `AMAP_WEB_SERVICE_KEY` in Supabase Function secrets only.
 - Seed script: `supabase/seed.sql`
 - Public seed share code: `nanjing-minguo`
 - Seed share URL:
@@ -176,6 +181,7 @@ GitHub Actions repository variables required for Pages build:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_AMAP_JS_KEY`
 
 ## Current UX Notes
 

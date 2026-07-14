@@ -37,6 +37,25 @@ npm run e2e
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`（仅 Edge Function 使用）
+- `NEXT_PUBLIC_AMAP_JS_KEY`（浏览器地图展示用）
+- `AMAP_WEB_SERVICE_KEY`（仅 `amap-proxy` Edge Function 使用）
+
+已实现的 Edge Functions：
+
+- `share-route`：读取只读分享路线。
+- `amap-proxy`：代理高德 Web 服务，支持 POI 关键字搜索与步行路线规划。
+
+部署高德代理时，先在 Supabase Secrets 中设置：
+
+```bash
+supabase secrets set AMAP_WEB_SERVICE_KEY=你的高德Web服务Key
+```
+
+然后部署函数：
+
+```bash
+supabase functions deploy amap-proxy
+```
 
 ## 参考资料
 

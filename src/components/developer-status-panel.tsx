@@ -2,6 +2,7 @@
 
 import { Database, KeyRound, Map, Sparkles } from "lucide-react";
 import { isAmapJsConfigured } from "@/lib/maps/amap";
+import { isAmapWebProxyConfigured } from "@/lib/maps/amap-web";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const statuses = [
@@ -22,8 +23,8 @@ const statuses = [
   {
     label: "高德 Web",
     icon: KeyRound,
-    getReady: () => false,
-    readyText: "已接入",
+    getReady: () => isAmapWebProxyConfigured(),
+    readyText: "代理可调用",
     pendingText: "待 Edge Function",
   },
   {
