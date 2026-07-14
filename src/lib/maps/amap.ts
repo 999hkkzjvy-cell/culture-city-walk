@@ -1,4 +1,5 @@
 import type { Coordinate, PlaceCandidate } from "@/lib/maps/types";
+import type { RouteTravelMode } from "@/lib/route";
 
 const AMAP_URI_BASE = "https://uri.amap.com";
 
@@ -27,9 +28,10 @@ export function amapPlaceSearchUrl(place: {
 export function amapWalkingNavigationUrl(input: {
   from?: { name: string; coordinate?: Coordinate | null };
   to: { name: string; coordinate?: Coordinate | null };
+  mode?: RouteTravelMode;
 }) {
   const params = new URLSearchParams({
-    mode: "walk",
+    mode: amapUriMode(input.mode),
     policy: "1",
     coordinate: "gaode",
     callnative: "1",
@@ -49,6 +51,20 @@ export function amapWalkingNavigationUrl(input: {
   }
 
   return amapPlaceSearchUrl({ name: input.to.name });
+}
+
+function amapUriMode(mode: RouteTravelMode = "walking") {
+  switch (mode) {
+    case "cycling":
+      return "ride";
+    case "transit":
+      return "bus";
+    case "driving":
+    case "taxi":
+      return "car";
+    case "walking":
+      return "walk";
+  }
 }
 
 export function placeCandidateFromAmapPoi(poi: {

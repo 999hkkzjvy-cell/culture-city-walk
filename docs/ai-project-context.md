@@ -112,8 +112,10 @@ passed through query strings rather than dynamic App Router segments.
   AMap POI-to-candidate conversion, type inference, dedupe, and fallback
   provenance labels.
 - `src/lib/route-editing.ts` - pre-API route editing primitives for candidate
-  insertion, stop deletion, moving, stay-time edits, and estimated leg
-  recalculation.
+  insertion, stop deletion, moving, stay-time edits, leg travel-mode edits,
+  manual leg-minute edits, and estimated leg recalculation.
+- `src/lib/transport.ts` - local route travel-mode labels and estimated
+  duration rules for walking, cycling, transit, driving, and taxi legs.
 - `src/lib/ai/route-collaboration.ts` - Phase 5 structured intent, AI proposal,
   and theme-content schemas plus local fallback behavior.
 - `src/lib/maps/types.ts` - map provider, coordinate, POI, and walking-leg
@@ -244,6 +246,13 @@ GitHub Actions repository variables required for Pages build:
   are persisted in localStorage, and `/route/?id=demo` reads that saved preview
   before falling back to the demo route. Signed-in users are prompted to sync
   unsynced local previews.
+- Route legs support selectable travel modes: `步行`, `骑行`, `公共交通`,
+  `驾车`, and `打车`. The planning preview and route reader edit mode both allow
+  changing the mode for each "previous stop to this stop" leg and manually
+  overriding the leg minutes. Old route data without a leg mode defaults to
+  walking. AMap walking recalculation only replaces walking legs; non-walking
+  legs keep local estimates or manual overrides until provider-backed mode APIs
+  are added.
 - The planning page's must-visit flow now lives in the left conversation column:
   users can select `出发`, `必去`, or `终点`, search AMap or manually add a place,
   and the chosen place automatically appears in the right-side route preview.
@@ -284,8 +293,9 @@ Notes:
 
 Near-term likely work:
 
-- Phase 3 next: marker/polyline rendering, richer map viewport behavior, and
-  confirmed POI persistence beyond local route previews.
+- Phase 3 next: marker/polyline rendering, richer map viewport behavior,
+  provider-backed cycling/transit/driving/taxi route APIs, and confirmed POI
+  persistence beyond local route previews.
 - Phase 4/5 next: improve sampled-route candidate quality with route polyline
   density controls, add candidate opening-hours/facts verification, and persist
   richer AI usage/cost records.

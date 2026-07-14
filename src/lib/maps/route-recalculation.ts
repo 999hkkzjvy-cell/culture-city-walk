@@ -2,6 +2,7 @@ import { estimateWalkingLeg } from "@/lib/maps/fallback";
 import type { MapProvider, PlaceCandidate } from "@/lib/maps/types";
 import type { RoutePlan, RouteStop } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+import { estimateTravelLeg } from "@/lib/transport";
 
 export type RouteRecalculationResult = {
   route: RoutePlan;
@@ -30,6 +31,27 @@ export async function recalculateRouteWithProvider(
     const previousStop = stops[index - 1];
     const origin = routeStopAsPlaceCandidate(previousStop);
     const destination = routeStopAsPlaceCandidate(stop);
+    const mode = stop.walkingFromPrevious?.mode ?? "walking";
+
+    if (mode !== "walking") {
+      const estimatedLeg = estimateTravelLeg({ origin, destination, mode });
+      estimatedLegs += 1;
+      stops.push({
+        ...stop,
+        walkingFromPrevious: {
+          minutes: estimatedLeg.durationMinutes,
+          distanceMeters:
+            estimatedLeg.distanceMeters ||
+            stop.walkingFromPrevious?.distanceMeters ||
+            0,
+          mode,
+          source: "estimated",
+          provider: "local",
+        },
+      });
+      continue;
+    }
+
     const leg = await provider
       .calculateWalkingRoute({ origin, destination })
       .then((providerLeg) => {
@@ -51,6 +73,7 @@ export async function recalculateRouteWithProvider(
       walkingFromPrevious: {
         minutes: leg.durationMinutes,
         distanceMeters: leg.distanceMeters,
+        mode: "walking",
         source: leg.source,
         provider: leg.provider,
         polyline: leg.polyline,

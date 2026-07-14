@@ -8,6 +8,9 @@ export type Theme = "历史" | "文学" | "建筑" | "音乐" | "书店" | "美�
 
 export type PlanningMode = "discover" | "complete" | "refine";
 
+export type RouteTravelMode =
+  "walking" | "cycling" | "transit" | "driving" | "taxi";
+
 export type Place = {
   id: string;
   name: string;
@@ -30,6 +33,7 @@ export type RouteStop = Place & {
   walkingFromPrevious?: {
     minutes: number;
     distanceMeters: number;
+    mode?: RouteTravelMode;
     source?: "provider" | "estimated";
     provider?: "amap" | "local";
     label?: string;
@@ -109,6 +113,7 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 12,
         distanceMeters: 750,
+        mode: "walking",
         source: "estimated",
         provider: "local",
       },
@@ -131,6 +136,7 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 15,
         distanceMeters: 1100,
+        mode: "walking",
         source: "estimated",
         provider: "local",
       },
@@ -152,6 +158,7 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 9,
         distanceMeters: 620,
+        mode: "walking",
         source: "estimated",
         provider: "local",
       },
@@ -173,6 +180,7 @@ export const demoRoute: RoutePlan = {
       walkingFromPrevious: {
         minutes: 16,
         distanceMeters: 980,
+        mode: "walking",
         source: "estimated",
         provider: "local",
       },

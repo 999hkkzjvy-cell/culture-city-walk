@@ -142,9 +142,18 @@ test("route reader can edit stay time locally", async ({ page }) => {
   await page.getByRole("button", { name: "编辑路线" }).click();
   await page.getByLabel("停留分钟").first().fill("65");
   await expect(page.getByLabel("停留分钟").first()).toHaveValue("65");
+  await page.getByLabel("交通方式").first().selectOption("cycling");
+  await expect(page.getByText(/骑行 \d+ 分钟/).first()).toBeVisible();
+  await page
+    .getByLabel(/路途分钟/)
+    .first()
+    .fill("18");
+  await expect(page.getByText("骑行 18 分钟").first()).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "编辑路线" }).click();
   await expect(page.getByLabel("停留分钟").first()).toHaveValue("65");
+  await expect(page.getByLabel("交通方式").first()).toHaveValue("cycling");
+  await expect(page.getByLabel(/路途分钟/).first()).toHaveValue("18");
 });
 
 test("library page shows cloud save entry point", async ({ page }) => {

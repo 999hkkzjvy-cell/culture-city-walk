@@ -95,7 +95,7 @@ export function validateRouteStops(stops: RouteStop[]): RouteKernelIssue[] {
         code: "missing_route_leg",
         severity: "warning",
         stopId: stop.id,
-        message: `${stop.name} 缺少上一站到本站的步行数据。`,
+        message: `${stop.name} 缺少上一站到本站的路途数据。`,
       });
     }
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MapProvider } from "@/lib/maps/types";
 import { demoRoute } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+import { updateRouteLegTravelMode } from "@/lib/route-editing";
 import { recalculateRouteWithProvider } from "./route-recalculation";
 
 describe("route recalculation with map provider", () => {
@@ -57,5 +58,35 @@ describe("route recalculation with map provider", () => {
     expect(result.estimatedLegs).toBe(demoRoute.stops.length - 1);
     expect(result.errors[0]).toContain("amap unavailable");
     expect(calculateRouteKernel(result.route).legSource).toBe("estimated");
+  });
+
+  it("does not replace non-walking legs with walking provider data", async () => {
+    const mixedRoute = updateRouteLegTravelMode(demoRoute, "gym", "cycling");
+    const provider: MapProvider = {
+      async suggestPlaces() {
+        return [];
+      },
+      async calculateWalkingRoute({ origin, destination }) {
+        return {
+          fromPlaceId: origin.id,
+          toPlaceId: destination.id,
+          distanceMeters: 900,
+          durationMinutes: 12,
+          source: "provider",
+          provider: "amap",
+        };
+      },
+    };
+
+    const result = await recalculateRouteWithProvider(mixedRoute, provider);
+
+    expect(result.route.stops[1].walkingFromPrevious).toEqual(
+      expect.objectContaining({
+        mode: "cycling",
+        source: "estimated",
+        provider: "local",
+      }),
+    );
+    expect(result.providerLegs).toBe(demoRoute.stops.length - 2);
   });
 });

@@ -62,6 +62,8 @@ import {
   moveRouteStop,
   removeRouteStop,
   type RouteStopPlacement,
+  updateRouteLegMinutes,
+  updateRouteLegTravelMode,
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import {
@@ -74,6 +76,11 @@ import {
   type StoredCandidateAction,
 } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
+import {
+  getRouteTravelModeLabel,
+  routeTravelModeLabels,
+  routeTravelModes,
+} from "@/lib/transport";
 
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
 type CandidateAction = "joined" | "backup" | "ignored";
@@ -104,6 +111,7 @@ const amapCandidateTypesByPlaceType: Record<CandidatePlaceType, string[]> = {
   餐厅: ["餐饮服务"],
   公园: ["风景名胜"],
 };
+const AMAP_ROUTE_CANDIDATE_TIMEOUT_MS = 3000;
 
 function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
   const centers: Coordinate[] = [];
@@ -133,7 +141,7 @@ function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
     }
   });
 
-  return dedupeCoordinates(centers).slice(0, 8);
+  return dedupeCoordinates(centers).slice(0, 5);
 }
 
 function midpointCoordinate(
@@ -180,6 +188,19 @@ function isGcj02Coordinate(
     Number.isFinite(coordinate.lng) &&
     Number.isFinite(coordinate.lat),
   );
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error("route_candidate_timeout"));
+    }, timeoutMs);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeoutId));
+  });
 }
 
 export function PlanningDesk() {
@@ -520,19 +541,23 @@ export function PlanningDesk() {
     }
 
     try {
-      const places: PlaceCandidate[] = [];
       const types = getAmapCandidateTypes(options.acceptedTypes);
-
-      for (const center of centers) {
-        const aroundPlaces = await provider.searchPlacesAround({
-          center,
-          city: route.city,
-          types,
-          radiusMeters: 1200,
-          limit: 8,
-        });
-        places.push(...aroundPlaces);
-      }
+      const searchPlacesAround = provider.searchPlacesAround;
+      const placeGroups = await withTimeout(
+        Promise.all(
+          centers.map((center) =>
+            searchPlacesAround({
+              center,
+              city: route.city,
+              types,
+              radiusMeters: 1200,
+              limit: 8,
+            }),
+          ),
+        ),
+        AMAP_ROUTE_CANDIDATE_TIMEOUT_MS,
+      );
+      const places = placeGroups.flat();
 
       const providerCandidates = generateRouteCandidatesFromPlaces(
         route,
@@ -658,6 +683,23 @@ export function PlanningDesk() {
     setSaved(false);
     setPreviewRoute((current) =>
       persistPreviewRoute(updateStopStayMinutes(current, stopId, stayMinutes)),
+    );
+  }
+
+  function changeLegTravelMode(
+    stopId: string,
+    mode: (typeof routeTravelModes)[number],
+  ) {
+    setSaved(false);
+    setPreviewRoute((current) =>
+      persistPreviewRoute(updateRouteLegTravelMode(current, stopId, mode)),
+    );
+  }
+
+  function changeLegMinutes(stopId: string, minutes: number) {
+    setSaved(false);
+    setPreviewRoute((current) =>
+      persistPreviewRoute(updateRouteLegMinutes(current, stopId, minutes)),
     );
   }
 
@@ -1150,6 +1192,9 @@ export function PlanningDesk() {
                 </strong>
                 <span>
                   {stop.calculatedTime} · 停留 {stop.stayMinutes} 分钟
+                  {stop.walkingFromPrevious
+                    ? ` · ${getRouteTravelModeLabel(stop.walkingFromPrevious.mode)} ${stop.walkingFromPrevious.minutes} 分钟`
+                    : ""}
                 </span>
               </div>
               <div className="route-preview-controls">
@@ -1192,6 +1237,47 @@ export function PlanningDesk() {
                   <Trash2 size={14} />
                 </button>
               </div>
+              {stop.walkingFromPrevious ? (
+                <div
+                  className="route-leg-controls"
+                  aria-label={`${stop.name} 路途设置`}
+                >
+                  <label>
+                    方式
+                    <select
+                      aria-label={`${stop.name} 交通方式`}
+                      onChange={(event) =>
+                        changeLegTravelMode(
+                          stop.id,
+                          event.target
+                            .value as (typeof routeTravelModes)[number],
+                        )
+                      }
+                      value={stop.walkingFromPrevious.mode ?? "walking"}
+                    >
+                      {routeTravelModes.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {routeTravelModeLabels[mode]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    路途分钟
+                    <input
+                      aria-label={`${stop.name} 路途分钟`}
+                      max={360}
+                      min={1}
+                      onChange={(event) =>
+                        changeLegMinutes(stop.id, Number(event.target.value))
+                      }
+                      step={1}
+                      type="number"
+                      value={stop.walkingFromPrevious.minutes}
+                    />
+                  </label>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>

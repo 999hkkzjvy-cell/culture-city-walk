@@ -31,6 +31,8 @@ import {
 import { demoRoute, type RoutePlan } from "@/lib/route";
 import {
   removeRouteStop,
+  updateRouteLegMinutes,
+  updateRouteLegTravelMode,
   updateStopNote,
   updateStopStayMinutes,
 } from "@/lib/route-editing";
@@ -43,6 +45,11 @@ import {
   saveRoutePlan,
   type StoredCandidateAction,
 } from "@/lib/storage";
+import {
+  getRouteTravelModeLabel,
+  routeTravelModeLabels,
+  routeTravelModes,
+} from "@/lib/transport";
 import { readRouteId } from "@/lib/urls";
 
 let cachedRouteSnapshot:
@@ -143,7 +150,9 @@ export function RouteReader() {
 
     if (!provider) {
       setMapRecalculationState("error");
-      setMapRecalculationMessage("Supabase 尚未配置，暂时不能调用高德 Web 代理。");
+      setMapRecalculationMessage(
+        "Supabase 尚未配置，暂时不能调用高德 Web 代理。",
+      );
       return;
     }
 
@@ -283,8 +292,8 @@ export function RouteReader() {
           <div className="map-source-note">
             <strong>地图内核</strong>
             <p>
-              当前站点顺序来自本地预案。可用高德 Web 服务复核步行距离、耗时和
-              polyline；失败的路段会保留本地估算。
+              当前站点顺序来自本地预案。可用高德 Web 服务复核步行段距离、耗时和
+              polyline；非步行或失败的路段会保留本地估算。
             </p>
             <div className="map-source-actions">
               <button
@@ -326,6 +335,7 @@ export function RouteReader() {
                         }
                       : undefined,
                     to: { name: stop.name, coordinate: stop.coordinate },
+                    mode: stop.walkingFromPrevious?.mode ?? "walking",
                   });
 
             return (
@@ -338,7 +348,8 @@ export function RouteReader() {
                     <strong>{stop.calculatedTime}</strong>
                     {stop.walkingFromPrevious ? (
                       <span>
-                        步行 {stop.walkingFromPrevious.minutes} 分钟 ·{" "}
+                        {getRouteTravelModeLabel(stop.walkingFromPrevious.mode)}{" "}
+                        {stop.walkingFromPrevious.minutes} 分钟 ·{" "}
                         {stop.walkingFromPrevious.distanceMeters} m
                         <em>
                           {stop.walkingFromPrevious.source === "provider"
@@ -409,6 +420,52 @@ export function RouteReader() {
                           value={stop.stayMinutes}
                         />
                       </label>
+                      {stop.walkingFromPrevious ? (
+                        <div className="stop-leg-edit">
+                          <label>
+                            交通方式
+                            <select
+                              onChange={(event) =>
+                                persistRouteEdit(
+                                  updateRouteLegTravelMode(
+                                    route,
+                                    stop.id,
+                                    event.target
+                                      .value as (typeof routeTravelModes)[number],
+                                  ),
+                                )
+                              }
+                              value={stop.walkingFromPrevious.mode ?? "walking"}
+                            >
+                              {routeTravelModes.map((mode) => (
+                                <option key={mode} value={mode}>
+                                  {routeTravelModeLabels[mode]}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            路途分钟
+                            <input
+                              aria-label={`${stop.name} 路途分钟`}
+                              max={360}
+                              min={1}
+                              onChange={(event) =>
+                                persistRouteEdit(
+                                  updateRouteLegMinutes(
+                                    route,
+                                    stop.id,
+                                    Number(event.target.value),
+                                  ),
+                                )
+                              }
+                              step={1}
+                              type="number"
+                              value={stop.walkingFromPrevious.minutes}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
                       <label>
                         个人备注
                         <textarea
@@ -450,7 +507,7 @@ export function RouteReader() {
                     target="_blank"
                   >
                     <Navigation size={15} />
-                    {index === 0 ? "在高德查看地点" : "打开高德步行导航"}
+                    {index === 0 ? "在高德查看地点" : "打开高德导航"}
                   </a>
                 </div>
               </article>

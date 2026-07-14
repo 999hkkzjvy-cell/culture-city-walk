@@ -1,8 +1,8 @@
-import { estimateWalkingLeg } from "@/lib/maps/fallback";
 import type { PlaceCandidate } from "@/lib/maps/types";
 import type { RouteCandidate } from "@/lib/route-candidates";
-import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
+import type { RoutePlan, RouteStop, RouteTravelMode, Theme } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+import { estimateTravelLeg, estimateTravelMinutes } from "@/lib/transport";
 
 export type RouteStopPlacement = "start" | "middle" | "end";
 
@@ -180,7 +180,7 @@ export function updateStopStayMinutes(
 ): RoutePlan {
   const safeStayMinutes = Math.min(240, Math.max(5, Math.round(stayMinutes)));
 
-  return rebuildRouteFromStops(
+  return rebuildRouteTimeline(
     route,
     route.stops.map((stop) =>
       stop.id === stopId ? { ...stop, stayMinutes: safeStayMinutes } : stop,
@@ -188,12 +188,102 @@ export function updateStopStayMinutes(
   );
 }
 
+export function updateRouteLegTravelMode(
+  route: RoutePlan,
+  stopId: string,
+  mode: RouteTravelMode,
+): RoutePlan {
+  const stopIndex = route.stops.findIndex((stop) => stop.id === stopId);
+
+  if (stopIndex <= 0) {
+    return route;
+  }
+
+  const stops: RouteStop[] = route.stops.map((stop, index) => {
+    if (index !== stopIndex) {
+      return stop;
+    }
+
+    const previousStop = route.stops[index - 1];
+    const currentLeg = stop.walkingFromPrevious;
+
+    if (mode === "walking" && currentLeg?.source === "provider") {
+      return {
+        ...stop,
+        walkingFromPrevious: {
+          ...currentLeg,
+          mode,
+        },
+      };
+    }
+
+    const estimatedLeg = estimateTravelLeg({
+      origin: routeStopAsPlaceCandidate(previousStop),
+      destination: routeStopAsPlaceCandidate(stop),
+      mode,
+    });
+    const distanceMeters =
+      estimatedLeg.distanceMeters || currentLeg?.distanceMeters || 0;
+
+    return {
+      ...stop,
+      walkingFromPrevious: {
+        minutes:
+          estimatedLeg.durationMinutes ||
+          estimateTravelMinutes(distanceMeters, mode, currentLeg?.minutes),
+        distanceMeters,
+        mode,
+        source: "estimated",
+        provider: "local",
+      },
+    };
+  });
+
+  return rebuildRouteTimeline(route, stops);
+}
+
+export function updateRouteLegMinutes(
+  route: RoutePlan,
+  stopId: string,
+  minutes: number,
+): RoutePlan {
+  const stopIndex = route.stops.findIndex((stop) => stop.id === stopId);
+
+  if (stopIndex <= 0) {
+    return route;
+  }
+
+  const safeMinutes = Math.min(360, Math.max(1, Math.round(minutes)));
+  const stops: RouteStop[] = route.stops.map((stop, index) => {
+    if (index !== stopIndex) {
+      return stop;
+    }
+
+    const currentLeg = stop.walkingFromPrevious;
+
+    return {
+      ...stop,
+      walkingFromPrevious: {
+        minutes: safeMinutes,
+        distanceMeters: currentLeg?.distanceMeters ?? 0,
+        mode: currentLeg?.mode ?? "walking",
+        source: "estimated",
+        provider: "local",
+        label: "手动调整",
+        polyline: currentLeg?.polyline,
+      },
+    };
+  });
+
+  return rebuildRouteTimeline(route, stops);
+}
+
 export function updateStopNote(
   route: RoutePlan,
   stopId: string,
   note: string,
 ): RoutePlan {
-  return rebuildRouteFromStops(
+  return rebuildRouteTimeline(
     route,
     route.stops.map((stop) =>
       stop.id === stopId ? { ...stop, note: note.trim() } : stop,
@@ -206,7 +296,11 @@ export function rebuildRouteFromStops(
   stops: RouteStop[],
 ): RoutePlan {
   const stopsWithLegs = recalculateEstimatedLegs(stops);
-  const kernel = calculateRouteKernel({ ...route, stops: stopsWithLegs });
+  return rebuildRouteTimeline(route, stopsWithLegs);
+}
+
+function rebuildRouteTimeline(route: RoutePlan, stops: RouteStop[]): RoutePlan {
+  const kernel = calculateRouteKernel({ ...route, stops });
   const timelineStops = kernel.stops.map((stop) => ({
     ...stop,
     time: stop.calculatedTime,
@@ -230,9 +324,11 @@ function recalculateEstimatedLegs(stops: RouteStop[]): RouteStop[] {
     }
 
     const previousStop = stops[index - 1];
-    const leg = estimateWalkingLeg({
+    const mode = stop.walkingFromPrevious?.mode ?? "walking";
+    const leg = estimateTravelLeg({
       origin: routeStopAsPlaceCandidate(previousStop),
       destination: routeStopAsPlaceCandidate(stop),
+      mode,
     });
 
     return {
@@ -240,6 +336,7 @@ function recalculateEstimatedLegs(stops: RouteStop[]): RouteStop[] {
       walkingFromPrevious: {
         minutes: leg.durationMinutes,
         distanceMeters: leg.distanceMeters,
+        mode,
         source: leg.source,
         provider: leg.provider,
       },

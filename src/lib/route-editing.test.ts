@@ -8,6 +8,8 @@ import {
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
+  updateRouteLegMinutes,
+  updateRouteLegTravelMode,
   updateStopStayMinutes,
   updateStopNote,
 } from "./route-editing";
@@ -100,23 +102,25 @@ describe("route editing", () => {
         coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
       }),
     );
-    expect(appendPlaceCandidateToRoute(edited, {
-      place: {
-        id: "amap:B001905YQ1",
-        source: "amap",
-        sourcePlaceId: "B001905YQ1",
-        name: "先锋书店(五台山总店)",
-        address: "广州路173号",
-        city: "南京市",
-        district: "鼓楼区",
-        adcode: "320106",
-        coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
-        poiType: "购物服务;专卖店;书店",
-        verificationStatus: "verified",
-      },
-      stayMinutes: 40,
-      themes: ["书店", "文学"],
-    }).stops).toHaveLength(edited.stops.length + 1);
+    expect(
+      appendPlaceCandidateToRoute(edited, {
+        place: {
+          id: "amap:B001905YQ1",
+          source: "amap",
+          sourcePlaceId: "B001905YQ1",
+          name: "先锋书店(五台山总店)",
+          address: "广州路173号",
+          city: "南京市",
+          district: "鼓楼区",
+          adcode: "320106",
+          coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
+          poiType: "购物服务;专卖店;书店",
+          verificationStatus: "verified",
+        },
+        stayMinutes: 40,
+        themes: ["书店", "文学"],
+      }).stops,
+    ).toHaveLength(edited.stops.length + 1);
   });
 
   it("can insert a confirmed place as the route start", () => {
@@ -162,6 +166,32 @@ describe("route editing", () => {
     expect(calculateRouteKernel(edited).totalStayMinutes).toBeGreaterThan(
       calculateRouteKernel(demoRoute).totalStayMinutes,
     );
+  });
+
+  it("updates a leg travel mode and manual travel minutes", () => {
+    const cycling = updateRouteLegTravelMode(demoRoute, "gym", "cycling");
+
+    expect(cycling.stops[1].walkingFromPrevious).toEqual(
+      expect.objectContaining({
+        mode: "cycling",
+        source: "estimated",
+        provider: "local",
+      }),
+    );
+    expect(cycling.stops[1].walkingFromPrevious?.minutes).toBeLessThan(
+      demoRoute.stops[1].walkingFromPrevious?.minutes ?? 999,
+    );
+
+    const manual = updateRouteLegMinutes(cycling, "gym", 18);
+
+    expect(manual.stops[1].walkingFromPrevious).toEqual(
+      expect.objectContaining({
+        mode: "cycling",
+        minutes: 18,
+        label: "手动调整",
+      }),
+    );
+    expect(calculateRouteKernel(manual).stops[1].calculatedTime).toBe("10:33");
   });
 
   it("updates a stop note and recalculates the route", () => {

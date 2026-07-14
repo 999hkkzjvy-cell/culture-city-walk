@@ -2327,6 +2327,37 @@ button {
   font-size: 13px;
 }
 
+.route-leg-controls {
+  display: grid;
+  grid-template-columns: minmax(105px, 1fr) minmax(92px, 0.75fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.route-leg-controls label,
+.stop-leg-edit label {
+  display: grid;
+  gap: 4px;
+  color: var(--green-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-leg-controls select,
+.route-leg-controls input {
+  min-height: 30px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.route-leg-controls input {
+  padding: 0 8px;
+}
+
 .route-hero {
   position: relative;
   display: flex;
@@ -2675,6 +2706,7 @@ button {
 }
 
 .stop-edit-panel input,
+.stop-edit-panel select,
 .stop-edit-panel textarea {
   width: 100%;
   padding: 9px 10px;
@@ -2685,6 +2717,12 @@ button {
   color: var(--text-primary);
   font-weight: 400;
   line-height: 1.6;
+}
+
+.stop-leg-edit {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(110px, 0.7fr);
+  gap: 10px;
 }
 
 .stop-edit-delete {
