@@ -949,6 +949,22 @@ button {
   box-shadow: 0 0 0 3px rgb(23 62 50 / 10%);
 }
 
+.must-visit-search-status {
+  display: block;
+  margin-top: 9px;
+  color: #5f675f;
+  font-size: 12px;
+}
+
+.must-visit-search-status.error {
+  color: #7a5a27;
+}
+
+.place-suggestion-list.compact {
+  max-width: 420px;
+  margin-top: 10px;
+}
+
 .plan-actions {
   display: flex;
   flex-wrap: wrap;

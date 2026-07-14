@@ -45,6 +45,7 @@ test("planning page can edit city and must-visit places", async ({ page }) => {
   await expect(page.getByLabel("去哪座城市")).toHaveValue("苏州");
 
   await page.getByLabel("新增必去地点").fill("拙政园");
+  await expect(page.getByRole("button", { name: "搜高德" })).toBeVisible();
   await page.getByLabel("新增必去地点").press("Enter");
   await expect(
     page.getByRole("button", { name: "移除必去地点 拙政园" }),

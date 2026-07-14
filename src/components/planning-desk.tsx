@@ -90,6 +90,12 @@ export function PlanningDesk() {
     "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
   );
   const [mustVisitInput, setMustVisitInput] = useState("");
+  const [mustVisitSearchState, setMustVisitSearchState] =
+    useState<PlaceSearchState>("idle");
+  const [mustVisitSearchMessage, setMustVisitSearchMessage] = useState("");
+  const [mustVisitSuggestions, setMustVisitSuggestions] = useState<
+    PlaceCandidate[]
+  >([]);
   const [candidates, setCandidates] = useState<RouteCandidate[]>(() =>
     typeof window === "undefined" ? [] : readCurrentCandidateState().candidates,
   );
@@ -183,8 +189,8 @@ export function PlanningDesk() {
     }));
   }
 
-  function addMustVisit() {
-    const place = mustVisitInput.trim();
+  function addMustVisit(placeName = mustVisitInput) {
+    const place = placeName.trim();
 
     if (!place) {
       return;
@@ -202,6 +208,9 @@ export function PlanningDesk() {
       };
     });
     setMustVisitInput("");
+    setMustVisitSuggestions([]);
+    setMustVisitSearchState("idle");
+    setMustVisitSearchMessage("");
   }
 
   function removeMustVisit(place: string) {
@@ -219,6 +228,44 @@ export function PlanningDesk() {
 
     event.preventDefault();
     addMustVisit();
+  }
+
+  async function searchMustVisitPlaces() {
+    const keyword = mustVisitInput.trim();
+
+    if (keyword.length < 2) {
+      setMustVisitSearchState("error");
+      setMustVisitSearchMessage("请输入至少两个字再搜索。");
+      return;
+    }
+
+    const provider = createAmapWebServiceProvider();
+
+    if (!provider) {
+      setMustVisitSearchState("error");
+      setMustVisitSearchMessage("Supabase 尚未配置，暂时不能搜索高德地点。");
+      return;
+    }
+
+    setMustVisitSearchState("loading");
+    setMustVisitSearchMessage("正在搜索高德地点...");
+
+    try {
+      const places = await provider.suggestPlaces({
+        keyword,
+        city: draft.city,
+      });
+
+      setMustVisitSuggestions(places);
+      setMustVisitSearchState("ready");
+      setMustVisitSearchMessage(
+        places.length > 0 ? `找到 ${places.length} 个地点。` : "没有找到匹配地点。",
+      );
+    } catch {
+      setMustVisitSuggestions([]);
+      setMustVisitSearchState("error");
+      setMustVisitSearchMessage("高德地点搜索失败，可先手工添加。");
+    }
   }
 
   function persistDraft() {
@@ -511,17 +558,61 @@ export function PlanningDesk() {
               <div className="must-visit-add">
                 <input
                   aria-label="新增必去地点"
-                  onChange={(event) => setMustVisitInput(event.target.value)}
+                  onChange={(event) => {
+                    setMustVisitInput(event.target.value);
+                    setMustVisitSuggestions([]);
+                    setMustVisitSearchState("idle");
+                    setMustVisitSearchMessage("");
+                  }}
                   onKeyDown={handleMustVisitKeyDown}
                   placeholder="输入地点"
                   value={mustVisitInput}
                 />
-                <button className="chip" onClick={addMustVisit} type="button">
+                <button
+                  className="chip"
+                  disabled={
+                    mustVisitSearchState === "loading" ||
+                    !isAmapWebProxyConfigured()
+                  }
+                  onClick={searchMustVisitPlaces}
+                  type="button"
+                >
+                  <Search size={14} aria-hidden="true" />
+                  {mustVisitSearchState === "loading" ? "搜索中" : "搜高德"}
+                </button>
+                <button
+                  className="chip"
+                  onClick={() => addMustVisit()}
+                  type="button"
+                >
                   <Plus size={14} aria-hidden="true" />
                   添加
                 </button>
               </div>
             </div>
+            {mustVisitSearchMessage ? (
+              <span className={`must-visit-search-status ${mustVisitSearchState}`}>
+                {mustVisitSearchMessage}
+              </span>
+            ) : null}
+            {mustVisitSuggestions.length > 0 ? (
+              <div className="place-suggestion-list compact">
+                {mustVisitSuggestions.map((place) => (
+                  <button
+                    key={place.id}
+                    onClick={() => addMustVisit(place.name)}
+                    type="button"
+                  >
+                    <strong>{place.name}</strong>
+                    <span>
+                      {[place.district, place.address]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
