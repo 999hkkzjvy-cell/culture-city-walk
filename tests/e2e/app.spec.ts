@@ -66,6 +66,25 @@ test("planning page can add a candidate to the editable route preview", async ({
   ).toBeVisible();
 });
 
+test("saved planning preview appears in the route reader", async ({ page }) => {
+  await page.goto("/plan/");
+
+  await page.getByRole("button", { name: /生成沿途候选/ }).click();
+  const candidateName = await page
+    .getByLabel("沿途可选点")
+    .locator(".candidate-item h3")
+    .first()
+    .innerText();
+
+  await page.getByRole("button", { name: "加入路线" }).first().click();
+  await page.getByRole("button", { name: "保存草稿" }).click();
+  await page.getByRole("link", { name: /查看生成路线/ }).click();
+
+  await expect(
+    page.getByRole("heading", { name: candidateName }),
+  ).toBeVisible();
+});
+
 test("route reader supports direct refresh with query string", async ({
   page,
 }) => {
@@ -96,7 +115,7 @@ test("library page shows cloud save entry point", async ({ page }) => {
     page.getByRole("heading", { name: "我的路线", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "保存当前示例" }),
+    page.getByRole("button", { name: "保存当前预案" }),
   ).toBeVisible();
 });
 

@@ -47,7 +47,15 @@ import {
   removeRouteStop,
   updateStopStayMinutes,
 } from "@/lib/route-editing";
-import { readDraft, saveDraft } from "@/lib/storage";
+import {
+  readCandidateState,
+  readDraft,
+  readRoutePlan,
+  saveCandidateState,
+  saveDraft,
+  saveRoutePlan,
+  type StoredCandidateAction,
+} from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
@@ -69,10 +77,16 @@ export function PlanningDesk() {
   const [candidates, setCandidates] = useState<RouteCandidate[]>([]);
   const [candidateActions, setCandidateActions] = useState<
     Record<string, CandidateAction>
-  >({});
+  >(() =>
+    typeof window === "undefined"
+      ? {}
+      : (readCandidateState().actions as Record<string, CandidateAction>),
+  );
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);
-  const [previewRoute, setPreviewRoute] = useState(demoRoute);
+  const [previewRoute, setPreviewRoute] = useState(() =>
+    typeof window === "undefined" ? demoRoute : readRoutePlan(),
+  );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
 
@@ -115,6 +129,12 @@ export function PlanningDesk() {
 
   function persistDraft() {
     saveDraft(draft);
+    saveRoutePlan(previewRoute);
+    saveCandidateState({
+      routeId: previewRoute.id,
+      actions: candidateActions as Record<string, StoredCandidateAction>,
+      updatedAt: new Date().toISOString(),
+    });
     setSaved(true);
   }
 
@@ -129,21 +149,26 @@ export function PlanningDesk() {
 
     setCandidates(ranked.data);
     setCandidateActions({});
+    persistCandidateActions({});
     setAiWarnings([...intent.warnings, ...ranked.warnings]);
     setAiUsage(ranked.usage);
   }
 
   function markCandidate(candidateId: string, action: CandidateAction) {
-    setCandidateActions((current) => ({
-      ...current,
+    const nextActions = {
+      ...candidateActions,
       [candidateId]: action,
-    }));
+    };
+
+    setCandidateActions(nextActions);
+    persistCandidateActions(nextActions);
   }
 
   function clearCandidateAction(candidateId: string) {
     setCandidateActions((current) => {
       const next = { ...current };
       delete next[candidateId];
+      persistCandidateActions(next);
       return next;
     });
   }
@@ -152,30 +177,38 @@ export function PlanningDesk() {
     setSaved(false);
 
     if (candidateActions[candidate.id] === "joined") {
-      setPreviewRoute((current) => removeRouteStop(current, candidate.id));
+      setPreviewRoute((current) =>
+        persistPreviewRoute(removeRouteStop(current, candidate.id)),
+      );
       clearCandidateAction(candidate.id);
       return;
     }
 
-    setPreviewRoute((current) => insertCandidateIntoRoute(current, candidate));
+    setPreviewRoute((current) =>
+      persistPreviewRoute(insertCandidateIntoRoute(current, candidate)),
+    );
     markCandidate(candidate.id, "joined");
   }
 
   function removePreviewStop(stopId: string) {
     setSaved(false);
-    setPreviewRoute((current) => removeRouteStop(current, stopId));
+    setPreviewRoute((current) =>
+      persistPreviewRoute(removeRouteStop(current, stopId)),
+    );
     clearCandidateAction(stopId);
   }
 
   function movePreviewStop(fromIndex: number, toIndex: number) {
     setSaved(false);
-    setPreviewRoute((current) => moveRouteStop(current, fromIndex, toIndex));
+    setPreviewRoute((current) =>
+      persistPreviewRoute(moveRouteStop(current, fromIndex, toIndex)),
+    );
   }
 
   function changeStayMinutes(stopId: string, stayMinutes: number) {
     setSaved(false);
     setPreviewRoute((current) =>
-      updateStopStayMinutes(current, stopId, stayMinutes),
+      persistPreviewRoute(updateStopStayMinutes(current, stopId, stayMinutes)),
     );
   }
 
@@ -188,6 +221,19 @@ export function PlanningDesk() {
       return current.includes(type)
         ? current.filter((item) => item !== type)
         : [...current, type];
+    });
+  }
+
+  function persistPreviewRoute(route: typeof previewRoute) {
+    saveRoutePlan(route);
+    return route;
+  }
+
+  function persistCandidateActions(actions: Record<string, CandidateAction>) {
+    saveCandidateState({
+      routeId: previewRoute.id,
+      actions: actions as Record<string, StoredCandidateAction>,
+      updatedAt: new Date().toISOString(),
     });
   }
 

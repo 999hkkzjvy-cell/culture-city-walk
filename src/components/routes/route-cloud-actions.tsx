@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Cloud, Copy, Share2 } from "lucide-react";
 import { useState } from "react";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
-import { demoRoute } from "@/lib/route";
+import { readRoutePlan } from "@/lib/storage";
 import { shareUrl } from "@/lib/urls";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -20,7 +20,7 @@ export function RouteCloudActions() {
 
     try {
       const repository = createRouteRepository();
-      const saved = await repository.save(demoRoute);
+      const saved = await repository.save(readRoutePlan());
       setSaveState("saved");
       setMessage(`已保存：${saved.title}`);
     } catch (error) {
@@ -34,7 +34,7 @@ export function RouteCloudActions() {
 
     try {
       const repository = createRouteRepository();
-      const saved = await repository.save(demoRoute);
+      const saved = await repository.save(readRoutePlan());
       const share = await repository.createShare(saved.id);
       setShareCode(share.code);
       setMessage("分享链接已生成。");
@@ -48,7 +48,9 @@ export function RouteCloudActions() {
       return;
     }
 
-    await window.navigator.clipboard.writeText(`${window.location.origin}${shareUrl(shareCode)}`);
+    await window.navigator.clipboard.writeText(
+      `${window.location.origin}${shareUrl(shareCode)}`,
+    );
     setMessage("分享链接已复制。");
   }
 
@@ -56,7 +58,11 @@ export function RouteCloudActions() {
     <section className="cloud-actions" aria-label="云端路线操作">
       <button className="secondary-button" onClick={saveToCloud} type="button">
         <Cloud size={17} />
-        {saveState === "saving" ? "保存中" : saveState === "saved" ? "已保存" : "保存到云端"}
+        {saveState === "saving"
+          ? "保存中"
+          : saveState === "saved"
+            ? "已保存"
+            : "保存到云端"}
       </button>
       <button className="secondary-button" onClick={createShare} type="button">
         <Share2 size={17} />
@@ -67,7 +73,11 @@ export function RouteCloudActions() {
           <Link className="secondary-link" href={shareUrl(shareCode)}>
             打开分享页
           </Link>
-          <button className="icon-text-button" onClick={copyShareLink} type="button">
+          <button
+            className="icon-text-button"
+            onClick={copyShareLink}
+            type="button"
+          >
             <Copy size={16} />
             复制
           </button>

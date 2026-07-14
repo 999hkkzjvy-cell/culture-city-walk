@@ -756,10 +756,77 @@ button {
 .plan-shell {
   display: grid;
   width: min(1060px, calc(100% - 48px));
-  margin: 0 auto 54px;
+  margin: 24px auto 54px;
   grid-template-columns: minmax(0, 1fr) 330px;
   gap: 36px;
   align-items: start;
+}
+
+.dev-status-panel {
+  display: grid;
+  width: min(1060px, calc(100% - 48px));
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 48%);
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid rgb(216 208 195 / 82%);
+  border-radius: 8px;
+  background: rgb(251 247 239 / 72%);
+}
+
+.dev-status-panel p,
+.dev-status-panel h2 {
+  margin: 0;
+}
+
+.dev-status-panel p {
+  color: var(--archive-brown);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dev-status-panel h2 {
+  margin-top: 4px;
+  color: var(--green-primary);
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.dev-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dev-status-grid article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgb(255 251 244 / 70%);
+}
+
+.dev-status-grid svg {
+  color: var(--archive-brown);
+}
+
+.dev-status-grid article.ready svg {
+  color: var(--green-primary);
+}
+
+.dev-status-grid span {
+  color: #6a7069;
+  font-size: 11px;
+}
+
+.dev-status-grid strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .conversation {
@@ -1150,6 +1217,13 @@ button {
   margin-top: 18px;
 }
 
+.auth-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .auth-form label {
   display: inline-flex;
   align-items: center;
@@ -1204,6 +1278,25 @@ button {
 .route-list {
   display: grid;
   gap: 12px;
+}
+
+.library-empty {
+  display: flex;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  border: 1px dashed rgb(142 118 87 / 36%);
+  border-radius: 7px;
+  color: #665d50;
+  font-size: 14px;
+  text-align: center;
+}
+
+.library-empty svg {
+  flex: 0 0 auto;
+  color: var(--archive-brown);
 }
 
 .route-list-item {
@@ -1781,6 +1874,7 @@ button {
   .quote-band,
   .site-footer,
   .plan-shell,
+  .dev-status-panel,
   .reader-layout,
   .account-layout,
   .info-layout,
@@ -1805,6 +1899,10 @@ button {
 
   .info-cta {
     display: grid;
+  }
+
+  .dev-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .site-footer {
@@ -1906,6 +2004,7 @@ button {
   .site-footer,
   .page-intro,
   .plan-shell,
+  .dev-status-panel,
   .reader-layout,
   .account-layout,
   .route-cloud-band,

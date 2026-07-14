@@ -2,7 +2,12 @@
 
 import { LogIn, LogOut, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { createRouteRepository } from "@/lib/repositories/route-repository";
+import { readRoutePlan } from "@/lib/storage";
+import {
+  createBrowserSupabaseClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/client";
 
 type AuthState = "loading" | "signed-out" | "signed-in" | "not-configured";
 
@@ -32,11 +37,13 @@ export function AuthPanel() {
       setAuthState(user ? "signed-in" : "signed-out");
     });
 
-    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user;
-      setUserEmail(user?.email ?? null);
-      setAuthState(user ? "signed-in" : "signed-out");
-    });
+    const { data: subscription } = client.auth.onAuthStateChange(
+      (_event, session) => {
+        const user = session?.user;
+        setUserEmail(user?.email ?? null);
+        setAuthState(user ? "signed-in" : "signed-out");
+      },
+    );
 
     return () => {
       isMounted = false;
@@ -62,12 +69,26 @@ export function AuthPanel() {
       },
     });
 
-    setMessage(error ? "登录邮件发送失败，请稍后重试。" : "登录链接已发送，请检查邮箱。");
+    setMessage(
+      error ? "登录邮件发送失败，请稍后重试。" : "登录链接已发送，请检查邮箱。",
+    );
   }
 
   async function signOut() {
     const client = createBrowserSupabaseClient();
     await client?.auth.signOut();
+  }
+
+  async function syncLocalPreview() {
+    setMessage("");
+
+    try {
+      const repository = createRouteRepository();
+      const saved = await repository.save(readRoutePlan());
+      setMessage(`已同步：${saved.title}`);
+    } catch {
+      setMessage("同步失败，请稍后重试。");
+    }
   }
 
   if (authState === "loading") {
@@ -78,7 +99,9 @@ export function AuthPanel() {
     return (
       <section className="auth-panel">
         <h2>云端保存待连接</h2>
-        <p>配置 Supabase 环境变量后，就可以使用邮箱登录、跨设备保存和分享路线。</p>
+        <p>
+          配置 Supabase 环境变量后，就可以使用邮箱登录、跨设备保存和分享路线。
+        </p>
       </section>
     );
   }
@@ -88,10 +111,21 @@ export function AuthPanel() {
       <section className="auth-panel">
         <h2>已登录</h2>
         <p>{userEmail}</p>
-        <button className="secondary-button" onClick={signOut} type="button">
-          <LogOut size={17} />
-          退出登录
-        </button>
+        <div className="auth-action-row">
+          <button
+            className="secondary-button"
+            onClick={syncLocalPreview}
+            type="button"
+          >
+            <LogIn size={17} />
+            同步本地预案
+          </button>
+          <button className="secondary-button" onClick={signOut} type="button">
+            <LogOut size={17} />
+            退出登录
+          </button>
+        </div>
+        {message ? <p className="auth-message">{message}</p> : null}
       </section>
     );
   }

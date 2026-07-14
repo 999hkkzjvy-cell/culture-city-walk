@@ -30,12 +30,25 @@ Phase 4/5 development has a key split:
   - undo candidate insertion
   - editable route preview with move, delete, and stay-time controls
   - recalculated timeline, walking distance, end time, and route impact summary
+  - local persistence for route preview and candidate actions
   - local template source and zero-cost usage label
 - Route editing foundation:
   - pure candidate insertion function
   - estimated leg recalculation after insert, delete, move, or stay-time edits
   - duplicate insertion guard
   - minimum two-stop route guard
+- Route reader local preview:
+  - route reader prefers the locally saved planning preview
+  - saved candidate insertions, ordering, and stay-time edits survive refresh
+  - route reader falls back to the demo route when no local preview exists
+- Cloud/local bridge:
+  - route-page save/share actions now use the current local route preview
+  - library-page save action now saves the current local route preview
+  - signed-in auth panel can sync the current local preview to cloud storage
+- Developer status panel:
+  - Supabase client configuration state
+  - AMap JS key configuration state
+  - AMap Web Service and AI provider pending states
 - Supabase schema foundation:
   - `route_candidates` table for suggested / joined / backup / ignored states
   - `route_ai_runs` table for prompt version, schema version, token, cost,
@@ -53,10 +66,12 @@ Phase 4/5 development has a key split:
   - candidate sorting and provenance tests
   - candidate type-filter test
   - route candidate insertion, move, delete, and stay-time tests
+  - local route plan and candidate-state storage tests
   - local intent parsing test
   - invalid AI-created POI rejection test
   - fallback candidate ranking test
   - Playwright Complete-mode candidate insertion smoke test
+  - Playwright saved-preview-to-route-reader smoke test
 
 ## Still Requires AMap Configuration
 

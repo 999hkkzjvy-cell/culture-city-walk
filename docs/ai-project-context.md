@@ -74,7 +74,11 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/auth/auth-panel.tsx` - Supabase magic-link auth UI.
 - `src/components/routes/route-library.tsx` - saved route list.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
+- `src/components/routes/route-reader.tsx` - client route reader that prefers
+  the locally saved planning preview and falls back to the demo route.
 - `src/components/routes/shared-route-reader.tsx` - read-only share loader.
+- `src/components/developer-status-panel.tsx` - planning-page status panel for
+  local/API configuration state.
 - `src/lib/route.ts` - route types and demo route data.
 - `src/lib/route-kernel.ts` - Phase 3 pure route timeline, totals, and
   validation functions.
@@ -94,6 +98,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/supabase/database.types.ts` - generated/hand-maintained DB types.
 - `src/lib/urls.ts` - static-export URL helpers.
 - `src/lib/storage.ts` - localStorage draft persistence.
+- `src/lib/storage.ts` also stores the current local `RoutePlan` preview and
+  route-candidate action state.
 - `src/lib/validation/route-schemas.ts` - Zod URL/input validation.
 
 ## Supabase State
@@ -133,7 +139,8 @@ Auth is MVP-level email magic-link auth via Supabase:
 - Registration and login are the same flow.
 - Sessions are persisted by Supabase JS in the browser.
 - After login, users can save demo route data, list their own cloud routes, and
-  generate share links.
+  generate share links. Route-page and library-page save actions now use the
+  current locally edited route preview when present.
 
 Supabase Auth URL configuration must allow GitHub Pages redirects:
 
@@ -180,8 +187,10 @@ GitHub Actions repository variables required for Pages build:
   apply add/backup/ignore decisions. Candidate insertion now updates an editable
   route preview with locally estimated leg recalculation, end-time impact, move,
   delete, and stay-time controls. Candidate lists support type filters and
-  fit-band grouping. AI collaboration currently uses schemas and deterministic
-  local fallback only; there is no live DeepSeek call yet.
+  fit-band grouping. The route preview and candidate actions are persisted in
+  localStorage, and `/route/?id=demo` reads that saved preview before falling
+  back to the demo route. AI collaboration currently uses schemas and
+  deterministic local fallback only; there is no live DeepSeek call yet.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.
