@@ -39,11 +39,15 @@ npm run e2e
 - `SUPABASE_SERVICE_ROLE_KEY`（仅 Edge Function 使用）
 - `NEXT_PUBLIC_AMAP_JS_KEY`（浏览器地图展示用）
 - `AMAP_WEB_SERVICE_KEY`（仅 `amap-proxy` Edge Function 使用）
+- `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED`（公开开关，设为 `true` 后前端调用 DeepSeek 代理）
+- `DEEPSEEK_API_KEY`（仅 `deepseek-proxy` Edge Function 使用）
+- `DEEPSEEK_MODEL`（默认 `deepseek-v4-flash`）
 
 已实现的 Edge Functions：
 
 - `share-route`：读取只读分享路线。
 - `amap-proxy`：代理高德 Web 服务，支持 POI 关键字搜索与步行路线规划。
+- `deepseek-proxy`：代理 DeepSeek JSON 输出，用于规划意图解析和候选点排序。
 
 部署高德代理时，先在 Supabase Secrets 中设置：
 
@@ -55,6 +59,19 @@ supabase secrets set AMAP_WEB_SERVICE_KEY=你的高德Web服务Key
 
 ```bash
 supabase functions deploy amap-proxy
+```
+
+部署 DeepSeek 代理时，先在 Supabase Secrets 中设置：
+
+```bash
+supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-v4-flash
+```
+
+然后部署函数，并在 GitHub Pages 环境变量中把
+`NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` 设为 `true`：
+
+```bash
+supabase functions deploy deepseek-proxy
 ```
 
 ## 参考资料

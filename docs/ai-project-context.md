@@ -129,6 +129,8 @@ Implemented:
 - Edge Function: `share-route`
 - Edge Function: `amap-proxy` for AMap POI keyword search and walking-route
   proxy calls. Keep `AMAP_WEB_SERVICE_KEY` in Supabase Function secrets only.
+- Edge Function: `deepseek-proxy` for DeepSeek JSON-mode intent parsing and
+  candidate ranking. Keep `DEEPSEEK_API_KEY` in Supabase Function secrets only.
 - Seed script: `supabase/seed.sql`
 - Public seed share code: `nanjing-minguo`
 - Seed share URL:
@@ -164,6 +166,8 @@ Client-side:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` enables browser calls to the
+  `deepseek-proxy` function when set to `true`.
 - `NEXT_PUBLIC_BASE_PATH` is set by GitHub Actions for Pages builds.
 
 Server-only / function-side:
@@ -171,7 +175,8 @@ Server-only / function-side:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SHARE_ALLOWED_ORIGINS`
 - `AMAP_WEB_SERVICE_KEY` for future provider-backed walking/POI proxy
-- `DEEPSEEK_API_KEY` for future AI provider calls
+- `DEEPSEEK_API_KEY` for DeepSeek provider calls
+- `DEEPSEEK_MODEL` defaults to `deepseek-v4-flash`
 - `AI_DAILY_USER_LIMIT`
 - `AI_PROJECT_COST_LIMIT_CNY`
 
@@ -182,6 +187,7 @@ GitHub Actions repository variables required for Pages build:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_AMAP_JS_KEY`
+- `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED`
 
 ## Current UX Notes
 
@@ -199,8 +205,9 @@ GitHub Actions repository variables required for Pages build:
   fit-band grouping. The route preview and candidate actions are persisted in
   localStorage, and `/route/?id=demo` reads that saved preview before falling
   back to the demo route. Signed-in users are prompted to sync unsynced local
-  previews. AI collaboration currently uses schemas and deterministic local
-  fallback only; there is no live DeepSeek call yet.
+  previews. AI collaboration can call the Supabase `deepseek-proxy` Edge
+  Function when `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps
+  deterministic local fallback behavior.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.

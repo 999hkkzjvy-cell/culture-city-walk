@@ -4,7 +4,7 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: /认识一座城市/ }),
+    page.getByRole("heading", { name: /怎样认识一座城/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /AI 帮我发现/ })).toBeVisible();
   await expect(

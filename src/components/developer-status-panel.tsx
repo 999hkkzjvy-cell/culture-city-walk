@@ -1,6 +1,7 @@
 "use client";
 
 import { Database, KeyRound, Map, Sparkles } from "lucide-react";
+import { isDeepSeekProxyConfigured } from "@/lib/ai/deepseek";
 import { isAmapJsConfigured } from "@/lib/maps/amap";
 import { isAmapWebProxyConfigured } from "@/lib/maps/amap-web";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -30,7 +31,7 @@ const statuses = [
   {
     label: "AI",
     icon: Sparkles,
-    getReady: () => false,
+    getReady: () => isDeepSeekProxyConfigured(),
     readyText: "DeepSeek",
     pendingText: "模板 fallback",
   },

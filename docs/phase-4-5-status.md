@@ -116,10 +116,16 @@ Phase 4/5 development has a key split:
 - Loading cloud route detail directly into `/route/?id=...`; the route reader
   currently prefers local preview and demo fallback.
 
-## Still Requires AI API Configuration
+## DeepSeek Integration Status
 
-- DeepSeek provider adapter.
-- JSON mode request/response handling.
+- `deepseek-proxy` Edge Function proxies DeepSeek JSON-mode requests for
+  planning intent parsing and candidate ranking.
+- The planning page uses DeepSeek when
+  `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`, and falls back to local templates
+  on missing config or provider failure.
+
+Still pending:
+
 - One repair retry on schema validation failure.
 - Prompt version persistence.
 - Token, latency, and cost logging against user/project limits.

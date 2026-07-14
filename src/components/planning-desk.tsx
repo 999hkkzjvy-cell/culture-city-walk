@@ -39,6 +39,11 @@ import {
   type AiUsageRecord,
 } from "@/lib/ai/route-collaboration";
 import {
+  isDeepSeekProxyConfigured,
+  parseIntentWithDeepSeek,
+  rankCandidatesWithDeepSeek,
+} from "@/lib/ai/deepseek";
+import {
   calculateRouteKernel,
   formatTime,
   parseTime,
@@ -99,6 +104,7 @@ export function PlanningDesk() {
   });
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);
+  const [isGeneratingCandidates, setIsGeneratingCandidates] = useState(false);
   const [previewRoute, setPreviewRoute] = useState(() =>
     typeof window === "undefined" ? demoRoute : readRoutePlan(),
   );
@@ -227,20 +233,63 @@ export function PlanningDesk() {
     setSaved(true);
   }
 
-  function generateSuggestions() {
-    const intent = parseIntentWithFallback(requestText, draft);
-    const localCandidates = generateRouteCandidates(previewRoute, {
-      themes: intent.data.themeFilters,
-      acceptedTypes: selectedCandidateTypes,
-      maxResults: 5,
-    });
-    const ranked = rankCandidatesWithFallback(localCandidates, intent.data);
+  async function generateSuggestions() {
+    setIsGeneratingCandidates(true);
 
-    setCandidates(ranked.data);
-    setCandidateActions({});
-    persistCandidateActions({}, ranked.data);
-    setAiWarnings([...intent.warnings, ...ranked.warnings]);
-    setAiUsage(ranked.usage);
+    try {
+      const intent = await getPlanningIntent();
+      const localCandidates = generateRouteCandidates(previewRoute, {
+        themes: intent.data.themeFilters,
+        acceptedTypes: selectedCandidateTypes,
+        maxResults: 5,
+      });
+      const ranked = await rankCandidateSuggestions(localCandidates, intent.data);
+
+      setCandidates(ranked.data);
+      setCandidateActions({});
+      persistCandidateActions({}, ranked.data);
+      setAiWarnings([...intent.warnings, ...ranked.warnings]);
+      setAiUsage(ranked.usage);
+    } finally {
+      setIsGeneratingCandidates(false);
+    }
+  }
+
+  async function getPlanningIntent() {
+    if (!isDeepSeekProxyConfigured()) {
+      return parseIntentWithFallback(requestText, draft);
+    }
+
+    try {
+      return await parseIntentWithDeepSeek(requestText, draft);
+    } catch {
+      const fallback = parseIntentWithFallback(requestText, draft);
+
+      return {
+        ...fallback,
+        warnings: ["DeepSeek 调用失败，已切回本地规则解析。", ...fallback.warnings],
+      };
+    }
+  }
+
+  async function rankCandidateSuggestions(
+    localCandidates: RouteCandidate[],
+    intent: ReturnType<typeof parseIntentWithFallback>["data"],
+  ) {
+    if (!isDeepSeekProxyConfigured()) {
+      return rankCandidatesWithFallback(localCandidates, intent);
+    }
+
+    try {
+      return await rankCandidatesWithDeepSeek(localCandidates, intent);
+    } catch {
+      const fallback = rankCandidatesWithFallback(localCandidates, intent);
+
+      return {
+        ...fallback,
+        warnings: ["DeepSeek 候选排序失败，已使用本地模板理由。", ...fallback.warnings],
+      };
+    }
   }
 
   function markCandidate(candidateId: string, action: CandidateAction) {
@@ -562,13 +611,18 @@ export function PlanningDesk() {
             <div className="candidate-toolbar">
               <button
                 className="primary-action compact"
+                disabled={isGeneratingCandidates}
                 onClick={generateSuggestions}
                 type="button"
               >
-                生成沿途候选
+                {isGeneratingCandidates ? "生成中..." : "生成沿途候选"}
                 <Sparkles size={17} />
               </button>
-              <span>高德与 DeepSeek 未配置时使用本地规则。</span>
+              <span>
+                {isDeepSeekProxyConfigured()
+                  ? "DeepSeek 已启用，失败时自动回退本地规则。"
+                  : "高德与 DeepSeek 未配置时使用本地规则。"}
+              </span>
             </div>
           </div>
         </div>

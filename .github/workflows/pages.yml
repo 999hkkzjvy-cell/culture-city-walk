@@ -46,6 +46,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_AMAP_JS_KEY: ${{ vars.NEXT_PUBLIC_AMAP_JS_KEY }}
+          NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED: ${{ vars.NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
