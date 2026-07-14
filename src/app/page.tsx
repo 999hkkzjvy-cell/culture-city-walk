@@ -104,7 +104,9 @@ export default function Home() {
             <Link className="theme-card" href={theme.href} key={theme.title}>
               <div
                 className={`theme-image theme-image-${index + 1}`}
-                style={{ "--theme-image": `url("${heroImage}")` } as CSSProperties}
+                style={
+                  { "--theme-image": `url("${heroImage}")` } as CSSProperties
+                }
               />
               <p>{theme.city}</p>
               <h3>{theme.title}</h3>
@@ -115,16 +117,14 @@ export default function Home() {
       </section>
 
       <section className="quote-band">
-        <blockquote>
-          每一条路线，都是重新阅读一座城市的方式。
-        </blockquote>
+        <blockquote>每一条路线，都是重新阅读一座城市的方式。</blockquote>
         <p>Cultural Citywalk</p>
       </section>
 
       <footer className="site-footer">
         <nav aria-label="页脚导航">
-          <Link href="/">关于我们</Link>
-          <Link href="/">如何使用</Link>
+          <Link href="/about/">关于我们</Link>
+          <Link href="/guide/">如何使用</Link>
           <Link href="/plan/">开始规划</Link>
         </nav>
         <form>

@@ -20,7 +20,7 @@ export function SiteHeader() {
         <Link href={libraryUrl()}>我的路线</Link>
         <Link href={routeUrl("demo")}>收藏</Link>
         <Link href="/">主题</Link>
-        <Link href="/">关于我们</Link>
+        <Link href="/about/">关于我们</Link>
       </nav>
 
       <div className="header-actions">

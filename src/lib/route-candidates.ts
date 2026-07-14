@@ -1,0 +1,333 @@
+import type { PlaceCandidate } from "@/lib/maps/types";
+import { estimateWalkingLeg } from "@/lib/maps/fallback";
+import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
+
+export type CandidatePlaceType =
+  "景点" | "博物馆" | "历史建筑" | "书店" | "咖啡馆" | "餐厅" | "公园";
+
+export type CandidateFitBand = "very_along" | "recommended" | "optional";
+
+export type RouteCandidate = {
+  id: string;
+  place: PlaceCandidate;
+  placeType: CandidatePlaceType;
+  themes: Theme[];
+  stayMinutes: number;
+  insertionIndex: number;
+  detourMinutes: number;
+  detourMeters: number;
+  score: number;
+  fitBand: CandidateFitBand;
+  reasons: string[];
+  risks: string[];
+  cacheKey: string;
+};
+
+export type CandidateSearchOptions = {
+  themes: Theme[];
+  acceptedTypes?: CandidatePlaceType[];
+  maxResults?: number;
+  now?: Date;
+};
+
+type SeedCandidate = Omit<
+  RouteCandidate,
+  | "id"
+  | "insertionIndex"
+  | "detourMinutes"
+  | "detourMeters"
+  | "score"
+  | "fitBand"
+  | "reasons"
+  | "risks"
+  | "cacheKey"
+>;
+
+export const candidatePlaceTypes: CandidatePlaceType[] = [
+  "景点",
+  "博物馆",
+  "历史建筑",
+  "书店",
+  "咖啡馆",
+  "餐厅",
+  "公园",
+];
+
+const LOCAL_NANJING_CANDIDATES: SeedCandidate[] = [
+  {
+    place: {
+      id: "local:john-rabe-house",
+      source: "manual",
+      sourcePlaceId: "nanjing-john-rabe-house",
+      name: "拉贝故居",
+      address: "小粉桥 1 号",
+      city: "南京",
+      district: "鼓楼",
+      adcode: null,
+      coordinate: { lng: 118.7839, lat: 32.0559, system: "gcj02" },
+      poiType: "历史建筑",
+      verificationStatus: "source_pending",
+    },
+    placeType: "历史建筑",
+    themes: ["历史", "建筑"],
+    stayMinutes: 30,
+  },
+  {
+    place: {
+      id: "local:six-dynasties-museum",
+      source: "manual",
+      sourcePlaceId: "nanjing-six-dynasties-museum",
+      name: "六朝博物馆",
+      address: "长江路 302 号",
+      city: "南京",
+      district: "玄武",
+      adcode: null,
+      coordinate: { lng: 118.797, lat: 32.0438, system: "gcj02" },
+      poiType: "博物馆",
+      verificationStatus: "source_pending",
+    },
+    placeType: "博物馆",
+    themes: ["历史", "建筑"],
+    stayMinutes: 50,
+  },
+  {
+    place: {
+      id: "local:jiangning-imperial-silk",
+      source: "manual",
+      sourcePlaceId: "nanjing-jiangning-imperial-silk",
+      name: "江宁织造博物馆",
+      address: "长江路 123 号",
+      city: "南京",
+      district: "玄武",
+      adcode: null,
+      coordinate: { lng: 118.7901, lat: 32.0442, system: "gcj02" },
+      poiType: "博物馆",
+      verificationStatus: "source_pending",
+    },
+    placeType: "博物馆",
+    themes: ["历史", "文学", "建筑"],
+    stayMinutes: 45,
+  },
+  {
+    place: {
+      id: "local:nanjing-library",
+      source: "manual",
+      sourcePlaceId: "nanjing-library",
+      name: "南京图书馆",
+      address: "中山东路 189 号",
+      city: "南京",
+      district: "玄武",
+      adcode: null,
+      coordinate: { lng: 118.7919, lat: 32.0448, system: "gcj02" },
+      poiType: "书店",
+      verificationStatus: "source_pending",
+    },
+    placeType: "书店",
+    themes: ["文学", "书店"],
+    stayMinutes: 35,
+  },
+  {
+    place: {
+      id: "local:1912-block",
+      source: "manual",
+      sourcePlaceId: "nanjing-1912-block",
+      name: "南京 1912 街区",
+      address: "太平北路",
+      city: "南京",
+      district: "玄武",
+      adcode: null,
+      coordinate: { lng: 118.7945, lat: 32.0473, system: "gcj02" },
+      poiType: "餐厅",
+      verificationStatus: "source_pending",
+    },
+    placeType: "餐厅",
+    themes: ["美食", "建筑"],
+    stayMinutes: 45,
+  },
+];
+
+export function generateRouteCandidates(
+  route: RoutePlan,
+  options: CandidateSearchOptions,
+): RouteCandidate[] {
+  const acceptedTypes = options.acceptedTypes ?? candidatePlaceTypes;
+  const maxResults = options.maxResults ?? 6;
+  const existingPlaceIds = new Set(
+    route.stops.map((stop) => stop.sourcePlaceId ?? stop.id),
+  );
+
+  return dedupeCandidates(LOCAL_NANJING_CANDIDATES)
+    .filter((candidate) => candidate.place.city === route.city)
+    .filter((candidate) => acceptedTypes.includes(candidate.placeType))
+    .filter(
+      (candidate) =>
+        !existingPlaceIds.has(
+          candidate.place.sourcePlaceId ?? candidate.place.id,
+        ),
+    )
+    .map((candidate) => scoreCandidate(route, candidate, options.themes))
+    .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
+    .slice(0, maxResults);
+}
+
+export function getCandidateBandLabel(band: CandidateFitBand) {
+  switch (band) {
+    case "very_along":
+      return "非常顺路";
+    case "recommended":
+      return "推荐";
+    case "optional":
+      return "可考虑";
+  }
+}
+
+function scoreCandidate(
+  route: RoutePlan,
+  candidate: SeedCandidate,
+  preferredThemes: Theme[],
+): RouteCandidate {
+  const insertion = findBestInsertion(route.stops, candidate.place);
+  const matchedThemes = candidate.themes.filter((theme) =>
+    preferredThemes.includes(theme),
+  );
+  const typeAlreadyUsed = route.stops.some((stop) =>
+    stop.themes.some((theme) => candidate.themes.includes(theme)),
+  );
+  const detourPenalty = Math.min(34, insertion.detourMinutes * 2.2);
+  const themeScore = matchedThemes.length * 18;
+  const diversityScore = typeAlreadyUsed ? 4 : 12;
+  const baseScore = 58 + themeScore + diversityScore - detourPenalty;
+  const score = clamp(Math.round(baseScore), 0, 100);
+  const fitBand = getFitBand(score, insertion.detourMinutes);
+  const reasons = buildReasons(
+    candidate,
+    matchedThemes,
+    insertion.detourMinutes,
+  );
+  const risks =
+    candidate.place.verificationStatus === "source_pending"
+      ? ["地点信息待高德复核"]
+      : [];
+
+  return {
+    id: candidate.place.id,
+    ...candidate,
+    insertionIndex: insertion.index,
+    detourMinutes: insertion.detourMinutes,
+    detourMeters: insertion.detourMeters,
+    score,
+    fitBand,
+    reasons,
+    risks,
+    cacheKey: [
+      route.id,
+      candidate.place.sourcePlaceId ?? candidate.place.id,
+      insertion.index,
+    ].join(":"),
+  };
+}
+
+function findBestInsertion(stops: RouteStop[], candidate: PlaceCandidate) {
+  if (stops.length < 2) {
+    return { index: 0, detourMinutes: 0, detourMeters: 0 };
+  }
+
+  return stops.slice(0, -1).reduce(
+    (best, stop, index) => {
+      const nextStop = stops[index + 1];
+      const origin = routeStopAsPlaceCandidate(stop);
+      const destination = routeStopAsPlaceCandidate(nextStop);
+      const originToCandidate = estimateWalkingLeg({
+        origin,
+        destination: candidate,
+      });
+      const candidateToDestination = estimateWalkingLeg({
+        origin: candidate,
+        destination,
+      });
+      const originalMinutes =
+        nextStop.walkingFromPrevious?.minutes ??
+        estimateWalkingLeg({ origin, destination }).durationMinutes;
+      const originalMeters =
+        nextStop.walkingFromPrevious?.distanceMeters ??
+        estimateWalkingLeg({ origin, destination }).distanceMeters;
+      const detourMinutes = Math.max(
+        0,
+        originToCandidate.durationMinutes +
+          candidateToDestination.durationMinutes -
+          originalMinutes,
+      );
+      const detourMeters = Math.max(
+        0,
+        originToCandidate.distanceMeters +
+          candidateToDestination.distanceMeters -
+          originalMeters,
+      );
+
+      return detourMinutes < best.detourMinutes
+        ? { index, detourMinutes, detourMeters }
+        : best;
+    },
+    { index: 0, detourMinutes: Number.POSITIVE_INFINITY, detourMeters: 0 },
+  );
+}
+
+function routeStopAsPlaceCandidate(
+  stop: RouteStop,
+): Pick<PlaceCandidate, "id" | "coordinate"> {
+  return {
+    id: stop.sourcePlaceId ?? stop.id,
+    coordinate: stop.coordinate ?? null,
+  };
+}
+
+function dedupeCandidates(candidates: SeedCandidate[]) {
+  const seen = new Set<string>();
+
+  return candidates.filter((candidate) => {
+    const key = candidate.place.sourcePlaceId ?? candidate.place.id;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getFitBand(score: number, detourMinutes: number): CandidateFitBand {
+  if (score >= 78 && detourMinutes <= 8) {
+    return "very_along";
+  }
+
+  if (score >= 62 && detourMinutes <= 18) {
+    return "recommended";
+  }
+
+  return "optional";
+}
+
+function buildReasons(
+  candidate: SeedCandidate,
+  matchedThemes: Theme[],
+  detourMinutes: number,
+) {
+  const reasons = [
+    detourMinutes <= 8
+      ? "绕行时间很低"
+      : `预计新增约 ${detourMinutes} 分钟步行`,
+  ];
+
+  if (matchedThemes.length > 0) {
+    reasons.push(`匹配${matchedThemes.join("、")}偏好`);
+  }
+
+  reasons.push(`${candidate.placeType}类型补足路线层次`);
+
+  return reasons;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}

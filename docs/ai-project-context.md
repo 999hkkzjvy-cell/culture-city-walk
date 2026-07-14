@@ -20,6 +20,7 @@ walkable before they are thematically rich.
 - UI references: `ignore-files/UI-web.jpg`, `ignore-files/UI-mobile.jpg`
 - Phase 1 audit: `docs/phase-1-audit.md`
 - Phase 2 status: `docs/phase-2-status.md`
+- Phase 4/5 status: `docs/phase-4-5-status.md`
 - User-facing setup: `README.md`
 - Agent rule: `AGENTS.md`
 
@@ -51,6 +52,8 @@ font/image behavior, read the relevant docs in `node_modules/next/dist/docs/`.
 - `/route/?id=demo` - route reader for the local demo route.
 - `/library/` - auth panel plus user's cloud route archive.
 - `/share/?code=...` - read-only shared route loaded from Supabase Edge Function.
+- `/about/` - product purpose and principles page.
+- `/guide/` - short usage guide for planning, candidates, editing, and sharing.
 
 Because the app is statically exported for GitHub Pages, dynamic route IDs are
 passed through query strings rather than dynamic App Router segments.
@@ -62,6 +65,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/app/route/page.tsx` - route reader page and map/timeline layout.
 - `src/app/library/page.tsx` - auth and saved route archive page.
 - `src/app/share/page.tsx` - shared route page.
+- `src/app/about/page.tsx` - about page.
+- `src/app/guide/page.tsx` - usage guide page.
 - `src/app/globals.css` - design system, responsive layout, route reader UI.
 - `src/app/layout.tsx` - app metadata and font loading.
 - `src/components/site-header.tsx` - shared top navigation.
@@ -73,6 +78,13 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/route.ts` - route types and demo route data.
 - `src/lib/route-kernel.ts` - Phase 3 pure route timeline, totals, and
   validation functions.
+- `src/lib/route-candidates.ts` - Phase 4 candidate scoring, detour estimation,
+  dedupe, and fallback provenance labels.
+- `src/lib/route-editing.ts` - pre-API route editing primitives for candidate
+  insertion, stop deletion, moving, stay-time edits, and estimated leg
+  recalculation.
+- `src/lib/ai/route-collaboration.ts` - Phase 5 structured intent, AI proposal,
+  and theme-content schemas plus local fallback behavior.
 - `src/lib/maps/types.ts` - map provider, coordinate, POI, and walking-leg
   contracts.
 - `src/lib/maps/amap.ts` - AMap URI helpers and POI parsing helpers.
@@ -96,8 +108,10 @@ Remote project:
 Implemented:
 
 - Migration: `supabase/migrations/20260713000100_phase2_routes_auth.sql`
+- Migration: `supabase/migrations/20260714000100_phase4_candidates_ai_runs.sql`
 - Tables: `profiles`, `places`, `routes`, `route_stops`,
-  `route_constraints`, `route_snapshots`, `route_shares`
+  `route_constraints`, `route_snapshots`, `route_shares`,
+  `route_candidates`, `route_ai_runs`
 - Storage bucket: private `route-media`
 - RLS: owner-only access for route data
 - Edge Function: `share-route`
@@ -141,6 +155,10 @@ Server-only / function-side:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SHARE_ALLOWED_ORIGINS`
+- `AMAP_WEB_SERVICE_KEY` for future provider-backed walking/POI proxy
+- `DEEPSEEK_API_KEY` for future AI provider calls
+- `AI_DAILY_USER_LIMIT`
+- `AI_PROJECT_COST_LIMIT_CNY`
 
 Never expose service role keys in browser or GitHub Pages variables.
 
@@ -157,6 +175,13 @@ GitHub Actions repository variables required for Pages build:
 - Phase 3 has started on the route reader. It now shows whether walking legs are
   provider-backed or locally estimated, and exposes AMap place/navigation links.
   Current demo legs are still local estimates, not real AMap Web Service results.
+- Phase 4/5 pre-API development has started on `/plan/`: Complete mode can
+  generate locally seeded along-route candidates, score and classify them, and
+  apply add/backup/ignore decisions. Candidate insertion now updates an editable
+  route preview with locally estimated leg recalculation, end-time impact, move,
+  delete, and stay-time controls. Candidate lists support type filters and
+  fit-band grouping. AI collaboration currently uses schemas and deterministic
+  local fallback only; there is no live DeepSeek call yet.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.
@@ -189,6 +214,9 @@ Near-term likely work:
 - Phase 3 next: AMap Web Service proxy, live POI suggestions, confirmed POI
   persistence, real walking route calculation, marker/polyline rendering, and
   route editing primitives.
+- Phase 4/5 next: replace local candidate source with AMap sampled-route POI
+  search, add DeepSeek adapter with JSON mode and repair retry, and persist AI
+  usage/cost records.
 - Finish remaining Phase 2 polish opportunistically: auth redirect verification,
   clearer auth UX, local draft migration after login, route archive empty states.
 - Improve mobile fidelity against `ignore-files/UI-mobile.jpg`.

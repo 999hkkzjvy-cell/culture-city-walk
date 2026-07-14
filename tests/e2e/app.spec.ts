@@ -14,6 +14,13 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: /南京 金陵城南 · 民国记忆/ }),
   ).toHaveAttribute("href", /\/share\/\?code=nanjing-minguo/);
+  await expect(
+    page.getByRole("link", { name: "关于我们" }).last(),
+  ).toHaveAttribute("href", "/about/");
+  await expect(page.getByRole("link", { name: "如何使用" })).toHaveAttribute(
+    "href",
+    "/guide/",
+  );
 });
 
 test("planning page can save a local draft and open route reader", async ({
@@ -28,6 +35,34 @@ test("planning page can save a local draft and open route reader", async ({
   await page.getByRole("link", { name: /查看生成路线/ }).click();
   await expect(
     page.getByRole("heading", { name: /南京 · 文学漫游/ }),
+  ).toBeVisible();
+});
+
+test("planning page can add a candidate to the editable route preview", async ({
+  page,
+}) => {
+  await page.goto("/plan/");
+
+  await page.getByRole("button", { name: /生成沿途候选/ }).click();
+  await expect(page.getByLabel("沿途可选点")).toContainText(
+    /拉贝故居|六朝博物馆|江宁织造博物馆|南京图书馆|南京 1912 街区/,
+  );
+
+  await page.getByRole("button", { name: "加入路线" }).first().click();
+  await expect(
+    page.getByRole("button", { name: "撤销加入" }).first(),
+  ).toBeVisible();
+  await expect(page.getByLabel("路线预案站点")).toContainText(/预案|停留/);
+
+  await page
+    .getByLabel(/停留分钟/)
+    .first()
+    .fill("55");
+  await expect(page.getByLabel("路线预案站点")).toContainText("停留 55 分钟");
+
+  await page.getByRole("button", { name: "撤销加入" }).first().click();
+  await expect(
+    page.getByRole("button", { name: "加入路线" }).first(),
   ).toBeVisible();
 });
 
@@ -72,4 +107,21 @@ test("share page has a read-only fallback shell", async ({ page }) => {
     page.getByRole("heading", { name: "朋友发来的一段城市阅读" }),
   ).toBeVisible();
   await expect(page.getByText(/分享页待连接|分享链接不可用/)).toBeVisible();
+});
+
+test("about and guide pages are available", async ({ page }) => {
+  await page.goto("/about/");
+
+  await expect(
+    page.getByRole("heading", { name: /城市重新变成一本可以慢慢读的书/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "地理优先" })).toBeVisible();
+
+  await page.goto("/guide/");
+  await expect(
+    page.getByRole("heading", { name: /可走、可读、可分享/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "推荐的一次完整流程" }),
+  ).toBeVisible();
 });

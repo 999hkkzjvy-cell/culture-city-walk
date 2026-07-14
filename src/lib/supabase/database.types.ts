@@ -164,6 +164,103 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["route_shares"]["Insert"]>;
         Relationships: [];
       };
+      route_ai_runs: {
+        Row: {
+          id: string;
+          route_id: string | null;
+          user_id: string;
+          action: string;
+          provider: string;
+          model: string;
+          prompt_version: string;
+          schema_version: string;
+          status: string;
+          input_payload: Json;
+          output_payload: Json | null;
+          error_message: string | null;
+          input_tokens: number;
+          output_tokens: number;
+          estimated_cost_cny: number;
+          elapsed_ms: number;
+          idempotency_key: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          route_id?: string | null;
+          user_id: string;
+          action: string;
+          provider: string;
+          model: string;
+          prompt_version: string;
+          schema_version?: string;
+          status?: string;
+          input_payload?: Json;
+          output_payload?: Json | null;
+          error_message?: string | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          estimated_cost_cny?: number;
+          elapsed_ms?: number;
+          idempotency_key?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["route_ai_runs"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      route_candidates: {
+        Row: {
+          id: string;
+          route_id: string;
+          place_id: string | null;
+          generated_by_run_id: string | null;
+          source: string;
+          source_place_id: string | null;
+          title_snapshot: string;
+          candidate_place: Json;
+          place_type: string;
+          themes: Json;
+          status: string;
+          fit_band: string;
+          score: number;
+          insertion_index: number;
+          detour_minutes: number;
+          detour_meters: number;
+          stay_minutes: number;
+          reasons: Json;
+          risks: Json;
+          cache_key: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          route_id: string;
+          place_id?: string | null;
+          generated_by_run_id?: string | null;
+          source: string;
+          source_place_id?: string | null;
+          title_snapshot: string;
+          candidate_place?: Json;
+          place_type: string;
+          themes?: Json;
+          status?: string;
+          fit_band: string;
+          score?: number;
+          insertion_index?: number;
+          detour_minutes?: number;
+          detour_meters?: number;
+          stay_minutes?: number;
+          reasons?: Json;
+          risks?: Json;
+          cache_key: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["route_candidates"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
