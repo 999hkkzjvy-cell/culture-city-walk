@@ -6,6 +6,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { isCloudRouteId } from "@/lib/validation/route-schemas";
 
 type AiRunAction = "parse_intent" | "rank_candidates";
 
@@ -40,7 +41,7 @@ export async function logAiUsageRun(input: LogAiUsageInput) {
   }
 
   const payload: Database["public"]["Tables"]["route_ai_runs"]["Insert"] = {
-    route_id: isUuid(input.routeId) ? input.routeId : null,
+    route_id: isCloudRouteId(input.routeId) ? input.routeId : null,
     user_id: user.id,
     action: input.action,
     provider: input.usage.provider,
@@ -67,15 +68,6 @@ export function makeAiRunIdempotencyKey(
   fingerprint: string,
 ) {
   return `${action}:${routeId}:${stableFingerprint(fingerprint)}`;
-}
-
-function isUuid(value?: string | null) {
-  return Boolean(
-    value &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        value,
-      ),
-  );
 }
 
 function stableFingerprint(value: string) {

@@ -5,8 +5,8 @@ import { useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
 import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
-import { demoRoute } from "@/lib/route";
 import { readRoutePlan } from "@/lib/storage";
+import { isCloudRouteId } from "@/lib/validation/route-schemas";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -18,7 +18,7 @@ export function RouteCloudActions() {
     }
 
     const route = readRoutePlan();
-    return route.id === demoRoute.id ? null : route.id;
+    return isCloudRouteId(route.id) ? route.id : null;
   });
   const [message, setMessage] = useState("");
 

@@ -23,6 +23,7 @@ import {
   type AppSupabaseClient,
 } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { isCloudRouteId } from "@/lib/validation/route-schemas";
 
 export type SavedRouteSummary = {
   id: string;
@@ -294,7 +295,7 @@ class SupabaseRouteRepository implements RouteRepository {
     await this.client.from("profiles").upsert({ id: userId });
 
     const routeInsert: Database["public"]["Tables"]["routes"]["Insert"] = {
-      id: route.id === "demo" ? undefined : route.id,
+      id: isCloudRouteId(route.id) ? route.id : undefined,
       owner_id: userId,
       explore_mode: route.mode,
       title: route.title,
@@ -405,7 +406,7 @@ class SupabaseRouteRepository implements RouteRepository {
     let routeId = route.id;
     let snapshotRoute = route;
 
-    if (route.id === demoRoute.id) {
+    if (!isCloudRouteId(route.id)) {
       const saved = await this.save(route);
       routeId = saved.id;
       snapshotRoute = {
@@ -443,7 +444,7 @@ class SupabaseRouteRepository implements RouteRepository {
   }
 
   async listSnapshots(routeId: string): Promise<RouteSnapshotSummary[]> {
-    if (routeId === demoRoute.id) {
+    if (!isCloudRouteId(routeId)) {
       return [];
     }
 
