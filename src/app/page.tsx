@@ -63,7 +63,7 @@ export default function Home() {
       <section className="hero">
         <div className="hero-copy">
           <span className="archive-stamp">THE CITY WITH AI</span>
-          <h1>怎样认识一座城？</h1>
+          <h1>细读一座城</h1>
           <p>AI 与你一起，探索城市中的故事与连接。</p>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}

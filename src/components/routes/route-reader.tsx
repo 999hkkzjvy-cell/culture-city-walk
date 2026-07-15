@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { RouteJourneyPanel } from "@/components/routes/route-journey-panel";
+import { RouteMap } from "@/components/routes/route-map";
 import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import { createAmapWebServiceProvider } from "@/lib/maps/amap-web";
@@ -274,25 +274,12 @@ export function RouteReader() {
           <button className="map-toggle" type="button">
             查看地图
           </button>
-          <div className="paper-map" aria-label="路线地图示意图">
-            <ol>
-              {route.stops.map((stop, index) => (
-                <li key={stop.id} style={{ "--i": index } as CSSProperties}>
-                  <span>{index + 1}</span>
-                  {stop.name}
-                </li>
-              ))}
-            </ol>
-            <div className="map-legend">
-              <span>••• 步行路线</span>
-              <span>● 站点</span>
-              <span>◎ 地铁站</span>
-            </div>
-          </div>
+          <RouteMap route={route} />
           <div className="map-source-note">
             <strong>地图内核</strong>
             <p>
-              当前站点顺序来自本地预案。可用高德 Web 服务复核步行段距离、耗时和
+              当前地图只读取路线内的 GCJ-02 坐标和已保存 polyline，不会把 POI
+              写入 places。可用高德 Web 服务复核步行段距离、耗时和
               polyline；非步行或失败的路段会保留本地估算。
             </p>
             <div className="map-source-actions">

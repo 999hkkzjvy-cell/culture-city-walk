@@ -38,6 +38,7 @@ npm run e2e
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`（仅 Edge Function 使用）
 - `NEXT_PUBLIC_AMAP_JS_KEY`（浏览器地图展示用）
+- `NEXT_PUBLIC_AMAP_SECURITY_JS_CODE`（高德 JS API 安全密钥；对应 Key 需要时填写）
 - `AMAP_WEB_SERVICE_KEY`（仅 `amap-proxy` Edge Function 使用）
 - `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED`（公开开关，设为 `true` 后前端调用 DeepSeek 代理）
 - `DEEPSEEK_API_KEY`（仅 `deepseek-proxy` Edge Function 使用）

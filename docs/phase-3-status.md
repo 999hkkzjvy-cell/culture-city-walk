@@ -27,6 +27,13 @@ labels, and manual route editing.
   - route validation alert area
   - "打开高德步行导航" / "在高德查看地点" links
   - map source note explaining that current demo legs are local estimates
+  - AMap JS route map that renders GCJ-02 stop markers when
+    `NEXT_PUBLIC_AMAP_JS_KEY` is configured
+  - provider-backed polylines drawn as route lines and local coordinate
+    connectors drawn as estimated/dashed lines
+  - paper-map fallback when AMap JS is not configured, fails to load, or route
+    coordinates are missing
+  - no confirmed-POI persistence yet; the map only reads route-local geometry
 - Tests:
   - timeline pure-function test
   - fixed appointment conflict test
@@ -38,13 +45,10 @@ labels, and manual route editing.
 ## Not Yet Done
 
 - Configure actual AMap JS API key and domain allowlist.
-- Add AMap Web Service proxy; do not expose the Web Service key in the browser.
-- Implement live place input suggestions.
 - Persist confirmed AMap POIs into `places`.
-- Calculate real walking legs from AMap Web Service.
-- Draw real AMap markers and polylines.
-- Add manual place creation UI.
-- Add drag sorting, add/delete stops, and recalculation UI.
+- Add richer map viewport behavior and full-screen/mobile navigation map mode.
+- Add provider-backed cycling/transit/driving/taxi route APIs.
+- Add drag sorting UI.
 - Save route-kernel conflict results into the route editing flow.
 
 ## Guardrails

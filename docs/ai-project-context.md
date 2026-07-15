@@ -18,9 +18,8 @@ state, and the files that matter most.
   `ignore-files/` is ignored, so future agents can quickly understand the
   project's commit history. Do not force-add other files from `ignore-files/`
   unless the user explicitly asks.
-- There is currently one known local user edit outside the latest submitted
-  work: `src/app/page.tsx` homepage title text may be modified locally. Do not
-  revert or stage it unless the user asks.
+- The homepage hero title in `src/app/page.tsx` is intentionally simplified to
+  `细读一座城`. Do not revert it to the earlier question-style headline.
 
 ## Product In One Paragraph
 
@@ -200,6 +199,9 @@ Client-side:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_AMAP_JS_KEY` enables AMap JS route-map rendering in the browser.
+- `NEXT_PUBLIC_AMAP_SECURITY_JS_CODE` is used for AMap JS API browser loading
+  when the chosen Web key requires a security code.
 - `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` enables browser calls to the
   `deepseek-proxy` function when set to `true`.
 - `NEXT_PUBLIC_BASE_PATH` is set by GitHub Actions for Pages builds.
@@ -221,17 +223,22 @@ GitHub Actions repository variables required for Pages build:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_AMAP_JS_KEY`
+- `NEXT_PUBLIC_AMAP_SECURITY_JS_CODE`
 - `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED`
 
 ## Current UX Notes
 
-- Home page has a featured card linking to the seeded南京 route.
+- Home page uses the simplified hero title `细读一座城` and has a featured card
+  linking to the seeded南京 route.
 - Share links are direct URLs; there is no manual share-code input UI yet. This
   is intentional until a Xiaohongshu/poster/code-sharing use case exists.
 - Phase 3 has started on the route reader. It now shows whether walking legs are
-  provider-backed or locally estimated, exposes AMap place/navigation links, and
-  can recalculate walking legs through the `amap-proxy` Edge Function when
-  coordinates and Supabase configuration are available. Local estimates remain
+  provider-backed or locally estimated, renders an AMap JS map with route
+  markers and provider/estimated polyline layers when `NEXT_PUBLIC_AMAP_JS_KEY`
+  is configured, exposes AMap place/navigation links, and can recalculate
+  walking legs through the `amap-proxy` Edge Function when coordinates and
+  Supabase configuration are available. The AMap JS map reads route coordinates
+  only and does not persist confirmed POIs into `places`; local estimates remain
   the fallback.
 - Phase 4/5 development has started on `/plan/`: Complete mode can generate
   along-route candidates, score and classify them, and apply add/backup/ignore
@@ -293,9 +300,9 @@ Notes:
 
 Near-term likely work:
 
-- Phase 3 next: marker/polyline rendering, richer map viewport behavior,
-  provider-backed cycling/transit/driving/taxi route APIs, and confirmed POI
-  persistence beyond local route previews.
+- Phase 3 next: richer map viewport behavior, provider-backed
+  cycling/transit/driving/taxi route APIs, and confirmed POI persistence beyond
+  local route previews.
 - Phase 4/5 next: improve sampled-route candidate quality with route polyline
   density controls, add candidate opening-hours/facts verification, and persist
   richer AI usage/cost records.

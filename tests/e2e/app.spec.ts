@@ -3,9 +3,7 @@ import { expect, test } from "@playwright/test";
 test("home page exposes the three planning modes", async ({ page }) => {
   await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", { name: /认识一座城|怎样认识一座城/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "细读一座城" })).toBeVisible();
   await expect(page.getByRole("link", { name: /AI 帮我发现/ })).toBeVisible();
   await expect(
     page.getByRole("link", { name: /我已有几个目标/ }),
@@ -124,7 +122,7 @@ test("route reader supports direct refresh with query string", async ({
   await expect(
     page.getByRole("heading", { name: "先锋书店（五台山店） 必去" }),
   ).toBeVisible();
-  await expect(page.getByLabel("路线地图示意图")).toBeVisible();
+  await expect(page.getByLabel("高德路线地图")).toBeVisible();
   await expect(page.getByText("本地估算，待高德复核")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "在高德查看地点" }),
