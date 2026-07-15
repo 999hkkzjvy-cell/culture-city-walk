@@ -23,6 +23,12 @@ type DeepSeekProxyRequest =
       schemaRepair?: SchemaRepairHint;
     }
   | {
+      action: "route-title";
+      route: unknown;
+      requestText: string;
+      schemaRepair?: SchemaRepairHint;
+    }
+  | {
       action: "stop-deep-reading";
       route: unknown;
       stop: unknown;
@@ -39,6 +45,10 @@ type DeepSeekUsage = {
   completion_tokens?: number;
   prompt_cache_hit_tokens?: number;
   prompt_cache_miss_tokens?: number;
+};
+
+type AuthenticatedUser = {
+  id: string;
 };
 
 Deno.serve(async (request) => {
@@ -71,12 +81,22 @@ Deno.serve(async (request) => {
   }
 
   try {
+    const limitCheck = await checkAiUsageLimits(request);
+
+    if (!limitCheck.allowed) {
+      return json({ error: limitCheck.error }, limitCheck.status);
+    }
+
     if (body.action === "parse-intent") {
       return await handleParseIntent(body, apiKey);
     }
 
     if (body.action === "rank-candidates") {
       return await handleRankCandidates(body, apiKey);
+    }
+
+    if (body.action === "route-title") {
+      return await handleRouteTitle(body, apiKey);
     }
 
     if (body.action === "stop-deep-reading") {
@@ -89,6 +109,165 @@ Deno.serve(async (request) => {
 
   return json({ error: "invalid_action" }, 400);
 });
+
+async function checkAiUsageLimits(request: Request) {
+  const dailyUserLimit = parsePositiveNumber(Deno.env.get("AI_DAILY_USER_LIMIT"));
+  const projectCostLimit = parsePositiveNumber(
+    Deno.env.get("AI_PROJECT_COST_LIMIT_CNY"),
+  );
+
+  if (!dailyUserLimit && !projectCostLimit) {
+    return { allowed: true as const };
+  }
+
+  const user = dailyUserLimit ? await getAuthenticatedUser(request) : null;
+
+  if (dailyUserLimit && !user) {
+    return {
+      allowed: false as const,
+      status: 401,
+      error: "deepseek_auth_required",
+    };
+  }
+
+  if (dailyUserLimit && user) {
+    const runs = await fetchAiRuns({
+      userId: user.id,
+      fields: "id",
+      useServiceRole: true,
+    });
+
+    if (!runs) {
+      return {
+        allowed: false as const,
+        status: 503,
+        error: "deepseek_limit_check_failed",
+      };
+    }
+
+    if (runs.length >= dailyUserLimit) {
+      return {
+        allowed: false as const,
+        status: 429,
+        error: "deepseek_daily_user_limit_exceeded",
+      };
+    }
+  }
+
+  if (projectCostLimit) {
+    const runs = await fetchAiRuns({
+      fields: "estimated_cost_cny",
+      useServiceRole: true,
+    });
+
+    if (!runs) {
+      return {
+        allowed: false as const,
+        status: 503,
+        error: "deepseek_limit_check_failed",
+      };
+    }
+
+    const totalCost = runs.reduce(
+      (sum, run) => sum + Number(run.estimated_cost_cny ?? 0),
+      0,
+    );
+
+    if (totalCost >= projectCostLimit) {
+      return {
+        allowed: false as const,
+        status: 429,
+        error: "deepseek_project_cost_limit_exceeded",
+      };
+    }
+  }
+
+  return { allowed: true as const };
+}
+
+async function getAuthenticatedUser(request: Request) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const authorization = request.headers.get("Authorization");
+
+  if (!supabaseUrl || !anonKey || !authorization) {
+    return null;
+  }
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: anonKey,
+      Authorization: authorization,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  return typeof data?.id === "string"
+    ? ({ id: data.id } satisfies AuthenticatedUser)
+    : null;
+}
+
+async function fetchAiRuns({
+  fields,
+  userId,
+  useServiceRole = false,
+}: {
+  fields: string;
+  userId?: string;
+  useServiceRole?: boolean;
+}) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const apiKey = useServiceRole ? serviceRoleKey : anonKey;
+
+  if (!supabaseUrl || !apiKey) {
+    return null;
+  }
+
+  const since = new Date();
+  since.setUTCHours(0, 0, 0, 0);
+  const query = new URLSearchParams({
+    select: fields,
+    provider: "eq.deepseek",
+    created_at: `gte.${since.toISOString()}`,
+  });
+
+  if (userId) {
+    query.set("user_id", `eq.${userId}`);
+  }
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/route_ai_runs?${query.toString()}`,
+    {
+      headers: {
+        apikey: apiKey,
+        Authorization: `Bearer ${apiKey}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return await response.json();
+}
+
+function parsePositiveNumber(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
 
 async function handleParseIntent(
   input: Extract<DeepSeekProxyRequest, { action: "parse-intent" }>,
@@ -157,6 +336,35 @@ async function handleStopDeepReading(
         checkInTasks: ["拍一张入口与街道同框的照片。"],
         sourceClaims: [],
         sourceStatus: "unverified",
+      },
+    }),
+  });
+
+  return json({
+    result: response.result,
+    usage: usageFromDeepSeek(response.usage, response.model, startedAt),
+    warnings: [],
+  });
+}
+
+async function handleRouteTitle(
+  input: Extract<DeepSeekProxyRequest, { action: "route-title" }>,
+  apiKey: string,
+) {
+  const startedAt = performance.now();
+  const response = await callDeepSeek(apiKey, {
+    maxTokens: 260,
+    systemPrompt: withRepairInstruction(
+      "你是城市漫游路线命名助手。请基于城市、主题、站点和用户目标，输出一个短而具体的中文路线标题。标题 8-18 个中文字符优先，不要营销口号，不要使用引号，不要超过 32 个字符。输出严格 json：{\"title\":\"路线标题\",\"warnings\":[]}。",
+      input.schemaRepair,
+    ),
+    userPrompt: JSON.stringify({
+      route: input.route,
+      requestText: input.requestText,
+      schemaRepair: input.schemaRepair ?? null,
+      exampleJson: {
+        title: "南京旧街书店慢读",
+        warnings: [],
       },
     }),
   });

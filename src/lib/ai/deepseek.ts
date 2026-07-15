@@ -8,10 +8,12 @@ import {
 import {
   planningIntentSchema,
   promptVersion,
+  routeTitleSchema,
   stopThemeContentSchema,
   type AiUsageRecord,
   type CollaborationResult,
   type PlanningIntent,
+  type RouteTitleSuggestion,
   type StopThemeContent,
 } from "./route-collaboration";
 
@@ -177,6 +179,35 @@ export async function generateStopThemeContentWithDeepSeek(
     data: parsed.data,
     usage: toUsageRecord(parsed.usage),
     warnings: parsed.warnings,
+  };
+}
+
+export async function generateRouteTitleWithDeepSeek(
+  route: RoutePlan,
+  requestText: string,
+): Promise<CollaborationResult<RouteTitleSuggestion>> {
+  const action = "route-title";
+  const payload = {
+    route: {
+      city: route.city,
+      themes: route.themes,
+      pace: route.pace,
+      stopNames: route.stops.map((stop) => stop.name),
+    },
+    requestText,
+  };
+  const response = await invokeDeepSeekProxy(action, payload);
+  const parsed = await parseResultWithRepair(
+    action,
+    payload,
+    response,
+    routeTitleSchema,
+  );
+
+  return {
+    data: parsed.data,
+    usage: toUsageRecord(parsed.usage),
+    warnings: [...parsed.warnings, ...parsed.data.warnings],
   };
 }
 

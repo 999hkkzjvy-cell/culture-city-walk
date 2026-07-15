@@ -19,7 +19,7 @@
 - DeepSeek Edge Function 代理，支持规划意图解析、候选排序和 AI 用量记录
 - 顶部导航统一为：首页、开始规划、我的路线、推荐路线、关于我们、如何使用
 - 多城市规划会在切换城市时清空旧城市路线预览；本地候选种子仅用于南京，同城高德 POI 未返回时不会展示南京候选
-- 规划页已移除自由手工添加地点；出发、必去、终点都需要从高德搜索结果中选择真实 POI。规划支持起始时间、含餐偏好、10-15 个沿途候选、开放时间提示和自动路线命名；候选搜索会按路线 polyline 抽样并控制密度，餐厅候选按菜系/人均加权，且排除奶茶/茶饮、咖啡馆、面包烘焙和甜品店
+- 规划页已移除自由手工添加地点；出发、必去、终点都需要从高德搜索结果中选择真实 POI。规划支持起始时间、含餐偏好、10-15 个沿途候选、开放时间提示和自动路线命名；候选搜索会按路线 polyline 抽样并控制密度，餐厅候选按菜系/人均/用餐时段/营业状态/评分加权，且排除奶茶/茶饮、咖啡馆、面包烘焙和甜品店
 - 保存路线和候选时会将确认 POI upsert 到 `places`；路线途中打卡图会先本地存档，云端路线登录后同步到 `route-media`
 
 ## 本地开发
@@ -76,7 +76,7 @@ supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-
 ```
 
 然后部署函数，并在 GitHub Pages 环境变量中把
-`NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` 设为 `true`。登录用户触发规划解析和候选排序时，会把 token、耗时、估算成本和 prompt 版本写入 `route_ai_runs`：
+`NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` 设为 `true`。登录用户触发规划解析、候选排序和路线标题生成时，会把 token、耗时、估算成本和 prompt 版本写入 `route_ai_runs`。`deepseek-proxy` 代码支持 `AI_DAILY_USER_LIMIT` 和 `AI_PROJECT_COST_LIMIT_CNY`，配置后需重新部署函数并做线上烟测：
 
 ```bash
 supabase functions deploy deepseek-proxy

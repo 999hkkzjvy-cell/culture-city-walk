@@ -417,4 +417,83 @@ describe("route candidates", () => {
       ]),
     );
   });
+
+  it("uses meal timing, opening hours, and rating when ranking restaurants", () => {
+    const lunchRoute = {
+      ...demoRoute,
+      dateLabel: "周二",
+      stops: [
+        {
+          ...demoRoute.stops[0],
+          id: "lunch-start",
+          name: "午餐起点",
+          time: "11:20",
+          stayMinutes: 0,
+          routeRole: "start" as const,
+          coordinate: { lng: 118.79, lat: 32.04, system: "gcj02" as const },
+        },
+        {
+          ...demoRoute.stops[1],
+          id: "lunch-end",
+          name: "午餐终点",
+          time: "13:30",
+          stayMinutes: 0,
+          routeRole: "end" as const,
+          coordinate: { lng: 118.8, lat: 32.04, system: "gcj02" as const },
+        },
+      ],
+    };
+    const candidates = generateRouteCandidatesFromPlaces(
+      lunchRoute,
+      [
+        {
+          id: "amap:R020",
+          source: "amap",
+          sourcePlaceId: "R020",
+          name: "午间寿司食堂",
+          address: "长江路 8 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.792, lat: 32.04, system: "gcj02" },
+          poiType: "餐饮服务;外国餐厅;日本料理",
+          openingHours: "周二至周日 10:30-14:00, 17:00-21:00",
+          providerRating: "4.7",
+          providerCost: "90",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R021",
+          source: "amap",
+          sourcePlaceId: "R021",
+          name: "夜间寿司屋",
+          address: "长江路 9 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.793, lat: 32.04, system: "gcj02" },
+          poiType: "餐饮服务;外国餐厅;日本料理",
+          openingHours: "17:00-22:00",
+          providerRating: "3.6",
+          providerCost: "90",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["美食"],
+        acceptedTypes: ["餐厅"],
+        maxResults: 2,
+        restaurantPreferences: {
+          cuisines: ["日料韩餐"],
+          budget: "50-100元",
+        },
+      },
+    );
+
+    expect(candidates[0].place.name).toBe("午间寿司食堂");
+    expect(candidates[0].reasons.join(" ")).toContain("预计营业");
+    expect(candidates[0].reasons.join(" ")).toContain("评分 4.7");
+    expect(candidates[1].risks.join(" ")).toContain("可能不在开放时间内");
+    expect(candidates[1].risks.join(" ")).toContain("评分 3.6");
+  });
 });

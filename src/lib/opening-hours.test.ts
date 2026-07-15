@@ -52,6 +52,19 @@ describe("opening hours", () => {
       ),
     ).toBe("");
   });
+
+  it("flags appointment and holiday notes for manual verification", () => {
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours("09:00-17:00，需提前预约", "10:00"),
+      ),
+    ).toContain("请出发前再次核验");
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours("节假日开放时间以景区公告为准", "10:00"),
+      ),
+    ).toContain("请出发前再次核验");
+  });
 });
 
 function stopWithOpeningHours(

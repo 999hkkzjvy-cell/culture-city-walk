@@ -44,6 +44,7 @@ import {
 } from "@/lib/ai/route-collaboration";
 import {
   isDeepSeekProxyConfigured,
+  generateRouteTitleWithDeepSeek,
   parseIntentWithDeepSeek,
   rankCandidatesWithDeepSeek,
 } from "@/lib/ai/deepseek";
@@ -553,8 +554,58 @@ export function PlanningDesk() {
         ...ranked.warnings,
       ]);
       setAiUsage(ranked.usage);
+      void updateRouteTitleWithAi(previewRoute);
     } finally {
       setIsGeneratingCandidates(false);
+    }
+  }
+
+  async function updateRouteTitleWithAi(route: RoutePlan) {
+    if (!isDeepSeekProxyConfigured()) {
+      return;
+    }
+
+    try {
+      const result = await generateRouteTitleWithDeepSeek(route, requestText);
+      const title = sanitizeRouteTitle(result.data.title);
+
+      if (!title) {
+        return;
+      }
+
+      setPreviewRoute((current) => {
+        if (!isSameRouteShape(current, route)) {
+          return current;
+        }
+
+        return persistPreviewRoute({
+          ...current,
+          title,
+        });
+      });
+      setAiWarnings((current) => [...current, ...result.warnings]);
+      void logAiUsageRun({
+        routeId: route.id,
+        action: "route_summary",
+        usage: result.usage,
+        inputPayload: {
+          routeId: route.id,
+          title: route.title,
+          requestText,
+          stopNames: route.stops.map((stop) => stop.name),
+        },
+        outputPayload: {
+          title,
+          warnings: result.warnings,
+        },
+        idempotencyKey: makeAiRunIdempotencyKey(
+          "route_summary",
+          route.id,
+          `${route.title}:${route.stops.map((stop) => stop.id).join(",")}:${requestText}`,
+        ),
+      });
+    } catch {
+      // 标题生成是增强能力，失败时保留本地确定性标题。
     }
   }
 
@@ -1775,10 +1826,35 @@ function generateRouteTitle(
           : "细读";
 
   if (stops.length >= 2) {
-    return `${city} · ${stops[0].name}到${stops.at(-1)?.name}${routeTone}`;
+    return sanitizeRouteTitle(
+      `${city} · ${stops[0].name}到${stops.at(-1)?.name}${routeTone}`,
+    );
   }
 
-  return secondaryTheme
+  const title = secondaryTheme
     ? `${city} · ${primaryTheme}${secondaryTheme}${routeTone}`
     : `${city} · ${primaryTheme}${routeTone}`;
+
+  return sanitizeRouteTitle(title);
+}
+
+function sanitizeRouteTitle(title: string) {
+  const cleaned = title
+    .replace(/[《》"'“”]/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+
+  return cleaned.length > 32 ? `${cleaned.slice(0, 31)}…` : cleaned;
+}
+
+function isSameRouteShape(current: RoutePlan, expected: RoutePlan) {
+  if (current.id !== expected.id || current.stops.length !== expected.stops.length) {
+    return false;
+  }
+
+  return current.stops.every(
+    (stop, index) =>
+      stop.id === expected.stops[index]?.id &&
+      stop.sourcePlaceId === expected.stops[index]?.sourcePlaceId,
+  );
 }

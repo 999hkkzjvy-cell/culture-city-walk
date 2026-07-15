@@ -26,6 +26,11 @@ export const routeProposalSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+export const routeTitleSchema = z.object({
+  title: z.string().min(2).max(32),
+  warnings: z.array(z.string()).default([]),
+});
+
 export const stopThemeContentSchema = z.object({
   placeId: z.string().min(1),
   shortIntro: z.string().min(20).max(700),
@@ -43,6 +48,7 @@ export const stopThemeContentSchema = z.object({
 
 export type PlanningIntent = z.infer<typeof planningIntentSchema>;
 export type RouteProposal = z.infer<typeof routeProposalSchema>;
+export type RouteTitleSuggestion = z.infer<typeof routeTitleSchema>;
 export type StopThemeContent = z.infer<typeof stopThemeContentSchema>;
 
 export type AiUsageRecord = {

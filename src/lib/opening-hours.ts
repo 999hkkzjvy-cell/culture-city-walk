@@ -10,8 +10,14 @@ type OpeningSchedule = {
   windows: OpeningWindow[];
   alwaysOpen: boolean;
   explicitlyClosed: boolean;
+  needsVerification: boolean;
   openWeekdays: number[] | null;
   closedWeekdays: number[];
+};
+
+export type OpeningHoursStatus = {
+  status: "open" | "closed" | "unknown";
+  reason: string;
 };
 
 export function getOpeningHoursWarning(
@@ -23,16 +29,38 @@ export function getOpeningHoursWarning(
     return "";
   }
 
-  const schedule = parseOpeningSchedule(stop.openingHours);
-  const arrival = parseTime(arrivalTime ?? stop.time);
+  const status = getOpeningHoursStatus(
+    stop.openingHours,
+    arrivalTime ?? stop.time,
+    dateLabel,
+  );
+
+  return status.reason;
+}
+
+export function getOpeningHoursStatus(
+  openingHours: string | null | undefined,
+  arrivalTime?: string,
+  dateLabel?: string,
+): OpeningHoursStatus {
+  if (!openingHours) {
+    return { status: "unknown", reason: "" };
+  }
+
+  const schedule = parseOpeningSchedule(openingHours);
+  const arrival = parseTime(arrivalTime);
+  const arrivalLabel = arrivalTime ?? "预计时间";
   const weekday = getWeekdayFromDateLabel(dateLabel);
 
   if (schedule.alwaysOpen) {
-    return "";
+    return { status: "open", reason: "" };
   }
 
   if (weekday !== null && schedule.closedWeekdays.includes(weekday)) {
-    return `预计 ${arrivalTime ?? stop.time} 到达，当天可能闭馆`;
+    return {
+      status: "closed",
+      reason: `预计 ${arrivalLabel} 到达，当天可能闭馆`,
+    };
   }
 
   if (
@@ -40,22 +68,40 @@ export function getOpeningHoursWarning(
     schedule.openWeekdays &&
     !schedule.openWeekdays.includes(weekday)
   ) {
-    return `预计 ${arrivalTime ?? stop.time} 到达，当天可能不开放`;
+    return {
+      status: "closed",
+      reason: `预计 ${arrivalLabel} 到达，当天可能不开放`,
+    };
   }
 
   if (schedule.explicitlyClosed && schedule.windows.length === 0) {
-    return "当前开放时间显示可能不开放，请出发前再次核验";
+    return {
+      status: "closed",
+      reason: "当前开放时间显示可能不开放，请出发前再次核验",
+    };
+  }
+
+  if (schedule.needsVerification) {
+    return {
+      status: "unknown",
+      reason: "开放时间含预约、节假日或公告说明，请出发前再次核验",
+    };
   }
 
   if (schedule.windows.length === 0 || arrival === null) {
-    return "";
+    return { status: "unknown", reason: "" };
   }
 
   const isOpen = schedule.windows.some((window) =>
     isTimeInsideWindow(arrival, window),
   );
 
-  return isOpen ? "" : `预计 ${arrivalTime ?? stop.time} 到达，可能不在开放时间内`;
+  return isOpen
+    ? { status: "open", reason: "" }
+    : {
+        status: "closed",
+        reason: `预计 ${arrivalLabel} 到达，可能不在开放时间内`,
+      };
 }
 
 function parseOpeningSchedule(value: string): OpeningSchedule {
@@ -65,6 +111,10 @@ function parseOpeningSchedule(value: string): OpeningSchedule {
     windows: parseOpeningWindows(normalized),
     alwaysOpen: /全天开放|24小时|24h|24H/.test(normalized),
     explicitlyClosed: /暂停开放|暂不开放|临时闭馆|停止开放/.test(normalized),
+    needsVerification:
+      /预约|需提前|节假日|法定假日|特殊开放|特殊闭馆|以公告为准|以景区公告|另行通知|闭馆日/.test(
+        normalized,
+      ),
     openWeekdays: parseOpenWeekdays(normalized),
     closedWeekdays: parseClosedWeekdays(normalized),
   };

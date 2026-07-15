@@ -1,7 +1,9 @@
 import type { PlaceCandidate } from "@/lib/maps/types";
 import { estimateWalkingLeg } from "@/lib/maps/fallback";
 import type { MapProvider } from "@/lib/maps/types";
+import { getOpeningHoursStatus } from "@/lib/opening-hours";
 import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
+import { calculateTimeline, formatTime, parseTime } from "@/lib/route-kernel";
 
 export type CandidatePlaceType =
   "景点" | "博物馆" | "历史建筑" | "书店" | "咖啡馆" | "餐厅" | "公园";
@@ -293,6 +295,8 @@ function scoreCandidate(
   const restaurantPreference = getRestaurantPreferenceMatch(
     candidate,
     scoringOptions.restaurantPreferences,
+    route,
+    insertion,
   );
   const baseScore =
     58 +
@@ -310,7 +314,10 @@ function scoreCandidate(
     scoringOptions.providerVerified,
     restaurantPreference.reasons,
   );
-  const risks = buildRisks(candidate.place);
+  const risks = [
+    ...buildRisks(candidate.place),
+    ...restaurantPreference.risks,
+  ];
 
   return {
     id: candidate.place.id,
@@ -609,9 +616,15 @@ function matchesAny(text: string, keywords: string[]) {
 function getRestaurantPreferenceMatch(
   candidate: SeedCandidate,
   preferences?: RestaurantPreferences,
+  route?: RoutePlan,
+  insertion?: CandidateInsertion,
 ) {
   if (candidate.placeType !== "餐厅" || !preferences) {
-    return { score: 0, reasons: [] as string[] };
+    return {
+      score: 0,
+      reasons: [] as string[],
+      risks: [] as string[],
+    };
   }
 
   const cuisines = preferences.cuisines?.filter(Boolean) ?? [];
@@ -627,7 +640,20 @@ function getRestaurantPreferenceMatch(
     candidate.place.providerCost,
     preferences.budget,
   );
+  const expectedArrival = route && insertion
+    ? getExpectedCandidateArrival(route, candidate.place, insertion)
+    : null;
+  const mealTiming = getMealTimingMatch(expectedArrival);
+  const openingStatus = getOpeningHoursStatus(
+    candidate.place.openingHours,
+    expectedArrival ?? undefined,
+    route?.dateLabel,
+  );
+  const restaurantRating = getRestaurantRatingMatch(
+    candidate.place.providerRating,
+  );
   const reasons: string[] = [];
+  const risks: string[] = [];
   let score = 0;
 
   if (matchedCuisine) {
@@ -648,7 +674,31 @@ function getRestaurantPreferenceMatch(
     reasons.push(`人均约 ${budgetMatch.cost} 元，低于预算上限`);
   }
 
-  return { score, reasons };
+  if (mealTiming.status === "meal_time") {
+    score += 6;
+    reasons.push(`${expectedArrival} 抵达接近${mealTiming.label}`);
+  } else if (mealTiming.status === "off_meal_time") {
+    score -= 3;
+    reasons.push(`${expectedArrival} 抵达不在常规正餐时段`);
+  }
+
+  if (openingStatus.status === "open" && expectedArrival) {
+    score += 8;
+    reasons.push(`${expectedArrival} 预计营业`);
+  } else if (openingStatus.status === "closed") {
+    score -= 18;
+    risks.push(openingStatus.reason || "预计用餐时段可能未营业");
+  }
+
+  if (restaurantRating.status === "strong") {
+    score += 4;
+    reasons.push(`餐厅评分 ${restaurantRating.rating}，优先级较高`);
+  } else if (restaurantRating.status === "weak") {
+    score -= 4;
+    risks.push(`餐厅评分 ${restaurantRating.rating}，建议谨慎选择`);
+  }
+
+  return { score, reasons, risks };
 }
 
 function getCuisineKeywords(cuisine: string) {
@@ -771,6 +821,76 @@ function getBudgetRange(budget?: string | null) {
     default:
       return null;
   }
+}
+
+function getExpectedCandidateArrival(
+  route: RoutePlan,
+  place: PlaceCandidate,
+  insertion: CandidateInsertion,
+) {
+  const timeline = calculateTimeline(route.stops);
+  const previousStop = timeline[insertion.index];
+
+  if (!previousStop) {
+    return null;
+  }
+
+  const previousArrival = parseTime(previousStop.calculatedTime);
+
+  if (previousArrival === null) {
+    return null;
+  }
+
+  const originToCandidate = estimateWalkingLeg({
+    origin: routeStopAsPlaceCandidate(previousStop),
+    destination: place,
+  });
+
+  return formatTime(
+    previousArrival +
+      previousStop.stayMinutes +
+      originToCandidate.durationMinutes,
+  );
+}
+
+function getMealTimingMatch(arrivalTime: string | null) {
+  const minutes = parseTime(arrivalTime);
+
+  if (minutes === null) {
+    return { status: "unknown" as const, label: "" };
+  }
+
+  if (minutes >= 11 * 60 && minutes <= 14 * 60) {
+    return { status: "meal_time" as const, label: "午餐时段" };
+  }
+
+  if (minutes >= 17 * 60 && minutes <= 20 * 60 + 30) {
+    return { status: "meal_time" as const, label: "晚餐时段" };
+  }
+
+  if (minutes >= 10 * 60 && minutes <= 21 * 60) {
+    return { status: "off_meal_time" as const, label: "" };
+  }
+
+  return { status: "unknown" as const, label: "" };
+}
+
+function getRestaurantRatingMatch(ratingText?: string | null) {
+  const rating = Number(ratingText);
+
+  if (!Number.isFinite(rating)) {
+    return { status: "unknown" as const, rating: null };
+  }
+
+  if (rating >= 4.5) {
+    return { status: "strong" as const, rating };
+  }
+
+  if (rating < 3.8) {
+    return { status: "weak" as const, rating };
+  }
+
+  return { status: "neutral" as const, rating };
 }
 
 function isExcludedPoi(text: string) {

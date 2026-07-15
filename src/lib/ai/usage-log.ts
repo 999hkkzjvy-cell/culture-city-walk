@@ -8,7 +8,7 @@ import {
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { isCloudRouteId } from "@/lib/validation/route-schemas";
 
-type AiRunAction = "parse_intent" | "rank_candidates";
+type AiRunAction = "parse_intent" | "rank_candidates" | "route_summary";
 
 type LogAiUsageInput = {
   routeId?: string | null;

@@ -4,6 +4,7 @@ import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   isDeepSeekProxyConfigured,
   generateStopThemeContentWithDeepSeek,
+  generateRouteTitleWithDeepSeek,
   parseIntentWithDeepSeek,
   rankCandidatesWithDeepSeek,
 } from "./deepseek";
@@ -234,6 +235,33 @@ describe("DeepSeek proxy client", () => {
     });
     expect(result.data.shortIntro).toContain("近代城市阅读");
     expect(result.data.checkInTasks[0]).toContain("门楼");
+    expect(result.usage.provider).toBe("deepseek");
+  });
+
+  it("generates a short route title through the proxy", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      data: {
+        result: {
+          title: "南京旧街书店慢读",
+          warnings: [],
+        },
+        usage: deepSeekUsage,
+        warnings: [],
+      },
+      error: null,
+    });
+
+    const result = await generateRouteTitleWithDeepSeek(
+      demoRoute,
+      "想要轻松一点，看看书店和旧街",
+    );
+
+    expect(mocks.invoke).toHaveBeenCalledWith("deepseek-proxy", {
+      body: expect.objectContaining({
+        action: "route-title",
+      }),
+    });
+    expect(result.data.title).toBe("南京旧街书店慢读");
     expect(result.usage.provider).toBe("deepseek");
   });
 });
