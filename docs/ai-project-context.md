@@ -66,6 +66,8 @@ font/image behavior, read the relevant docs in `node_modules/next/dist/docs/`.
 - `/` - home page with planning mode cards and featured themes.
 - `/plan/` - planning conversation mock and route summary.
 - `/route/?id=demo` - route reader for the local demo route.
+- `/journey/?id=demo` - two-column in-route experience mode with route
+  overview, stop deep reading, check-in tasks, and local photo archive.
 - `/library/` - user's route workspace. Signed-out users see the same
   email-password login/register form as `/login/`; signed-in users get a
   two-column route library with left navigation for `我的规划` and `我的收藏`.
@@ -86,6 +88,7 @@ passed through query strings rather than dynamic App Router segments.
 - `src/app/page.tsx` - home page and featured route entry.
 - `src/app/plan/page.tsx` - planning page shell.
 - `src/app/route/page.tsx` - route reader page and map/timeline layout.
+- `src/app/journey/page.tsx` - route experience mode page.
 - `src/app/library/page.tsx` - auth and saved route archive page.
 - `src/app/recommendations/page.tsx` - recommended-route explorer page.
 - `src/app/login/page.tsx` - login/register page.
@@ -107,6 +110,9 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/routes/recommended-routes-explorer.tsx` - city/theme/pace/
   duration filtering UI for recommended routes.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
+- `src/components/routes/route-journey-mode.tsx` - two-column route-in-progress
+  experience with overview, selected-stop reading, check-in tasks, and local
+  photo archive.
 - `src/components/routes/route-reader.tsx` - client route reader that prefers
   the locally saved planning preview and falls back to the demo route. It also
   exposes local reader-side edit controls for stay time, notes, and deletion.
@@ -151,7 +157,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/urls.ts` - static-export URL helpers.
 - `src/lib/storage.ts` - localStorage draft persistence.
 - `src/lib/storage.ts` also stores the current local `RoutePlan` preview and
-  route-candidate action state.
+  route-candidate action state, journey progress, and local check-in photo
+  archives.
 - `src/lib/validation/route-schemas.ts` - Zod URL/input validation.
 
 ## Supabase State
@@ -316,6 +323,13 @@ GitHub Actions repository variables required for Pages build:
   anecdotes, practical verification notes, and check-in tasks. Without DeepSeek
   or on failure, deterministic unverified template guidance remains the
   fallback.
+- Route detail exposes an `体验路线` entry to `/journey/?id=...`. The journey page
+  keeps a two-column layout: left-side route overview with every stop's arrival
+  time,交通/步行 data, planned stay time, and progress state; right-side selected
+  stop detail with deep-reading content, check-in tasks, practical tips, AMap
+  navigation, arrival/skip controls, and local check-in photo upload. Uploaded
+  photos are resized in the browser and stored in localStorage as a device-local
+  archive; they are not uploaded to Supabase Storage yet.
 - AI collaboration can call the Supabase `deepseek-proxy` Edge Function when
   `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps deterministic
   local fallback behavior. Signed-in users' intent parsing and candidate

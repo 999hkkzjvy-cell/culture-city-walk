@@ -4,6 +4,10 @@ export function routeUrl(routeId: string) {
   return `/route/?id=${encodeURIComponent(routeId)}`;
 }
 
+export function journeyUrl(routeId: string) {
+  return `/journey/?id=${encodeURIComponent(routeId)}`;
+}
+
 export function shareUrl(code: string) {
   return `/share/?code=${encodeURIComponent(code)}`;
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Camera,
   CheckCircle2,
   MapPinned,
   Route,
@@ -29,6 +30,11 @@ const steps = [
     title: "编辑路线并保存",
     text: "调整站点顺序、停留时间、路途方式和路线长度。登录后可以保存到云端并生成分享链接。",
     icon: Route,
+  },
+  {
+    title: "进入途中模式",
+    text: "在路线详情页点击“体验路线”，按站点查看深读、打卡任务并上传打卡图本地存档。",
+    icon: Camera,
   },
 ];
 
@@ -77,6 +83,7 @@ export default function GuidePage() {
             <li>点击“生成沿途候选”，查看不同顺路程度的补点。</li>
             <li>把合适候选加入路线，再调整停留时间、交通方式或站点顺序。</li>
             <li>确认路线后保存草稿，或进入路线阅读页查看时间轴。</li>
+            <li>点击“体验路线”，在途中模式中完成站点打卡和图片存档。</li>
           </ol>
         </article>
 

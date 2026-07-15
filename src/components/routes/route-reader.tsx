@@ -55,7 +55,7 @@ import {
   routeTravelModeLabels,
   routeTravelModes,
 } from "@/lib/transport";
-import { readRouteId } from "@/lib/urls";
+import { journeyUrl, readRouteId } from "@/lib/urls";
 
 let cachedRouteSnapshot:
   | {
@@ -272,6 +272,10 @@ export function RouteReader() {
           </div>
         </div>
         <div className="route-tools">
+          <Link href={journeyUrl(route.id)}>
+            <Navigation size={17} />
+            体验路线
+          </Link>
           <button
             onClick={() => setIsEditing((current) => !current)}
             type="button"
@@ -360,7 +364,8 @@ export function RouteReader() {
             const previousStop = routeKernel.stops[index - 1];
             const deepReading = deepReadings[stop.id];
             const story =
-              deepReading?.content ?? generateStopThemeContentWithFallback(stop);
+              deepReading?.content ??
+              generateStopThemeContentWithFallback(stop);
             const isStoryExpanded = expandedStories[stop.id] ?? false;
             const canExpandStory =
               index > 0 && index < routeKernel.stops.length - 1;

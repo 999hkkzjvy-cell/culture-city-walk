@@ -3,12 +3,15 @@ import { demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   createRouteSnapshot,
+  readCheckInPhotos,
   readJourneyState,
   readCandidateState,
   readCurrentCandidateState,
   readRoutePlan,
   readRouteSnapshots,
+  removeCheckInPhoto,
   saveCandidateState,
+  saveCheckInPhoto,
   saveJourneyState,
   saveRoutePlan,
 } from "./storage";
@@ -144,5 +147,40 @@ describe("local storage helpers", () => {
       }),
     );
     expect(readJourneyState("other").arrivedStopIds).toEqual([]);
+  });
+
+  it("archives check-in photos per route and stop", () => {
+    saveCheckInPhoto({
+      id: "photo-1",
+      routeId: "demo",
+      stopId: "librairie",
+      fileName: "bookstore.jpg",
+      mimeType: "image/jpeg",
+      dataUrl: "data:image/jpeg;base64,aaa",
+      createdAt: "2026-07-15T08:00:00.000Z",
+    });
+    saveCheckInPhoto({
+      id: "photo-2",
+      routeId: "demo",
+      stopId: "gym",
+      fileName: "gym.jpg",
+      mimeType: "image/jpeg",
+      dataUrl: "data:image/jpeg;base64,bbb",
+      createdAt: "2026-07-15T09:00:00.000Z",
+    });
+
+    expect(readCheckInPhotos("demo")).toHaveLength(2);
+    expect(readCheckInPhotos("demo", "librairie")).toEqual([
+      expect.objectContaining({
+        id: "photo-1",
+        fileName: "bookstore.jpg",
+      }),
+    ]);
+    expect(readCheckInPhotos("other")).toEqual([]);
+
+    removeCheckInPhoto("photo-1");
+    expect(readCheckInPhotos("demo").map((photo) => photo.id)).toEqual([
+      "photo-2",
+    ]);
   });
 });

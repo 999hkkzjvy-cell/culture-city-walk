@@ -34,10 +34,21 @@ export type StoredJourneyState = {
   updatedAt: string;
 };
 
+export type StoredCheckInPhoto = {
+  id: string;
+  routeId: string;
+  stopId: string;
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+  createdAt: string;
+};
+
 export const routePlanStorageKey = "cultural-citywalk:route-plan";
 export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
 export const routeSnapshotsStorageKey = "cultural-citywalk:route-snapshots";
 export const journeyStateStorageKey = "cultural-citywalk:journey-state";
+export const checkInPhotosStorageKey = "cultural-citywalk:check-in-photos";
 export const syncedRouteSignatureStorageKey =
   "cultural-citywalk:synced-route-signature";
 
@@ -217,6 +228,44 @@ export function saveJourneyState(state: StoredJourneyState) {
   );
 }
 
+export function readCheckInPhotos(
+  routeId: string,
+  stopId?: string,
+): StoredCheckInPhoto[] {
+  try {
+    const raw = window.localStorage.getItem(checkInPhotosStorageKey);
+    const parsed = raw ? (JSON.parse(raw) as StoredCheckInPhoto[]) : [];
+    const photos = Array.isArray(parsed) ? parsed : [];
+
+    return photos
+      .filter(
+        (photo) =>
+          photo.routeId === routeId && (!stopId || photo.stopId === stopId),
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  } catch {
+    return [];
+  }
+}
+
+export function saveCheckInPhoto(photo: StoredCheckInPhoto) {
+  const photos = readAllCheckInPhotos().filter((item) => item.id !== photo.id);
+
+  window.localStorage.setItem(
+    checkInPhotosStorageKey,
+    JSON.stringify([photo, ...photos].slice(0, 80)),
+  );
+}
+
+export function removeCheckInPhoto(photoId: string) {
+  window.localStorage.setItem(
+    checkInPhotosStorageKey,
+    JSON.stringify(
+      readAllCheckInPhotos().filter((photo) => photo.id !== photoId),
+    ),
+  );
+}
+
 export function getRoutePlanSignature(route = readRoutePlan()) {
   return [
     route.id,
@@ -245,6 +294,16 @@ export function markRoutePlanSynced(route = readRoutePlan()) {
 function readAllRouteSnapshots(): StoredRouteSnapshot[] {
   try {
     const raw = window.localStorage.getItem(routeSnapshotsStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readAllCheckInPhotos(): StoredCheckInPhoto[] {
+  try {
+    const raw = window.localStorage.getItem(checkInPhotosStorageKey);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {

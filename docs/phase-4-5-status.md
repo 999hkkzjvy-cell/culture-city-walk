@@ -74,6 +74,15 @@ Phase 4/5 development has a key split:
     and practical verification tips; start/end stops do not show deep-read UI
   - when DeepSeek proxy is enabled, middle-stop deep reads can generate longer
     architecture/history/anecdote content and check-in tasks on demand
+- Route in-progress experience:
+  - route detail links to `/journey/?id=...`
+  - journey mode uses a two-column layout with route overview on the left and
+    selected-stop deep reading/check-in tasks on the right
+  - left overview shows every stop's arrival time, transportation/walking data,
+    planned stay time, and progress state
+  - selected stop supports arrival/skip controls and AMap navigation
+  - check-in images are resized in the browser and archived in localStorage per
+    route and stop
 - Share experience:
   - route-page share button scrolls to cloud share actions
   - generated share links can be copied and revoked from route page or library
@@ -108,8 +117,9 @@ Phase 4/5 development has a key split:
   - local route plan and candidate-state storage tests
   - route-reader local edit smoke test
   - candidate processed-state smoke test
-  - route-reader fallback story smoke test
-  - local intent parsing test
+- route-reader fallback story smoke test
+- route journey mode check-in photo smoke test
+- local intent parsing test
   - invalid AI-created POI rejection test
   - fallback candidate ranking test
   - AI usage logging test

@@ -171,6 +171,31 @@ test("route reader can edit stay time locally", async ({ page }) => {
   await expect(page.getByLabel(/路途分钟/).first()).toHaveValue("18");
 });
 
+test("route journey mode archives check-in photos", async ({ page }) => {
+  await page.goto("/route/?id=demo");
+
+  await page.getByRole("link", { name: "体验路线" }).click();
+  await expect(page).toHaveURL(/\/journey\/\?id=demo/);
+  await expect(page.getByRole("heading", { name: /体验路线/ })).toBeVisible();
+  await expect(page.getByLabel("路线概览")).toContainText("先锋书店");
+  await expect(page.getByLabel("站点深度讲解")).toContainText("打卡任务");
+
+  await page.getByLabel("上传打卡图").setInputFiles({
+    name: "checkin.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lw2R9wAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  });
+
+  await expect(page.getByText("打卡图已存档在本地设备。")).toBeVisible();
+  await expect(page.getByRole("img", { name: /打卡图/ })).toBeVisible();
+
+  await page.getByRole("button", { name: /删除打卡图/ }).click();
+  await expect(page.getByText("还没有为这一站上传打卡图。")).toBeVisible();
+});
+
 test("library page shows login gate when signed out", async ({ page }) => {
   await page.goto("/library/");
 
