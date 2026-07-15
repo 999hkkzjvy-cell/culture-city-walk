@@ -56,6 +56,11 @@ import {
 } from "@/lib/maps/amap-web";
 import type { Coordinate, PlaceCandidate } from "@/lib/maps/types";
 import {
+  collectAmapPlacesAround,
+  getAmapCandidateTypes,
+  getAmapFailureDetail,
+} from "@/lib/maps/route-candidate-search";
+import {
   appendManualStopToRoute,
   appendPlaceCandidateToRoute,
   insertCandidateIntoRoute,
@@ -101,17 +106,6 @@ const placeRoleOptions: Array<{ value: RouteStopPlacement; label: string }> = [
   { value: "middle", label: "必去" },
   { value: "end", label: "终点" },
 ];
-
-const amapCandidateTypesByPlaceType: Record<CandidatePlaceType, string[]> = {
-  景点: ["风景名胜"],
-  博物馆: ["科教文化服务"],
-  历史建筑: ["风景名胜", "科教文化服务"],
-  书店: ["购物服务", "科教文化服务"],
-  咖啡馆: ["餐饮服务"],
-  餐厅: ["餐饮服务"],
-  公园: ["风景名胜"],
-};
-const AMAP_ROUTE_CANDIDATE_TIMEOUT_MS = 3000;
 
 function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
   const centers: Coordinate[] = [];
@@ -173,12 +167,6 @@ function dedupeCoordinates(coordinates: Coordinate[]) {
   });
 }
 
-function getAmapCandidateTypes(types: CandidatePlaceType[]) {
-  return [
-    ...new Set(types.flatMap((type) => amapCandidateTypesByPlaceType[type])),
-  ].join("|");
-}
-
 function isGcj02Coordinate(
   coordinate?: Coordinate | null,
 ): coordinate is Coordinate {
@@ -188,19 +176,6 @@ function isGcj02Coordinate(
     Number.isFinite(coordinate.lng) &&
     Number.isFinite(coordinate.lat),
   );
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      reject(new Error("route_candidate_timeout"));
-    }, timeoutMs);
-
-    promise
-      .then(resolve)
-      .catch(reject)
-      .finally(() => window.clearTimeout(timeoutId));
-  });
 }
 
 export function PlanningDesk() {
@@ -543,21 +518,22 @@ export function PlanningDesk() {
     try {
       const types = getAmapCandidateTypes(options.acceptedTypes);
       const searchPlacesAround = provider.searchPlacesAround;
-      const placeGroups = await withTimeout(
-        Promise.all(
-          centers.map((center) =>
-            searchPlacesAround({
-              center,
-              city: route.city,
-              types,
-              radiusMeters: 1200,
-              limit: 8,
-            }),
-          ),
-        ),
-        AMAP_ROUTE_CANDIDATE_TIMEOUT_MS,
+      const { places, failedCount, firstError } = await collectAmapPlacesAround(
+        {
+          centers,
+          city: route.city,
+          types,
+          radiusMeters: 1200,
+          limit: 8,
+          searchPlacesAround,
+        },
       );
-      const places = placeGroups.flat();
+      const warnings =
+        failedCount > 0 && failedCount < centers.length
+          ? [
+              `高德沿途候选部分采样点搜索失败（${failedCount}/${centers.length}），已使用成功返回的地点继续筛选。`,
+            ]
+          : [];
 
       const providerCandidates = generateRouteCandidatesFromPlaces(
         route,
@@ -570,17 +546,46 @@ export function PlanningDesk() {
       );
 
       if (providerCandidates.length > 0) {
-        return { candidates: providerCandidates, warnings: [] };
+        return { candidates: providerCandidates, warnings };
+      }
+
+      if (failedCount === centers.length) {
+        const failureDetail = getAmapFailureDetail(firstError);
+
+        return {
+          candidates: fallbackCandidates(),
+          warnings: [
+            failureDetail
+              ? `高德沿途候选搜索失败（${failureDetail}），已使用本地候选。`
+              : "高德沿途候选搜索失败，已使用本地候选。",
+          ],
+        };
+      }
+
+      if (places.length > 0) {
+        return {
+          candidates: fallbackCandidates(),
+          warnings: [
+            ...warnings,
+            "高德已返回地点，但当前筛选类型/路线约束下没有合适候选，已使用本地候选。",
+          ],
+        };
       }
 
       return {
         candidates: fallbackCandidates(),
-        warnings: ["高德没有返回合适的沿途候选，已使用本地候选。"],
+        warnings: [...warnings, "高德没有返回沿途地点，已使用本地候选。"],
       };
-    } catch {
+    } catch (error) {
+      const failureDetail = getAmapFailureDetail(error);
+
       return {
         candidates: fallbackCandidates(),
-        warnings: ["高德沿途候选搜索失败，已使用本地候选。"],
+        warnings: [
+          failureDetail
+            ? `高德沿途候选搜索失败（${failureDetail}），已使用本地候选。`
+            : "高德沿途候选搜索失败，已使用本地候选。",
+        ],
       };
     }
   }

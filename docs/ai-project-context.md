@@ -134,6 +134,9 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/maps/amap-web.ts` - browser-side AMap Web Service provider that
   calls the Supabase `amap-proxy` Edge Function instead of exposing the Web
   Service key.
+- `src/lib/maps/route-candidate-search.ts` - AMap along-route candidate search
+  helpers, including stable POI type-code mapping, per-sample timeout, and
+  partial-failure collection.
 - `src/lib/maps/fallback.ts` - local estimated walking-leg fallback.
 - `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
   It also persists route-candidate snapshots and candidate action states through
@@ -263,9 +266,12 @@ GitHub Actions repository variables required for Pages build:
   along-route candidates, score and classify them, and apply add/backup/ignore
   decisions. When `amap-proxy` is configured, candidate generation samples route
   stops, midpoints, and provider polyline points, searches nearby AMap POIs, maps
-  them into route candidates, and then scores them by detour and theme fit. If
-  AMap is unavailable or returns no suitable POIs, the app falls back to local
-  seeded candidates.
+  them into route candidates, and then scores them by detour and theme fit. AMap
+  POI searches use category codes and per-sample timeouts, so one failed sampled
+  point no longer forces the whole candidate generation to local fallback. If
+  AMap is unavailable, every sampled search fails, or the returned POIs do not
+  match the route constraints, the app falls back to local seeded candidates
+  with a more specific warning.
 - Candidate insertion updates an editable route preview with leg recalculation,
   end-time impact, move, delete, and stay-time controls. Candidate lists support
   type filters and fit-band grouping. The route preview and candidate actions
