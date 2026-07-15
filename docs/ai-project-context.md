@@ -66,7 +66,11 @@ font/image behavior, read the relevant docs in `node_modules/next/dist/docs/`.
 - `/` - home page with planning mode cards and featured themes.
 - `/plan/` - planning conversation mock and route summary.
 - `/route/?id=demo` - route reader for the local demo route.
-- `/library/` - auth panel plus user's cloud route archive.
+- `/library/` - user's route workspace. Signed-out users see the same
+  email-password login/register form as `/login/`; signed-in users get a
+  two-column route library with left navigation for `我的规划` and `我的收藏`.
+- `/recommendations/` - two-column recommended-route explorer with city,
+  theme, pace, and duration filters.
 - `/login/` - standalone login/register page for Supabase email-password auth.
 - `/profile/` - signed-in profile center for display name, location, WeChat,
   signature, and avatar URL.
@@ -83,6 +87,7 @@ passed through query strings rather than dynamic App Router segments.
 - `src/app/plan/page.tsx` - planning page shell.
 - `src/app/route/page.tsx` - route reader page and map/timeline layout.
 - `src/app/library/page.tsx` - auth and saved route archive page.
+- `src/app/recommendations/page.tsx` - recommended-route explorer page.
 - `src/app/login/page.tsx` - login/register page.
 - `src/app/profile/page.tsx` - profile center page.
 - `src/app/share/page.tsx` - shared route page.
@@ -96,7 +101,11 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/auth/auth-nav.tsx` - header login/avatar entry.
 - `src/components/auth/login-form.tsx` - email-password login/register form.
 - `src/components/auth/profile-center.tsx` - profile editing form.
+- `src/components/routes/library-workspace.tsx` - library auth gate, left
+  navigation, and theme-filtered route workspace.
 - `src/components/routes/route-library.tsx` - saved route list.
+- `src/components/routes/recommended-routes-explorer.tsx` - city/theme/pace/
+  duration filtering UI for recommended routes.
 - `src/components/routes/route-cloud-actions.tsx` - save/share controls.
 - `src/components/routes/route-reader.tsx` - client route reader that prefers
   the locally saved planning preview and falls back to the demo route. It also
@@ -105,6 +114,8 @@ passed through query strings rather than dynamic App Router segments.
 - `src/components/developer-status-panel.tsx` - planning-page status panel for
   local/API configuration state.
 - `src/lib/route.ts` - route types and demo route data.
+- `src/lib/recommended-routes.ts` - static recommended-route catalog used by
+  `/recommendations/`.
 - `src/lib/route-kernel.ts` - Phase 3 pure route timeline, totals, and
   validation functions.
 - `src/lib/route-candidates.ts` - Phase 4 candidate scoring, detour estimation,
@@ -230,6 +241,14 @@ GitHub Actions repository variables required for Pages build:
 
 - Home page uses the simplified hero title `细读一座城` and has a featured card
   linking to the seeded南京 route.
+- Top navigation is normalized to six entries: `首页`, `开始规划`, `我的路线`,
+  `推荐路线`, `关于我们`, and `如何使用`. `/recommendations/` is the static
+  recommended-route entry.
+- `/library/` now gates signed-out users to the email-password login/register
+  card. Signed-in users see a left sidebar (`我的规划`, `我的收藏`) and a right
+  content area with multi-select theme filters.
+- `/recommendations/` shows curated route cards in a two-column layout with a
+  left filter rail for city text, theme tags, pace tags, and duration tags.
 - Share links are direct URLs; there is no manual share-code input UI yet. This
   is intentional until a Xiaohongshu/poster/code-sharing use case exists.
 - Phase 3 has started on the route reader. It now shows whether walking legs are

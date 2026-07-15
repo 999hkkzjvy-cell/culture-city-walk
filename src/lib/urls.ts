@@ -12,6 +12,10 @@ export function libraryUrl() {
   return "/library/";
 }
 
+export function recommendedRoutesUrl() {
+  return "/recommendations/";
+}
+
 export function readRouteId(searchParams: URLSearchParams) {
   return normalizeParam(searchParams.get("id"));
 }

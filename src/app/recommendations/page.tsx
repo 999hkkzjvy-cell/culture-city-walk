@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { LibraryWorkspace } from "@/components/routes/library-workspace";
+import { RecommendedRoutesExplorer } from "@/components/routes/recommended-routes-explorer";
 import { SiteHeader } from "@/components/site-header";
 
-export default function LibraryPage() {
+export default function RecommendationsPage() {
   return (
     <main>
       <SiteHeader />
@@ -12,10 +12,10 @@ export default function LibraryPage() {
           <ArrowLeft size={16} />
           返回
         </Link>
-        <p>保存、同步与分享</p>
-        <h1>我的路线档案</h1>
+        <p>精选主题路线</p>
+        <h1>推荐路线</h1>
       </section>
-      <LibraryWorkspace />
+      <RecommendedRoutesExplorer />
     </main>
   );
 }

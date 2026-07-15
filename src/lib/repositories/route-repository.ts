@@ -4,6 +4,7 @@ import {
   type RouteDraft,
   type RoutePlan,
   type RouteStop,
+  type Theme,
 } from "@/lib/route";
 import {
   createRouteSnapshot,
@@ -26,6 +27,7 @@ export type SavedRouteSummary = {
   id: string;
   title: string;
   city: string;
+  themes: Theme[];
   updatedAt: string;
   visibility: "private" | "shared";
   version: number;
@@ -122,6 +124,7 @@ class LocalRouteRepository implements RouteRepository {
         id: demoRoute.id,
         title: demoRoute.title,
         city: demoRoute.city,
+        themes: demoRoute.themes,
         updatedAt: demoRoute.updatedAt,
         visibility: "private" as const,
         version: 1,
@@ -139,6 +142,7 @@ class LocalRouteRepository implements RouteRepository {
       id: route.id,
       title: route.title,
       city: route.city,
+      themes: route.themes,
       updatedAt: new Date().toISOString(),
       visibility: "private" as const,
       version: 1,
@@ -164,7 +168,9 @@ class LocalRouteRepository implements RouteRepository {
   }
 
   async createSnapshot(route: RoutePlan, candidateState: StoredCandidateState) {
-    return mapStoredSnapshotToSummary(createRouteSnapshot(route, candidateState));
+    return mapStoredSnapshotToSummary(
+      createRouteSnapshot(route, candidateState),
+    );
   }
 
   async listSnapshots(routeId: string) {
@@ -205,7 +211,7 @@ class SupabaseRouteRepository implements RouteRepository {
   async list(): Promise<SavedRouteSummary[]> {
     const { data, error } = await this.client
       .from("routes")
-      .select("id,title,city,updated_at,visibility,version")
+      .select("id,title,city,theme_filters,updated_at,visibility,version")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -216,6 +222,7 @@ class SupabaseRouteRepository implements RouteRepository {
       id: route.id,
       title: route.title,
       city: route.city,
+      themes: parseThemes(route.theme_filters),
       updatedAt: route.updated_at,
       visibility: route.visibility as "private" | "shared",
       version: route.version,
@@ -314,6 +321,7 @@ class SupabaseRouteRepository implements RouteRepository {
       id: savedRoute.id,
       title: savedRoute.title,
       city: savedRoute.city,
+      themes: route.themes,
       updatedAt: savedRoute.updated_at,
       visibility: savedRoute.visibility as "private" | "shared",
       version: savedRoute.version,
@@ -428,9 +436,7 @@ class SupabaseRouteRepository implements RouteRepository {
     return (data ?? []).map(mapSnapshotRowToSummary);
   }
 
-  async readSnapshot(
-    snapshotId: string,
-  ): Promise<RouteSnapshotPayload | null> {
+  async readSnapshot(snapshotId: string): Promise<RouteSnapshotPayload | null> {
     const { data, error } = await this.client
       .from("route_snapshots")
       .select("snapshot")
@@ -748,4 +754,14 @@ function mapStopFromRow(row: {
       ? (row.walking_from_previous as RouteStop["walkingFromPrevious"])
       : undefined,
   };
+}
+
+function parseThemes(value: Json | null): Theme[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((theme): theme is Theme =>
+    ["历史", "文学", "建筑", "音乐", "书店", "美食"].includes(String(theme)),
+  );
 }

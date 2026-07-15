@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("home page exposes the three planning modes", async ({ page }) => {
   await page.goto("/");
+  const mainNav = page.getByLabel("主导航");
 
   await expect(page.getByRole("heading", { name: "细读一座城" })).toBeVisible();
   await expect(page.getByRole("link", { name: /AI 帮我发现/ })).toBeVisible();
@@ -13,12 +14,23 @@ test("home page exposes the three planning modes", async ({ page }) => {
     page.getByRole("link", { name: /南京 金陵城南 · 民国记忆/ }),
   ).toHaveAttribute("href", /\/share\/\?code=nanjing-minguo/);
   await expect(
-    page.getByRole("link", { name: "关于我们" }).last(),
+    mainNav.getByRole("link", { name: "首页", exact: true }),
+  ).toHaveAttribute("href", "/");
+  await expect(
+    mainNav.getByRole("link", { name: "开始规划", exact: true }),
+  ).toHaveAttribute("href", "/plan/");
+  await expect(
+    mainNav.getByRole("link", { name: "我的路线", exact: true }),
+  ).toHaveAttribute("href", "/library/");
+  await expect(
+    mainNav.getByRole("link", { name: "推荐路线", exact: true }),
+  ).toHaveAttribute("href", "/recommendations/");
+  await expect(
+    mainNav.getByRole("link", { name: "关于我们", exact: true }),
   ).toHaveAttribute("href", "/about/");
-  await expect(page.getByRole("link", { name: "如何使用" })).toHaveAttribute(
-    "href",
-    "/guide/",
-  );
+  await expect(
+    mainNav.getByRole("link", { name: "如何使用", exact: true }),
+  ).toHaveAttribute("href", "/guide/");
   await expect(
     page.getByRole("link", { name: "登录" }).first(),
   ).toHaveAttribute("href", "/login/");
@@ -154,7 +166,7 @@ test("route reader can edit stay time locally", async ({ page }) => {
   await expect(page.getByLabel(/路途分钟/).first()).toHaveValue("18");
 });
 
-test("library page shows cloud save entry point", async ({ page }) => {
+test("library page shows login gate when signed out", async ({ page }) => {
   await page.goto("/library/");
 
   await expect(
@@ -162,15 +174,27 @@ test("library page shows cloud save entry point", async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: /云端保存待连接|登录后保存到云端|已登录/,
+      name: /登录账号|登录功能待连接/,
     }),
   ).toBeVisible();
+});
+
+test("recommended routes can be filtered", async ({ page }) => {
+  await page.goto("/recommendations/");
+
   await expect(
-    page.getByRole("heading", { name: "我的路线", exact: true }),
+    page.getByRole("heading", { level: 1, name: "推荐路线" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "保存当前预案" }),
-  ).toBeVisible();
+  await expect(page.getByText("金陵城南 · 民国记忆")).toBeVisible();
+
+  await page.getByPlaceholder("输入城市名").fill("上海");
+  await expect(page.getByText("武康路文学漫游")).toBeVisible();
+  await expect(page.getByText("金陵城南 · 民国记忆")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "书店" }).click();
+  await expect(page.getByText("武康路文学漫游")).toBeVisible();
+  await page.getByRole("button", { name: "紧凑" }).click();
+  await expect(page.getByText("没有符合当前筛选的推荐路线。")).toBeVisible();
 });
 
 test("login and profile pages expose account flows", async ({ page }) => {

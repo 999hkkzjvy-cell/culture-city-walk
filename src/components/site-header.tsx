@@ -1,7 +1,15 @@
 import Link from "next/link";
-import { Bell, Bookmark, Menu, Search } from "lucide-react";
 import { AuthNav } from "@/components/auth/auth-nav";
-import { libraryUrl, routeUrl } from "@/lib/urls";
+import { libraryUrl, recommendedRoutesUrl } from "@/lib/urls";
+
+const navItems = [
+  { label: "首页", href: "/" },
+  { label: "开始规划", href: "/plan/" },
+  { label: "我的路线", href: libraryUrl() },
+  { label: "推荐路线", href: recommendedRoutesUrl() },
+  { label: "关于我们", href: "/about/" },
+  { label: "如何使用", href: "/guide/" },
+];
 
 export function SiteHeader() {
   return (
@@ -17,33 +25,15 @@ export function SiteHeader() {
       </Link>
 
       <nav aria-label="主导航" className="main-nav">
-        <Link href="/">探索城市</Link>
-        <Link href={libraryUrl()}>我的路线</Link>
-        <Link href={routeUrl("demo")}>收藏</Link>
-        <Link href="/">主题</Link>
-        <Link href="/about/">关于我们</Link>
+        {navItems.map((item) => (
+          <Link href={item.href} key={item.label}>
+            {item.label}
+          </Link>
+        ))}
       </nav>
 
       <div className="header-actions">
-        <label className="search-box">
-          <Search aria-hidden="true" size={16} />
-          <span className="sr-only">搜索城市、主题或地点</span>
-          <input placeholder="搜索城市、主题或地点" />
-        </label>
         <AuthNav />
-        <button aria-label="通知" className="icon-button" type="button">
-          <Bell size={18} />
-        </button>
-        <button aria-label="收藏" className="icon-button" type="button">
-          <Bookmark size={18} />
-        </button>
-      </div>
-
-      <div className="mobile-header-actions">
-        <AuthNav />
-        <button aria-label="打开菜单" className="mobile-menu" type="button">
-          <Menu size={24} />
-        </button>
       </div>
     </header>
   );

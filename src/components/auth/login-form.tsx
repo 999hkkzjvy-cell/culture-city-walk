@@ -12,7 +12,11 @@ import {
 
 type AuthMode = "login" | "register";
 
-export function LoginForm() {
+export function LoginForm({
+  redirectTo = "/profile/",
+}: {
+  redirectTo?: string;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -31,10 +35,10 @@ export function LoginForm() {
 
     client.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
-        router.replace("/profile/");
+        router.replace(redirectTo);
       }
     });
-  }, [router]);
+  }, [redirectTo, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +65,7 @@ export function LoginForm() {
           return;
         }
 
-        router.push("/profile/");
+        router.push(redirectTo);
         return;
       }
 
@@ -72,7 +76,7 @@ export function LoginForm() {
           data: {
             display_name: displayName.trim() || email.split("@")[0],
           },
-          emailRedirectTo: `${window.location.origin}${basePath}/profile/`,
+          emailRedirectTo: `${window.location.origin}${basePath}${redirectTo}`,
         },
       });
 
@@ -89,7 +93,7 @@ export function LoginForm() {
       }
 
       if (data.session) {
-        router.push("/profile/");
+        router.push(redirectTo);
         return;
       }
 
@@ -162,7 +166,9 @@ export function LoginForm() {
           <LogIn size={16} />
           密码
           <input
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
             minLength={6}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="至少 6 位"

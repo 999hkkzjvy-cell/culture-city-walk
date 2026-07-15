@@ -1,19 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { Cloud, FileText, Trash2 } from "lucide-react";
+import { Bookmark, Cloud, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
 import {
   createRouteRepository,
   type SavedRouteSummary,
 } from "@/lib/repositories/route-repository";
+import type { Theme } from "@/lib/route";
 import { readCandidateState, readRoutePlan } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 type LoadState = "loading" | "ready" | "error";
 
-export function RouteLibrary() {
+export function RouteLibrary({
+  selectedThemes = [],
+  view = "plans",
+}: {
+  selectedThemes?: Theme[];
+  view?: "plans" | "favorites";
+}) {
   const [routes, setRoutes] = useState<SavedRouteSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [message, setMessage] = useState("");
@@ -82,10 +89,30 @@ export function RouteLibrary() {
     );
   }
 
+  const filteredRoutes = routes.filter(
+    (route) =>
+      selectedThemes.length === 0 ||
+      selectedThemes.every((theme) => route.themes.includes(theme)),
+  );
+
+  if (view === "favorites") {
+    return (
+      <section className="library-panel">
+        <div className="section-heading">
+          <h2>我的收藏</h2>
+        </div>
+        <div className="library-empty">
+          <Bookmark size={24} />
+          <span>收藏夹还没有路线。之后推荐路线和朋友分享可以在这里归档。</span>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="library-panel">
       <div className="section-heading">
-        <h2>我的路线</h2>
+        <h2>我的规划</h2>
         <button
           className="secondary-button"
           onClick={saveCurrentRoute}
@@ -97,8 +124,8 @@ export function RouteLibrary() {
       </div>
       {message ? <p className="auth-message">{message}</p> : null}
       <div className="route-list">
-        {routes.length > 0 ? (
-          routes.map((route) => (
+        {filteredRoutes.length > 0 ? (
+          filteredRoutes.map((route) => (
             <article className="route-list-item" key={route.id}>
               <FileText size={22} aria-hidden="true" />
               <div>
@@ -108,6 +135,13 @@ export function RouteLibrary() {
                   {route.visibility === "shared" ? "已分享" : "私有"} · v
                   {route.version}
                 </p>
+                {route.themes.length > 0 ? (
+                  <div className="route-list-tags">
+                    {route.themes.map((theme) => (
+                      <span key={theme}>{theme}</span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <Link className="secondary-link" href={routeUrl(route.id)}>
                 查看
@@ -126,7 +160,11 @@ export function RouteLibrary() {
         ) : (
           <div className="library-empty">
             <FileText size={24} />
-            <span>还没有云端路线。先保存当前预案，之后可以跨设备查看。</span>
+            <span>
+              {routes.length > 0
+                ? "当前主题筛选下没有路线。"
+                : "还没有云端路线。先保存当前预案，之后可以跨设备查看。"}
+            </span>
           </div>
         )}
       </div>

@@ -8,12 +8,13 @@
 
 - Next.js App Router + TypeScript
 - 静态导出，适配 GitHub Pages
-- 首页、规划页、路线阅读页
+- 首页、规划页、路线阅读页、路线库、推荐路线页
 - localStorage 草稿保存与恢复
 - Vitest 纯函数测试
 - Playwright 桌面与移动端冒烟测试
 - GitHub Pages workflow
 - Supabase migration、RLS、邮箱登录入口、我的路线与分享页骨架
+- 顶部导航统一为：首页、开始规划、我的路线、推荐路线、关于我们、如何使用
 
 ## 本地开发
 
