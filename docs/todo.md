@@ -12,28 +12,7 @@
 
 ## P0 待验证与发布风险
 
-- `P0` 验证云端路线打卡图链路。
-  - `supabase/migrations/20260715000200_route_checkin_photos.sql` 已由用户在 Supabase 网站端部署。
-  - 私有 Storage bucket `route-media` 已由用户在 Supabase 网站端确认存在。
-  - 仍需用真实登录账号验证：云端路线途中模式上传打卡图、生成签名 URL 预览、删除图片、刷新后重新读取图片记录。
-
-- `P0` 推送后确认 GitHub Pages workflow 与线上版本。
-  - 确认本次提交推送后 workflow 成功完成。
-  - 线上至少验证：首页、规划页、路线详情页、途中模式、我的路线、分享页可正常打开。
-
-## P1 线上真实冒烟测试
-
-- `P1` 对 GitHub Pages 线上站点做真实核心链路冒烟。
-  - 使用高德真实 POI 规划路线。
-  - 至少验证南京和上海的沿途候选。
-  - 保存云端路线、创建分享、打开分享、撤销/删除分享。
-  - 验证收藏分享路线后可导入为自己的规划副本。
-  - 验证云端路线的途中打卡图上传、预览和删除。
-
-- `P1` 验证生产环境 Auth redirect 配置。
-  - GitHub Pages URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/`
-  - 通配 Redirect：`https://999hkkzjvy-cell.github.io/culture-city-walk/**`
-  - 本地 Redirect URL：`http://localhost:3000/**`
+当前没有 P0 待办。
 
 ## P1 规划与候选质量
 
@@ -90,6 +69,14 @@
 
 ## P1 认证、云端与数据可靠性
 
+- `P1` 如未来开启邮件确认或 magic link，补充邮件链接回跳验证。
+  - 2026-07-16 线上邮箱密码注册登录已通过，可直接进入 `/profile/`。
+  - 由于当前生产注册没有强制邮件确认，本次线上烟测没有触发邮件确认链接。
+  - 若后续启用邮件确认或恢复 magic-link 主流程，需要单独验证 GitHub Pages 回跳：
+    - Site URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/`
+    - Redirect URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/**`
+    - 本地 Redirect URL：`http://localhost:3000/**`
+
 - `P1` 改进登录后的本地草稿迁移。
   - 当前同步是 best effort。
   - 需要更明确的“保存本地草稿到云端”流程，并处理云端已有路线时的冲突。
@@ -144,8 +131,7 @@
    - `npm run e2e`
 2. 提交并推送分支。
 3. 确认 GitHub Pages workflow 成功。
-4. 验证 Supabase `route_checkin_photos` 和 `route-media`：上传、签名 URL 预览和删除。
-5. 线上冒烟测试：路线规划、云端保存、分享、撤销/删除、途中打卡图归档、分享路线收藏/修改。
+4. 线上冒烟测试：路线规划、云端保存、分享、撤销/删除、途中打卡图归档、分享路线收藏/修改。
 
 ## 文档维护注意
 
