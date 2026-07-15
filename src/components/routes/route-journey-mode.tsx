@@ -803,7 +803,7 @@ async function buildStoredPhoto(
   const createdAt = new Date().toISOString();
 
   return {
-    id: `checkin-${routeId}-${stopId}-${Date.now()}`,
+    id: createCheckInPhotoId(),
     routeId,
     stopId,
     fileName: file.name || "check-in.jpg",
@@ -811,6 +811,19 @@ async function buildStoredPhoto(
     dataUrl,
     createdAt,
   };
+}
+
+function createCheckInPhotoId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (char) =>
+    (
+      Number(char) ^
+      (Math.floor(Math.random() * 16) >> (Number(char) / 4))
+    ).toString(16),
+  );
 }
 
 function resizeImageFile(file: File): Promise<string> {

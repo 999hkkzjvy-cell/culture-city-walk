@@ -11,6 +11,7 @@ import {
   type AppSupabaseClient,
 } from "@/lib/supabase/client";
 import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
+import { isCloudRouteId } from "@/lib/validation/route-schemas";
 
 const routeMediaBucket = "route-media";
 
@@ -185,12 +186,6 @@ async function createSignedUrl(client: AppSupabaseClient, storagePath: string) {
     .createSignedUrl(storagePath, 60 * 60);
 
   return data?.signedUrl ?? null;
-}
-
-function isCloudRouteId(routeId: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    routeId,
-  );
 }
 
 function dataUrlToBlob(dataUrl: string) {
