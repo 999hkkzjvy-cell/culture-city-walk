@@ -81,7 +81,7 @@ export function SharedRouteReader() {
 
     const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/share-route?code=${encodeURIComponent(shareCode)}`;
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
     fetch(functionUrl, {
       headers: {

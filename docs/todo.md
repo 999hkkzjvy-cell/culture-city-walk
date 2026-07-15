@@ -17,12 +17,6 @@
   - 私有 Storage bucket `route-media` 已由用户在 Supabase 网站端确认存在。
   - 仍需用真实登录账号验证：云端路线途中模式上传打卡图、生成签名 URL 预览、删除图片、刷新后重新读取图片记录。
 
-- `P0` 处理 Supabase 迁移历史不一致。
-  - 2026-07-16 `npx supabase migration list --linked` 已可连接远端，说明 CLI 登录权限可用。
-  - 2026-07-16 `npx supabase db push --linked --yes --dry-run` 未写入远端；结果显示远端迁移历史存在本地没有的版本 `20260713174555`。
-  - 在确认该远端迁移来源前，不要直接执行真实 `db push`。
-  - 下一步：确认 `20260713174555` 是历史有效迁移、网页端临时 SQL 记录，还是可废弃记录；之后选择补回本地迁移文件，或在确认无用后按 Supabase 建议执行 migration repair。
-
 - `P0` 推送后确认 GitHub Pages workflow 与线上版本。
   - 确认本次提交推送后 workflow 成功完成。
   - 线上至少验证：首页、规划页、路线详情页、途中模式、我的路线、分享页可正常打开。
