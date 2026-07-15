@@ -388,6 +388,7 @@ export function RouteReader() {
             const openingWarning = getOpeningHoursWarning(
               stop,
               stop.calculatedTime,
+              route.dateLabel,
             );
             const navigationUrl =
               index === 0

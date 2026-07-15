@@ -27,8 +27,14 @@ export type RouteCandidate = {
 export type CandidateSearchOptions = {
   themes: Theme[];
   acceptedTypes?: CandidatePlaceType[];
+  restaurantPreferences?: RestaurantPreferences;
   maxResults?: number;
   now?: Date;
+};
+
+export type RestaurantPreferences = {
+  cuisines?: string[];
+  budget?: string | null;
 };
 
 type SeedCandidate = Omit<
@@ -157,7 +163,11 @@ export function generateRouteCandidates(
   return dedupeCandidates(LOCAL_NANJING_CANDIDATES)
     .filter((candidate) => isSameCity(candidate.place.city, route.city))
     .filter((candidate) => acceptedTypes.includes(candidate.placeType))
-    .map((candidate) => scoreCandidate(route, candidate, options.themes))
+    .map((candidate) =>
+      scoreCandidate(route, candidate, options.themes, undefined, {
+        restaurantPreferences: options.restaurantPreferences,
+      }),
+    )
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
     .slice(0, maxResults);
 }
@@ -178,7 +188,11 @@ export function generateRouteCandidatesFromPlaces(
     .filter((candidate) => isSameCity(candidate.place.city, route.city))
     .filter((candidate) => acceptedTypes.includes(candidate.placeType))
     .filter((candidate) => !isDuplicateRouteStop(route, candidate.place))
-    .map((candidate) => scoreCandidate(route, candidate, options.themes))
+    .map((candidate) =>
+      scoreCandidate(route, candidate, options.themes, undefined, {
+        restaurantPreferences: options.restaurantPreferences,
+      }),
+    )
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
     .slice(0, maxResults);
 }
@@ -213,6 +227,7 @@ export async function refineCandidatesWithProviderDetours(
   candidates: RouteCandidate[],
   calculateWalkingRoute: NonNullable<MapProvider["calculateWalkingRoute"]>,
   preferredThemes: Theme[],
+  restaurantPreferences?: RestaurantPreferences,
 ): Promise<ProviderDetourResult> {
   if (route.stops.length < 2 || candidates.length === 0) {
     return {
@@ -240,6 +255,7 @@ export async function refineCandidatesWithProviderDetours(
     failedLegs += insertion.failedLegs ?? 0;
     return scoreCandidate(route, candidate, preferredThemes, insertion, {
       providerVerified: (insertion.providerLegs ?? 0) > 0,
+      restaurantPreferences,
     });
   });
 
@@ -257,7 +273,10 @@ function scoreCandidate(
   candidate: SeedCandidate,
   preferredThemes: Theme[],
   insertionOverride?: CandidateInsertion,
-  scoringOptions: { providerVerified?: boolean } = {},
+  scoringOptions: {
+    providerVerified?: boolean;
+    restaurantPreferences?: RestaurantPreferences;
+  } = {},
 ): RouteCandidate {
   const insertion =
     insertionOverride ?? findBestInsertion(route.stops, candidate.place);
@@ -271,8 +290,17 @@ function scoreCandidate(
   const themeScore = matchedThemes.length * 18;
   const diversityScore = typeAlreadyUsed ? 4 : 12;
   const providerQualityScore = getProviderQualityScore(candidate.place);
+  const restaurantPreference = getRestaurantPreferenceMatch(
+    candidate,
+    scoringOptions.restaurantPreferences,
+  );
   const baseScore =
-    58 + themeScore + diversityScore + providerQualityScore - detourPenalty;
+    58 +
+    themeScore +
+    diversityScore +
+    providerQualityScore +
+    restaurantPreference.score -
+    detourPenalty;
   const score = clamp(Math.round(baseScore), 0, 100);
   const fitBand = getFitBand(score, insertion.detourMinutes);
   const reasons = buildReasons(
@@ -280,6 +308,7 @@ function scoreCandidate(
     matchedThemes,
     insertion.detourMinutes,
     scoringOptions.providerVerified,
+    restaurantPreference.reasons,
   );
   const risks = buildRisks(candidate.place);
 
@@ -577,6 +606,173 @@ function matchesAny(text: string, keywords: string[]) {
   return keywords.some((keyword) => text.includes(keyword));
 }
 
+function getRestaurantPreferenceMatch(
+  candidate: SeedCandidate,
+  preferences?: RestaurantPreferences,
+) {
+  if (candidate.placeType !== "餐厅" || !preferences) {
+    return { score: 0, reasons: [] as string[] };
+  }
+
+  const cuisines = preferences.cuisines?.filter(Boolean) ?? [];
+  const text = [
+    candidate.place.name,
+    candidate.place.address ?? "",
+    candidate.place.poiType ?? "",
+  ].join(" ");
+  const matchedCuisine = cuisines.find((cuisine) =>
+    matchesAny(text, getCuisineKeywords(cuisine)),
+  );
+  const budgetMatch = getBudgetMatch(
+    candidate.place.providerCost,
+    preferences.budget,
+  );
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (matchedCuisine) {
+    score += 10;
+    reasons.push(`符合${matchedCuisine}偏好`);
+  } else if (cuisines.length > 0) {
+    score -= 4;
+  }
+
+  if (budgetMatch.status === "matched") {
+    score += 8;
+    reasons.push(`人均约 ${budgetMatch.cost} 元，符合预算`);
+  } else if (budgetMatch.status === "above") {
+    score -= 5;
+    reasons.push(`人均约 ${budgetMatch.cost} 元，可能超出预算`);
+  } else if (budgetMatch.status === "below") {
+    score += 2;
+    reasons.push(`人均约 ${budgetMatch.cost} 元，低于预算上限`);
+  }
+
+  return { score, reasons };
+}
+
+function getCuisineKeywords(cuisine: string) {
+  const keywords: Record<string, string[]> = {
+    日料韩餐: [
+      "日料",
+      "日本",
+      "寿司",
+      "刺身",
+      "拉面",
+      "韩餐",
+      "韩国",
+      "韩式",
+      "烤肉",
+    ],
+    东南亚菜: [
+      "东南亚",
+      "泰国",
+      "泰式",
+      "越南",
+      "新加坡",
+      "马来",
+      "印尼",
+      "咖喱",
+    ],
+    炒菜: [
+      "炒菜",
+      "中餐",
+      "家常",
+      "本帮",
+      "江浙",
+      "淮扬",
+      "南京菜",
+      "川菜",
+      "湘菜",
+      "粤菜",
+      "菜馆",
+      "饭店",
+    ],
+    西餐: [
+      "西餐",
+      "意大利",
+      "披萨",
+      "牛排",
+      "汉堡",
+      "法餐",
+      "西式",
+      "brunch",
+    ],
+    快餐: [
+      "快餐",
+      "简餐",
+      "盖饭",
+      "面馆",
+      "粉面",
+      "饺子",
+      "馄饨",
+      "肯德基",
+      "麦当劳",
+    ],
+    火锅: ["火锅", "涮", "串串", "麻辣烫"],
+    烧烤: ["烧烤", "烤串", "烤肉", "炭火"],
+    地方小吃: [
+      "小吃",
+      "地方",
+      "老字号",
+      "鸭血粉丝",
+      "锅贴",
+      "馄饨",
+      "汤包",
+      "面馆",
+      "南京菜",
+      "淮扬",
+    ],
+  };
+
+  return keywords[cuisine] ?? [cuisine];
+}
+
+function getBudgetMatch(costText?: string | null, budget?: string | null) {
+  const cost = parseProviderCost(costText);
+  const range = getBudgetRange(budget);
+
+  if (cost === null || !range) {
+    return { status: "unknown" as const, cost };
+  }
+
+  if (cost < range.min) {
+    return { status: "below" as const, cost };
+  }
+
+  if (cost > range.max) {
+    return { status: "above" as const, cost };
+  }
+
+  return { status: "matched" as const, cost };
+}
+
+function parseProviderCost(costText?: string | null) {
+  if (!costText) {
+    return null;
+  }
+
+  const match = costText.match(/\d+(?:\.\d+)?/);
+  const cost = match ? Number(match[0]) : Number.NaN;
+
+  return Number.isFinite(cost) ? cost : null;
+}
+
+function getBudgetRange(budget?: string | null) {
+  switch (budget) {
+    case "50元以内":
+      return { min: 0, max: 50 };
+    case "50-100元":
+      return { min: 50, max: 100 };
+    case "100-200元":
+      return { min: 100, max: 200 };
+    case "200元以上":
+      return { min: 200, max: Number.POSITIVE_INFINITY };
+    default:
+      return null;
+  }
+}
+
 function isExcludedPoi(text: string) {
   return matchesAny(text, [
     "超级市场",
@@ -742,6 +938,7 @@ function buildReasons(
   matchedThemes: Theme[],
   detourMinutes: number,
   providerVerified = false,
+  extraReasons: string[] = [],
 ) {
   const reasons = [
     providerVerified
@@ -756,6 +953,8 @@ function buildReasons(
   if (matchedThemes.length > 0) {
     reasons.push(`匹配${matchedThemes.join("、")}偏好`);
   }
+
+  extraReasons.forEach((reason) => reasons.push(reason));
 
   if (candidate.place.providerRating) {
     reasons.push(`高德评分 ${candidate.place.providerRating}`);

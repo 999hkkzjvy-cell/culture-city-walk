@@ -14,17 +14,25 @@ type DeepSeekProxyRequest =
       action: "parse-intent";
       input: string;
       draft: unknown;
+      schemaRepair?: SchemaRepairHint;
     }
   | {
       action: "rank-candidates";
       intent: unknown;
       candidates: unknown[];
+      schemaRepair?: SchemaRepairHint;
     }
   | {
       action: "stop-deep-reading";
       route: unknown;
       stop: unknown;
+      schemaRepair?: SchemaRepairHint;
     };
+
+type SchemaRepairHint = {
+  issues?: unknown;
+  previousResult?: unknown;
+};
 
 type DeepSeekUsage = {
   prompt_tokens?: number;
@@ -93,11 +101,14 @@ async function handleParseIntent(
   const startedAt = performance.now();
   const response = await callDeepSeek(apiKey, {
     maxTokens: 700,
-    systemPrompt:
+    systemPrompt: withRepairInstruction(
       "你是城市漫游规划助手。请把用户需求解析为严格 json 对象，不要输出 markdown。只允许输出这些字段：mode, city, date, mustVisitPlaceIds, themeFilters, pace, maxWalkingKm, mealRequirement。themeFilters 只能从 历史、文学、建筑、音乐、书店、美食 中选择。pace 只能是 轻松漫步、平衡、充实紧凑。缺失信息使用 draft 中的值。",
+      input.schemaRepair,
+    ),
     userPrompt: JSON.stringify({
       input: input.input,
       draft: input.draft,
+      schemaRepair: input.schemaRepair ?? null,
       exampleJson: {
         mode: "complete",
         city: "南京",
@@ -125,11 +136,14 @@ async function handleStopDeepReading(
   const startedAt = performance.now();
   const response = await callDeepSeek(apiKey, {
     maxTokens: 1800,
-    systemPrompt:
+    systemPrompt: withRepairInstruction(
       "你是严谨但有趣的城市文化讲解撰稿人。请只基于用户给定站点和常识性公开知识生成内容；不确定的具体年份、人物轶事、开放信息要写成待核验，不要伪造来源。输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。shortIntro 写 180-420 字，包含空间第一印象、可能的建筑/街区观察、历史背景线索。themeConnections 至少 3 条，优先覆盖建筑风格、历史背景、名人轶事/城市记忆。checkInTasks 给 3 个有趣但不打扰他人的打卡任务。sourceStatus 固定 unverified。",
+      input.schemaRepair,
+    ),
     userPrompt: JSON.stringify({
       route: input.route,
       stop: input.stop,
+      schemaRepair: input.schemaRepair ?? null,
       exampleJson: {
         placeId: "poi-id",
         shortIntro:
@@ -165,11 +179,14 @@ async function handleRankCandidates(
   const startedAt = performance.now();
   const response = await callDeepSeek(apiKey, {
     maxTokens: 1200,
-    systemPrompt:
+    systemPrompt: withRepairInstruction(
       "你是城市漫游候选点排序助手。请只基于用户意图和给定 candidates 排序，不要编造候选点、事实来源或不可验证故事。输出严格 json 对象，不要输出 markdown。格式为 {\"ranked\":[{\"id\":\"候选点id\",\"reasons\":[\"一句中文推荐理由\"]}],\"warnings\":[]}。ranked 只能使用输入里的 id。",
+      input.schemaRepair,
+    ),
     userPrompt: JSON.stringify({
       intent: input.intent,
       candidates: input.candidates,
+      schemaRepair: input.schemaRepair ?? null,
       exampleJson: {
         ranked: [
           {
@@ -187,6 +204,14 @@ async function handleRankCandidates(
     usage: usageFromDeepSeek(response.usage, response.model, startedAt),
     warnings: [],
   });
+}
+
+function withRepairInstruction(prompt: string, schemaRepair?: SchemaRepairHint) {
+  if (!schemaRepair) {
+    return prompt;
+  }
+
+  return `${prompt}\n这是一次 schema 修复重试。请根据 schemaRepair.issues 修正 schemaRepair.previousResult 的 JSON 结构和值类型，只输出修复后的严格 json，不要添加 markdown、解释或不在字段范围内的内容。`;
 }
 
 async function callDeepSeek(

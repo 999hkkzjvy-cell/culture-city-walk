@@ -364,4 +364,57 @@ describe("route candidates", () => {
       "巷口南京菜馆",
     ]);
   });
+
+  it("prioritizes restaurants that match cuisine and budget preferences", () => {
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:R010",
+          source: "amap",
+          sourcePlaceId: "R010",
+          name: "寿司小馆",
+          address: "长江路 6 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.799, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;外国餐厅;日本料理",
+          providerCost: "85",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R011",
+          source: "amap",
+          sourcePlaceId: "R011",
+          name: "重油川菜馆",
+          address: "长江路 7 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.7988, lat: 32.0438, system: "gcj02" },
+          poiType: "餐饮服务;中餐厅;川菜",
+          providerCost: "160",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["美食"],
+        acceptedTypes: ["餐厅"],
+        maxResults: 2,
+        restaurantPreferences: {
+          cuisines: ["日料韩餐"],
+          budget: "50-100元",
+        },
+      },
+    );
+
+    expect(candidates[0].place.name).toBe("寿司小馆");
+    expect(candidates[0].reasons).toEqual(
+      expect.arrayContaining([
+        "符合日料韩餐偏好",
+        "人均约 85 元，符合预算",
+      ]),
+    );
+  });
 });

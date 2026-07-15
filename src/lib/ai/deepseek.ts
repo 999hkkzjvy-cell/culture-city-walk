@@ -42,6 +42,10 @@ const proxyResponseSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+type DeepSeekUsage = z.infer<typeof deepSeekUsageSchema>;
+
+type ProxyResponse = z.infer<typeof proxyResponseSchema>;
+
 export function isDeepSeekProxyConfigured() {
   return (
     isSupabaseConfigured() &&
@@ -53,7 +57,8 @@ export async function parseIntentWithDeepSeek(
   input: string,
   draft: RouteDraft,
 ): Promise<CollaborationResult<PlanningIntent>> {
-  const response = await invokeDeepSeekProxy("parse-intent", {
+  const action = "parse-intent";
+  const payload = {
     input,
     draft: {
       mode: draft.mode,
@@ -64,13 +69,19 @@ export async function parseIntentWithDeepSeek(
       pace: draft.pace,
       walkingRangeKm: draft.walkingRangeKm,
     },
-  });
-  const parsed = planningIntentSchema.parse(response.result);
+  };
+  const response = await invokeDeepSeekProxy(action, payload);
+  const parsed = await parseResultWithRepair(
+    action,
+    payload,
+    response,
+    planningIntentSchema,
+  );
 
   return {
-    data: parsed,
-    usage: toUsageRecord(response.usage),
-    warnings: response.warnings,
+    data: parsed.data,
+    usage: toUsageRecord(parsed.usage),
+    warnings: parsed.warnings,
   };
 }
 
@@ -78,7 +89,8 @@ export async function rankCandidatesWithDeepSeek(
   candidates: RouteCandidate[],
   intent: PlanningIntent,
 ): Promise<CollaborationResult<RouteCandidate[]>> {
-  const response = await invokeDeepSeekProxy("rank-candidates", {
+  const action = "rank-candidates";
+  const payload = {
     intent,
     candidates: candidates.map((candidate) => ({
       id: candidate.id,
@@ -94,8 +106,15 @@ export async function rankCandidatesWithDeepSeek(
       localReasons: candidate.reasons,
       risks: candidate.risks,
     })),
-  });
-  const ranked = rankedCandidateSchema.parse(response.result);
+  };
+  const response = await invokeDeepSeekProxy(action, payload);
+  const parsed = await parseResultWithRepair(
+    action,
+    payload,
+    response,
+    rankedCandidateSchema,
+  );
+  const ranked = parsed.data;
   const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   const seen = new Set<string>();
   const ordered = ranked.ranked
@@ -118,8 +137,8 @@ export async function rankCandidatesWithDeepSeek(
 
   return {
     data: [...ordered, ...missing],
-    usage: toUsageRecord(response.usage),
-    warnings: [...response.warnings, ...ranked.warnings],
+    usage: toUsageRecord(parsed.usage),
+    warnings: [...parsed.warnings, ...ranked.warnings],
   };
 }
 
@@ -127,7 +146,8 @@ export async function generateStopThemeContentWithDeepSeek(
   stop: RouteStop,
   route: RoutePlan,
 ): Promise<CollaborationResult<StopThemeContent>> {
-  const response = await invokeDeepSeekProxy("stop-deep-reading", {
+  const action = "stop-deep-reading";
+  const payload = {
     route: {
       city: route.city,
       title: route.title,
@@ -144,13 +164,19 @@ export async function generateStopThemeContentWithDeepSeek(
       stayMinutes: stop.stayMinutes,
       verificationStatus: stop.verificationStatus,
     },
-  });
-  const parsed = stopThemeContentSchema.parse(response.result);
+  };
+  const response = await invokeDeepSeekProxy(action, payload);
+  const parsed = await parseResultWithRepair(
+    action,
+    payload,
+    response,
+    stopThemeContentSchema,
+  );
 
   return {
-    data: parsed,
-    usage: toUsageRecord(response.usage),
-    warnings: response.warnings,
+    data: parsed.data,
+    usage: toUsageRecord(parsed.usage),
+    warnings: parsed.warnings,
   };
 }
 
@@ -175,7 +201,60 @@ async function invokeDeepSeekProxy(action: string, payload: object) {
   return proxyResponseSchema.parse(data);
 }
 
-function toUsageRecord(usage: z.infer<typeof deepSeekUsageSchema>): AiUsageRecord {
+async function parseResultWithRepair<T>(
+  action: string,
+  payload: object,
+  response: ProxyResponse,
+  schema: z.ZodType<T>,
+) {
+  const parsed = schema.safeParse(response.result);
+
+  if (parsed.success) {
+    return {
+      data: parsed.data,
+      usage: response.usage,
+      warnings: response.warnings,
+    };
+  }
+
+  const repairResponse = await invokeDeepSeekProxy(action, {
+    ...payload,
+    schemaRepair: {
+      issues: parsed.error.issues.map(formatZodIssue).slice(0, 8),
+      previousResult: response.result,
+    },
+  });
+  const repaired = schema.parse(repairResponse.result);
+
+  return {
+    data: repaired,
+    usage: mergeUsage(response.usage, repairResponse.usage),
+    warnings: [
+      ...response.warnings,
+      "DeepSeek 输出格式已自动修复一次。",
+      ...repairResponse.warnings,
+    ],
+  };
+}
+
+function formatZodIssue(issue: z.ZodIssue) {
+  const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+
+  return `${path}: ${issue.message}`;
+}
+
+function mergeUsage(first: DeepSeekUsage, second: DeepSeekUsage): DeepSeekUsage {
+  return {
+    provider: "deepseek",
+    model: second.model || first.model,
+    inputTokens: first.inputTokens + second.inputTokens,
+    outputTokens: first.outputTokens + second.outputTokens,
+    elapsedMs: first.elapsedMs + second.elapsedMs,
+    estimatedCostCny: first.estimatedCostCny + second.estimatedCostCny,
+  };
+}
+
+function toUsageRecord(usage: DeepSeekUsage): AiUsageRecord {
   return {
     promptVersion,
     provider: usage.provider,

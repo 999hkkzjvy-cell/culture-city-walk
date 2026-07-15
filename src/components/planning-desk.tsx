@@ -34,6 +34,7 @@ import {
   refineCandidatesWithProviderDetours,
   type CandidateFitBand,
   type CandidatePlaceType,
+  type RestaurantPreferences,
   type RouteCandidate,
 } from "@/lib/route-candidates";
 import {
@@ -56,13 +57,14 @@ import {
   createAmapWebServiceProvider,
   isAmapWebProxyConfigured,
 } from "@/lib/maps/amap-web";
-import type { Coordinate, PlaceCandidate } from "@/lib/maps/types";
+import type { PlaceCandidate } from "@/lib/maps/types";
 import { getOpeningHoursWarning } from "@/lib/opening-hours";
 import {
   collectAmapPlacesAround,
   getAmapCandidateTypes,
   getAmapFailureDetail,
 } from "@/lib/maps/route-candidate-search";
+import { collectRouteSearchCenters } from "@/lib/maps/route-search-centers";
 import {
   appendPlaceCandidateToRoute,
   inferStayMinutesForPlace,
@@ -125,77 +127,6 @@ const mealCuisineOptions = [
   "烧烤",
   "地方小吃",
 ];
-
-function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
-  const centers: Coordinate[] = [];
-
-  route.stops.forEach((stop, index) => {
-    if (isGcj02Coordinate(stop.coordinate)) {
-      centers.push(stop.coordinate);
-    }
-
-    const previousStop = route.stops[index - 1];
-    if (previousStop && isGcj02Coordinate(previousStop.coordinate)) {
-      const midpoint = midpointCoordinate(
-        previousStop.coordinate,
-        stop.coordinate,
-      );
-      if (midpoint) {
-        centers.push(midpoint);
-      }
-    }
-
-    const polyline = stop.walkingFromPrevious?.polyline ?? [];
-    if (polyline.length >= 3) {
-      const middle = polyline[Math.floor(polyline.length / 2)];
-      if (isGcj02Coordinate(middle)) {
-        centers.push(middle);
-      }
-    }
-  });
-
-  return dedupeCoordinates(centers).slice(0, 5);
-}
-
-function midpointCoordinate(
-  origin: Coordinate,
-  destination?: Coordinate | null,
-): Coordinate | null {
-  if (!isGcj02Coordinate(destination)) {
-    return null;
-  }
-
-  return {
-    lng: (origin.lng + destination.lng) / 2,
-    lat: (origin.lat + destination.lat) / 2,
-    system: "gcj02",
-  };
-}
-
-function dedupeCoordinates(coordinates: Coordinate[]) {
-  const seen = new Set<string>();
-
-  return coordinates.filter((coordinate) => {
-    const key = `${coordinate.lng.toFixed(4)},${coordinate.lat.toFixed(4)}`;
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function isGcj02Coordinate(
-  coordinate?: Coordinate | null,
-): coordinate is Coordinate {
-  return Boolean(
-    coordinate &&
-    coordinate.system === "gcj02" &&
-    Number.isFinite(coordinate.lng) &&
-    Number.isFinite(coordinate.lat),
-  );
-}
 
 function normalizeCityName(city: string) {
   return city.trim().replace(/市$/, "");
@@ -602,6 +533,9 @@ export function PlanningDesk() {
         themes: intent.data.themeFilters,
         acceptedTypes: effectiveCandidateTypes,
         maxResults: includeMeals ? 15 : 12,
+        restaurantPreferences: includeMeals
+          ? { cuisines: mealCuisines, budget: mealBudget }
+          : undefined,
       });
       const ranked = await rankCandidateSuggestions(
         candidateResult.candidates,
@@ -630,6 +564,7 @@ export function PlanningDesk() {
       themes: Theme[];
       acceptedTypes: CandidatePlaceType[];
       maxResults: number;
+      restaurantPreferences?: RestaurantPreferences;
     },
   ) {
     const fallbackCandidates = () =>
@@ -637,6 +572,7 @@ export function PlanningDesk() {
         themes: options.themes,
         acceptedTypes: options.acceptedTypes,
         maxResults: options.maxResults,
+        restaurantPreferences: options.restaurantPreferences,
       });
     const fallbackResult = (
       message: string,
@@ -698,6 +634,7 @@ export function PlanningDesk() {
             themes: options.themes,
             acceptedTypes: options.acceptedTypes,
             maxResults: options.maxResults,
+            restaurantPreferences: options.restaurantPreferences,
           },
         ),
         route,
@@ -712,6 +649,7 @@ export function PlanningDesk() {
             providerCandidates,
             provider.calculateWalkingRoute,
             options.themes,
+            options.restaurantPreferences,
           );
           const detourWarnings =
             detourResult.providerLegs > 0
@@ -976,6 +914,7 @@ export function PlanningDesk() {
       themes: Theme[];
       acceptedTypes: CandidatePlaceType[];
       maxResults: number;
+      restaurantPreferences?: RestaurantPreferences;
     },
   ) {
     if (!includeMeals) {
@@ -994,6 +933,7 @@ export function PlanningDesk() {
       themes: [...new Set([...options.themes, "美食" as Theme])],
       acceptedTypes: ["餐厅"],
       maxResults: 5,
+      restaurantPreferences: options.restaurantPreferences,
     });
     const merged = [...currentCandidates, ...restaurants];
     const seen = new Set<string>();
@@ -1669,37 +1609,36 @@ export function PlanningDesk() {
         </dl>
 
         <div className="route-preview-list" aria-label="路线预案站点">
-          {previewKernel.stops.map((stop, index) => (
-            <article className="route-preview-stop" key={stop.id}>
-              <div>
-                <strong>
-                  {index + 1}. {stop.name}
-                </strong>
-                <span>
-                  {stop.calculatedTime}
-                  {stop.routeRole === "start" || stop.routeRole === "end"
-                    ? ""
-                    : ` · 停留 ${stop.stayMinutes} 分钟`}
-                  {stop.walkingFromPrevious
-                    ? ` · ${getRouteTravelModeLabel(stop.walkingFromPrevious.mode)} ${stop.walkingFromPrevious.minutes} 分钟`
-                    : ""}
-                </span>
-                {stop.openingHours ? (
-                  <span
-                    className={
-                      getOpeningHoursWarning(stop, stop.calculatedTime)
-                        ? "opening-warning"
-                        : ""
-                    }
-                  >
-                    开放 {stop.openingHours}
-                    {getOpeningHoursWarning(stop, stop.calculatedTime)
-                      ? ` · ${getOpeningHoursWarning(stop, stop.calculatedTime)}`
+          {previewKernel.stops.map((stop, index) => {
+            const openingWarning = getOpeningHoursWarning(
+              stop,
+              stop.calculatedTime,
+              draft.dateLabel,
+            );
+
+            return (
+              <article className="route-preview-stop" key={stop.id}>
+                <div>
+                  <strong>
+                    {index + 1}. {stop.name}
+                  </strong>
+                  <span>
+                    {stop.calculatedTime}
+                    {stop.routeRole === "start" || stop.routeRole === "end"
+                      ? ""
+                      : ` · 停留 ${stop.stayMinutes} 分钟`}
+                    {stop.walkingFromPrevious
+                      ? ` · ${getRouteTravelModeLabel(stop.walkingFromPrevious.mode)} ${stop.walkingFromPrevious.minutes} 分钟`
                       : ""}
                   </span>
-                ) : null}
-              </div>
-              <div className="route-preview-controls">
+                  {stop.openingHours ? (
+                    <span className={openingWarning ? "opening-warning" : ""}>
+                      开放 {stop.openingHours}
+                      {openingWarning ? ` · ${openingWarning}` : ""}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="route-preview-controls">
                 <button
                   aria-label={`上移 ${stop.name}`}
                   disabled={index === 0}
@@ -1742,50 +1681,51 @@ export function PlanningDesk() {
                 >
                   <Trash2 size={14} />
                 </button>
-              </div>
-              {stop.walkingFromPrevious ? (
-                <div
-                  className="route-leg-controls"
-                  aria-label={`${stop.name} 路途设置`}
-                >
-                  <label>
-                    方式
-                    <select
-                      aria-label={`${stop.name} 交通方式`}
-                      onChange={(event) =>
-                        changeLegTravelMode(
-                          stop.id,
-                          event.target
-                            .value as (typeof routeTravelModes)[number],
-                        )
-                      }
-                      value={stop.walkingFromPrevious.mode ?? "walking"}
-                    >
-                      {routeTravelModes.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {routeTravelModeLabels[mode]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    路途分钟
-                    <input
-                      aria-label={`${stop.name} 路途分钟`}
-                      max={360}
-                      min={1}
-                      onChange={(event) =>
-                        changeLegMinutes(stop.id, Number(event.target.value))
-                      }
-                      step={1}
-                      type="number"
-                      value={stop.walkingFromPrevious.minutes}
-                    />
-                  </label>
                 </div>
-              ) : null}
-            </article>
-          ))}
+                {stop.walkingFromPrevious ? (
+                  <div
+                    className="route-leg-controls"
+                    aria-label={`${stop.name} 路途设置`}
+                  >
+                    <label>
+                      方式
+                      <select
+                        aria-label={`${stop.name} 交通方式`}
+                        onChange={(event) =>
+                          changeLegTravelMode(
+                            stop.id,
+                            event.target
+                              .value as (typeof routeTravelModes)[number],
+                          )
+                        }
+                        value={stop.walkingFromPrevious.mode ?? "walking"}
+                      >
+                        {routeTravelModes.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {routeTravelModeLabels[mode]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      路途分钟
+                      <input
+                        aria-label={`${stop.name} 路途分钟`}
+                        max={360}
+                        min={1}
+                        onChange={(event) =>
+                          changeLegMinutes(stop.id, Number(event.target.value))
+                        }
+                        step={1}
+                        type="number"
+                        value={stop.walkingFromPrevious.minutes}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
 
         <div className="brief-sketch compact">

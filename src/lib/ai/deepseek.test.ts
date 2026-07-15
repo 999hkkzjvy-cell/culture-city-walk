@@ -91,6 +91,60 @@ describe("DeepSeek proxy client", () => {
     expect(result.usage.provider).toBe("deepseek");
   });
 
+  it("retries once when DeepSeek output fails schema validation", async () => {
+    mocks.invoke
+      .mockResolvedValueOnce({
+        data: {
+          result: {
+            mode: "complete",
+            city: "",
+            date: null,
+            mustVisitPlaceIds: [],
+            themeFilters: ["不存在的主题"],
+            pace: "很快",
+            maxWalkingKm: -1,
+            mealRequirement: null,
+          },
+          usage: deepSeekUsage,
+          warnings: [],
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          result: {
+            mode: "complete",
+            city: "南京",
+            date: null,
+            mustVisitPlaceIds: [],
+            themeFilters: ["历史"],
+            pace: "平衡",
+            maxWalkingKm: 8,
+            mealRequirement: null,
+          },
+          usage: deepSeekUsage,
+          warnings: [],
+        },
+        error: null,
+      });
+
+    const result = await parseIntentWithDeepSeek("南京历史路线", defaultDraft);
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(2);
+    expect(mocks.invoke).toHaveBeenLastCalledWith("deepseek-proxy", {
+      body: expect.objectContaining({
+        action: "parse-intent",
+        schemaRepair: expect.objectContaining({
+          issues: expect.any(Array),
+          previousResult: expect.any(Object),
+        }),
+      }),
+    });
+    expect(result.data.city).toBe("南京");
+    expect(result.usage.inputTokens).toBe(deepSeekUsage.inputTokens * 2);
+    expect(result.warnings).toContain("DeepSeek 输出格式已自动修复一次。");
+  });
+
   it("orders known candidates and ignores invented ids", async () => {
     const candidates = generateRouteCandidates(demoRoute, {
       themes: ["历史", "文学"],
