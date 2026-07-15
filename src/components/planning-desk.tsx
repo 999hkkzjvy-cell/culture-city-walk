@@ -46,6 +46,10 @@ import {
   rankCandidatesWithDeepSeek,
 } from "@/lib/ai/deepseek";
 import {
+  logAiUsageRun,
+  makeAiRunIdempotencyKey,
+} from "@/lib/ai/usage-log";
+import {
   calculateRouteKernel,
   formatTime,
   parseTime,
@@ -467,6 +471,7 @@ export function PlanningDesk() {
         candidateResult.candidates,
         intent.data,
       );
+      void recordAiRuns(intent, ranked, candidateResult.candidates);
 
       setCandidates(ranked.data);
       setCandidateActions({});
@@ -633,6 +638,54 @@ export function PlanningDesk() {
         ],
       };
     }
+  }
+
+  async function recordAiRuns(
+    intent: Awaited<ReturnType<typeof getPlanningIntent>>,
+    ranked: Awaited<ReturnType<typeof rankCandidateSuggestions>>,
+    inputCandidates: RouteCandidate[],
+  ) {
+    const routeId = previewRoute.id;
+    const inputSummary = JSON.stringify({
+      requestText,
+      draft,
+      routeId,
+    });
+
+    await Promise.allSettled([
+      logAiUsageRun({
+        routeId,
+        action: "parse_intent",
+        usage: intent.usage,
+        inputPayload: {
+          requestText,
+          draft,
+        },
+        outputPayload: intent.data,
+        idempotencyKey: makeAiRunIdempotencyKey(
+          "parse_intent",
+          routeId,
+          inputSummary,
+        ),
+      }),
+      logAiUsageRun({
+        routeId,
+        action: "rank_candidates",
+        usage: ranked.usage,
+        inputPayload: {
+          intent: intent.data,
+          candidateIds: inputCandidates.map((candidate) => candidate.id),
+        },
+        outputPayload: {
+          rankedCandidateIds: ranked.data.map((candidate) => candidate.id),
+        },
+        idempotencyKey: makeAiRunIdempotencyKey(
+          "rank_candidates",
+          routeId,
+          `${inputSummary}:${inputCandidates.map((candidate) => candidate.id).join(",")}`,
+        ),
+      }),
+    ]);
   }
 
   function markCandidate(candidateId: string, action: CandidateAction) {

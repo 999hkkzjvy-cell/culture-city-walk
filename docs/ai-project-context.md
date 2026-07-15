@@ -128,6 +128,8 @@ passed through query strings rather than dynamic App Router segments.
   duration rules for walking, cycling, transit, driving, and taxi legs.
 - `src/lib/ai/route-collaboration.ts` - Phase 5 structured intent, AI proposal,
   and theme-content schemas plus local fallback behavior.
+- `src/lib/ai/usage-log.ts` - best-effort browser-side AI run logging into
+  `route_ai_runs` for signed-in users.
 - `src/lib/maps/types.ts` - map provider, coordinate, POI, and walking-leg
   contracts.
 - `src/lib/maps/amap.ts` - AMap URI helpers and POI parsing helpers.
@@ -306,10 +308,14 @@ GitHub Actions repository variables required for Pages build:
   concrete observation angles rather than factual claims.
 - AI collaboration can call the Supabase `deepseek-proxy` Edge Function when
   `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps deterministic
-  local fallback behavior.
+  local fallback behavior. Signed-in users' intent parsing and candidate
+  ranking runs are logged to `route_ai_runs` with prompt version, model, token
+  counts, latency, estimated cost, and idempotency keys; user/project limit
+  enforcement is still pending.
 - Auth MVP is present: header login/avatar entry, `/login/` email-password
   login/register, `/profile/` profile editing, and cloud route save/list/share
-  flows after login.
+  flows after login. Route detail and route library both expose share management
+  for cloud routes, including create/copy/revoke states.
 - Mobile fonts and route reader layout have been adjusted to more closely match
   the UI reference. Route reader mobile uses a horizontal two-column reader so
   timeline and map remain related instead of fully stacking.
@@ -343,8 +349,8 @@ Near-term likely work:
   cycling/transit/driving/taxi route APIs, and confirmed POI persistence beyond
   local route previews.
 - Phase 4/5 next: improve sampled-route candidate quality with route polyline
-  density controls, add candidate opening-hours/facts verification, and persist
-  richer AI usage/cost records.
+  density controls, add candidate opening-hours/facts verification, and enforce
+  AI user/project usage limits from logged `route_ai_runs` data.
 - Finish remaining Phase 2 polish opportunistically: auth redirect verification,
   clearer auth UX, local draft migration after login, route archive empty states,
   and avatar upload instead of avatar URL only.

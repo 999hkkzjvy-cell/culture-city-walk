@@ -2084,6 +2084,11 @@ button {
   margin: 0;
 }
 
+.cloud-actions .route-share-manager {
+  flex-basis: 100%;
+  width: 100%;
+}
+
 .route-snapshot-panel {
   display: grid;
   gap: 12px;

@@ -1,16 +1,24 @@
 "use client";
 
-import Link from "next/link";
-import { Cloud, Copy, Share2 } from "lucide-react";
+import { Cloud } from "lucide-react";
 import { useState } from "react";
+import { RouteShareManager } from "@/components/routes/route-share-manager";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
-import { shareUrl } from "@/lib/urls";
+import { demoRoute } from "@/lib/route";
+import { readRoutePlan } from "@/lib/storage";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function RouteCloudActions() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [cloudRouteId, setCloudRouteId] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const route = readRoutePlan();
+    return route.id === demoRoute.id ? null : route.id;
+  });
   const [message, setMessage] = useState("");
 
   async function saveToCloud() {
@@ -19,36 +27,13 @@ export function RouteCloudActions() {
 
     try {
       const { saved } = await saveLocalRouteToCloud();
+      setCloudRouteId(saved.id);
       setSaveState("saved");
       setMessage(`已保存：${saved.title}`);
     } catch (error) {
       setSaveState("error");
       setMessage(mapError(error));
     }
-  }
-
-  async function createShare() {
-    setMessage("");
-
-    try {
-      const { repository, saved } = await saveLocalRouteToCloud();
-      const share = await repository.createShare(saved.id);
-      setShareCode(share.code);
-      setMessage("分享链接已生成。");
-    } catch (error) {
-      setMessage(mapError(error));
-    }
-  }
-
-  async function copyShareLink() {
-    if (!shareCode) {
-      return;
-    }
-
-    await window.navigator.clipboard.writeText(
-      `${window.location.origin}${shareUrl(shareCode)}`,
-    );
-    setMessage("分享链接已复制。");
   }
 
   return (
@@ -65,28 +50,11 @@ export function RouteCloudActions() {
             ? "已保存"
             : "保存到云端"}
       </button>
-      <button className="secondary-button" onClick={createShare} type="button">
-        <Share2 size={17} />
-        生成分享
-      </button>
-      {shareCode ? (
-        <>
-          <Link className="secondary-link" href={shareUrl(shareCode)}>
-            打开分享页
-          </Link>
-          <button
-            className="icon-text-button"
-            onClick={copyShareLink}
-            type="button"
-          >
-            <Copy size={16} />
-            复制
-          </button>
-          <p>
-            分享链接默认不设置过期时间；后续可在路线库中增加撤销和过期设置。
-          </p>
-        </>
-      ) : null}
+      {cloudRouteId ? (
+        <RouteShareManager routeId={cloudRouteId} />
+      ) : (
+        <p>保存到云端后，可以生成、复制和撤销分享链接。</p>
+      )}
       {message ? <p>{message}</p> : null}
     </section>
   );

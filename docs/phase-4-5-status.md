@@ -45,6 +45,8 @@ Phase 4/5 development has a key split:
   - route reader falls back to the demo route when no local preview exists
 - Cloud/local bridge:
   - route-page save/share actions now use the current local route preview
+  - route-page cloud actions now expose the same share manager as route library,
+    including create/copy/revoke states after the route has a cloud ID
   - library-page save action now saves the current local route preview
   - signed-in auth panel can sync the current local preview to cloud storage
   - signed-in auth panel prompts when the local preview has not been synced yet
@@ -59,11 +61,11 @@ Phase 4/5 development has a key split:
   - route title and summary can be generated from deterministic templates
   - stop-level history/literature style content uses template fallback
   - fallback story content is labeled as source-pending
-  - expandable deep-read sections show placeholder theme connections and
-    practical verification tips
+  - middle-stop expandable deep-read sections show concrete observation angles
+    and practical verification tips; start/end stops do not show deep-read UI
 - Share experience:
   - route-page share button scrolls to cloud share actions
-  - generated share links can be copied
+  - generated share links can be copied and revoked from route page or library
   - share reader shows expiry state and source-verification note when connected
 - Repository candidate persistence:
   - local repository stores candidate snapshots in localStorage
@@ -99,22 +101,26 @@ Phase 4/5 development has a key split:
   - local intent parsing test
   - invalid AI-created POI rejection test
   - fallback candidate ranking test
+  - AI usage logging test
   - Playwright Complete-mode candidate insertion smoke test
   - Playwright saved-preview-to-route-reader smoke test
 
-## Still Requires AMap Configuration
+## AMap Integration Status
 
-- AMap JS browser key and domain allowlist.
-- AMap Web Service proxy.
-- Live POI suggestions.
-- Route polyline sampling.
-- Nearby POI search along sampled route points.
+- AMap JS browser map rendering is implemented when the public JS key and
+  domain allowlist are configured.
+- AMap Web Service proxy is implemented through `amap-proxy`.
+- Live POI suggestions for must-visit places are implemented through the proxy.
+- Route polyline sampling and nearby POI search along sampled route points are
+  implemented for candidate generation.
+
+Still pending:
+
 - Provider-backed detour calculation.
 - Persisting confirmed AMap POIs into `places`.
-- Replacing estimated preview legs with provider-backed leg recalculation after
-  each edit.
-- Loading cloud route detail directly into `/route/?id=...`; the route reader
-  currently prefers local preview and demo fallback.
+- Provider-backed cycling/transit/driving/taxi route APIs.
+- Opening-hours/facts verification beyond provider category/name/address
+  filtering.
 
 ## DeepSeek Integration Status
 
@@ -123,13 +129,14 @@ Phase 4/5 development has a key split:
 - The planning page uses DeepSeek when
   `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`, and falls back to local templates
   on missing config or provider failure.
+- Signed-in users' planning intent and candidate ranking runs are logged to
+  `route_ai_runs` with prompt version, model, token counts, latency, estimated
+  cost, and idempotency key.
 
 Still pending:
 
 - One repair retry on schema validation failure.
-- Prompt version persistence.
-- Token, latency, and cost logging against user/project limits.
-- Idempotency keys for identical route-generation requests.
+- Enforcing daily user/project AI limits from the logged usage records.
 
 ## Guardrails
 

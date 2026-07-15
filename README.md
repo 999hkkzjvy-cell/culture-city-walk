@@ -4,7 +4,8 @@
 
 ## 当前阶段
 
-阶段 1 已完成，阶段 2 已开始：Supabase 数据层、登录、保存与分享基础。
+阶段 1/2 已完成，阶段 3/4/5 的 MVP 能力已开始贯通：Supabase
+保存分享、高德地图/POI/步行代理、沿途候选补点、DeepSeek 规划协作和路线阅读编辑已具备本地 fallback。
 
 - Next.js App Router + TypeScript
 - 静态导出，适配 GitHub Pages
@@ -13,7 +14,9 @@
 - Vitest 纯函数测试
 - Playwright 桌面与移动端冒烟测试
 - GitHub Pages workflow
-- Supabase migration、RLS、邮箱登录入口、我的路线与分享页骨架
+- Supabase migration、RLS、邮箱登录、我的路线、云端保存、快照与分享管理
+- 高德 JS 地图、高德 Web Service 代理、必去地点搜索、沿途 POI 搜索和步行复核
+- DeepSeek Edge Function 代理，支持规划意图解析、候选排序和 AI 用量记录
 - 顶部导航统一为：首页、开始规划、我的路线、推荐路线、关于我们、如何使用
 
 ## 本地开发
@@ -33,7 +36,7 @@ npm run e2e
 
 ## Supabase
 
-阶段 2 的数据库迁移在 `supabase/migrations/` 下。复制 `.env.example` 为 `.env.local` 后，填入：
+数据库迁移在 `supabase/migrations/` 下。复制 `.env.example` 为 `.env.local` 后，填入：
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -70,7 +73,7 @@ supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-
 ```
 
 然后部署函数，并在 GitHub Pages 环境变量中把
-`NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` 设为 `true`：
+`NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED` 设为 `true`。登录用户触发规划解析和候选排序时，会把 token、耗时、估算成本和 prompt 版本写入 `route_ai_runs`：
 
 ```bash
 supabase functions deploy deepseek-proxy
