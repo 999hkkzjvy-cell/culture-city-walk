@@ -45,10 +45,7 @@ import {
   parseIntentWithDeepSeek,
   rankCandidatesWithDeepSeek,
 } from "@/lib/ai/deepseek";
-import {
-  logAiUsageRun,
-  makeAiRunIdempotencyKey,
-} from "@/lib/ai/usage-log";
+import { logAiUsageRun, makeAiRunIdempotencyKey } from "@/lib/ai/usage-log";
 import {
   calculateRouteKernel,
   formatTime,
@@ -76,7 +73,7 @@ import {
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import {
-  readCurrentCandidateState,
+  readCandidateState,
   readDraft,
   readRoutePlan,
   saveCandidateState,
@@ -182,6 +179,47 @@ function isGcj02Coordinate(
   );
 }
 
+function normalizeCityName(city: string) {
+  return city.trim().replace(/市$/, "");
+}
+
+function isSameDraftCity(route: RoutePlan, draft: RouteDraft) {
+  const routeCity = normalizeCityName(route.city);
+  const draftCity = normalizeCityName(draft.city);
+
+  return (
+    routeCity.length > 0 && draftCity.length > 0 && routeCity === draftCity
+  );
+}
+
+function cityDraftId(city: string) {
+  const slug =
+    normalizeCityName(city)
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 24) || "unspecified";
+
+  return `local-${slug}-draft`;
+}
+
+function createBlankRouteFromDraft(draft: RouteDraft): RoutePlan {
+  const city = draft.city.trim();
+  const title = city ? `${city}路线草稿` : "新城市路线草稿";
+
+  return {
+    ...defaultDraft,
+    ...draft,
+    id: cityDraftId(city),
+    city,
+    title,
+    mustVisits: [],
+    distanceKm: 0,
+    stops: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function PlanningDesk() {
   const [draft, setDraft] = useState<RouteDraft>(() =>
     typeof window === "undefined" ? defaultDraft : readDraft(),
@@ -205,7 +243,14 @@ export function PlanningDesk() {
     PlaceCandidate[]
   >([]);
   const [candidates, setCandidates] = useState<RouteCandidate[]>(() =>
-    typeof window === "undefined" ? [] : readCurrentCandidateState().candidates,
+    typeof window === "undefined"
+      ? []
+      : (() => {
+          const storedRoute = readRoutePlan();
+          return isSameDraftCity(storedRoute, draft)
+            ? readCandidateState(storedRoute.id).candidates
+            : [];
+        })(),
   );
   const [candidateActions, setCandidateActions] = useState<
     Record<string, CandidateAction>
@@ -214,16 +259,26 @@ export function PlanningDesk() {
       return {};
     }
 
-    return readCurrentCandidateState().actions as Record<
-      string,
-      CandidateAction
-    >;
+    const storedRoute = readRoutePlan();
+    return isSameDraftCity(storedRoute, draft)
+      ? (readCandidateState(storedRoute.id).actions as Record<
+          string,
+          CandidateAction
+        >)
+      : {};
   });
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsageRecord | null>(null);
   const [isGeneratingCandidates, setIsGeneratingCandidates] = useState(false);
   const [previewRoute, setPreviewRoute] = useState(() =>
-    typeof window === "undefined" ? demoRoute : readRoutePlan(),
+    typeof window === "undefined"
+      ? demoRoute
+      : (() => {
+          const storedRoute = readRoutePlan();
+          return isSameDraftCity(storedRoute, draft)
+            ? storedRoute
+            : createBlankRouteFromDraft(draft);
+        })(),
   );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
@@ -280,10 +335,44 @@ export function PlanningDesk() {
 
   function updateCity(city: string) {
     setSaved(false);
-    setDraft((current) => ({
-      ...current,
+    const nextDraft = {
+      ...draft,
       city,
-    }));
+      mustVisits:
+        normalizeCityName(city) === normalizeCityName(draft.city)
+          ? draft.mustVisits
+          : [],
+    };
+
+    setDraft(nextDraft);
+
+    if (normalizeCityName(city) === normalizeCityName(draft.city)) {
+      const nextRoute = {
+        ...previewRoute,
+        city: city.trim(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setPreviewRoute(persistPreviewRoute(nextRoute));
+      return;
+    }
+
+    const nextRoute = createBlankRouteFromDraft(nextDraft);
+
+    setPreviewRoute(persistPreviewRoute(nextRoute));
+    setPlannedPlaces([]);
+    setCandidates([]);
+    setCandidateActions({});
+    setExpandedCandidateIds({});
+    setMustVisitSuggestions([]);
+    setMustVisitSearchState("idle");
+    setMustVisitSearchMessage("");
+    saveCandidateState({
+      routeId: nextRoute.id,
+      candidates: [],
+      actions: {},
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   function addMustVisit(
@@ -502,6 +591,21 @@ export function PlanningDesk() {
         acceptedTypes: options.acceptedTypes,
         maxResults: options.maxResults,
       });
+    const fallbackResult = (
+      message: string,
+      existingWarnings: string[] = [],
+    ) => {
+      const fallback = fallbackCandidates();
+      const fallbackMessage =
+        fallback.length > 0
+          ? `${message}，已使用本地候选。`
+          : `${message}，当前城市暂无本地候选。请先搜索并添加带坐标的必去点，或放宽候选类型筛选。`;
+
+      return {
+        candidates: fallback,
+        warnings: [...existingWarnings, fallbackMessage],
+      };
+    };
 
     if (!isAmapWebProxyConfigured()) {
       return { candidates: fallbackCandidates(), warnings: [] };
@@ -516,10 +620,7 @@ export function PlanningDesk() {
     const centers = collectRouteSearchCenters(route);
 
     if (centers.length === 0) {
-      return {
-        candidates: fallbackCandidates(),
-        warnings: ["当前路线缺少可用于高德沿线搜索的坐标，已使用本地候选。"],
-      };
+      return fallbackResult("当前路线缺少可用于高德沿线搜索的坐标");
     }
 
     try {
@@ -559,41 +660,29 @@ export function PlanningDesk() {
       if (failedCount === centers.length) {
         const failureDetail = getAmapFailureDetail(firstError);
 
-        return {
-          candidates: fallbackCandidates(),
-          warnings: [
-            failureDetail
-              ? `高德沿途候选搜索失败（${failureDetail}），已使用本地候选。`
-              : "高德沿途候选搜索失败，已使用本地候选。",
-          ],
-        };
+        return fallbackResult(
+          failureDetail
+            ? `高德沿途候选搜索失败（${failureDetail}）`
+            : "高德沿途候选搜索失败",
+        );
       }
 
       if (places.length > 0) {
-        return {
-          candidates: fallbackCandidates(),
-          warnings: [
-            ...warnings,
-            "高德已返回地点，但当前筛选类型/路线约束下没有合适候选，已使用本地候选。",
-          ],
-        };
+        return fallbackResult(
+          "高德已返回地点，但当前筛选类型/路线约束下没有合适候选",
+          warnings,
+        );
       }
 
-      return {
-        candidates: fallbackCandidates(),
-        warnings: [...warnings, "高德没有返回沿途地点，已使用本地候选。"],
-      };
+      return fallbackResult("高德没有返回沿途地点", warnings);
     } catch (error) {
       const failureDetail = getAmapFailureDetail(error);
 
-      return {
-        candidates: fallbackCandidates(),
-        warnings: [
-          failureDetail
-            ? `高德沿途候选搜索失败（${failureDetail}），已使用本地候选。`
-            : "高德沿途候选搜索失败，已使用本地候选。",
-        ],
-      };
+      return fallbackResult(
+        failureDetail
+          ? `高德沿途候选搜索失败（${failureDetail}）`
+          : "高德沿途候选搜索失败",
+      );
     }
   }
 
@@ -1101,7 +1190,10 @@ export function PlanningDesk() {
                                 </span>
                                 <h3>{candidate.place.name}</h3>
                                 <p>
-                                  {[candidate.place.district, candidate.place.address]
+                                  {[
+                                    candidate.place.district,
+                                    candidate.place.address,
+                                  ]
                                     .filter(Boolean)
                                     .join(" · ") || "地址待核验"}
                                 </p>
@@ -1120,11 +1212,9 @@ export function PlanningDesk() {
                                 ))}
                               </div>
                               <ul>
-                                {candidate.reasons
-                                  .slice(0, 3)
-                                  .map((reason) => (
-                                    <li key={reason}>{reason}</li>
-                                  ))}
+                                {candidate.reasons.slice(0, 3).map((reason) => (
+                                  <li key={reason}>{reason}</li>
+                                ))}
                               </ul>
                               <div className="candidate-actions">
                                 <button
@@ -1270,7 +1360,11 @@ export function PlanningDesk() {
           </div>
           <div>
             <dt>必去地点</dt>
-            <dd>{draft.mustVisits.length > 0 ? draft.mustVisits.join("、") : "未选择"}</dd>
+            <dd>
+              {draft.mustVisits.length > 0
+                ? draft.mustVisits.join("、")
+                : "未选择"}
+            </dd>
           </div>
           <div>
             <dt>兴趣偏好</dt>

@@ -424,6 +424,10 @@ function isSameCity(candidateCity: string, routeCity: string) {
   const normalizedCandidateCity = normalize(candidateCity);
   const normalizedRouteCity = normalize(routeCity);
 
+  if (!normalizedCandidateCity || !normalizedRouteCity) {
+    return false;
+  }
+
   return (
     normalizedCandidateCity === normalizedRouteCity ||
     normalizedCandidateCity.includes(normalizedRouteCity) ||

@@ -1,6 +1,6 @@
 # Phase 4/5 Status
 
-Date: 2026-07-14
+Date: 2026-07-15
 
 ## Scope
 
@@ -23,6 +23,8 @@ Phase 4/5 development has a key split:
   - provenance and risk labels for locally seeded candidates
 - Planning page Complete-mode UI:
   - natural-language route goal input
+  - city changes reset stale route preview and candidate state so old-city stops
+    are not reused as new-city route context
   - generate along-route candidates
   - candidate type filters
   - grouped candidate bands
@@ -38,7 +40,8 @@ Phase 4/5 development has a key split:
   - pure candidate insertion function
   - estimated leg recalculation after insert, delete, move, or stay-time edits
   - repeated POI support with distinct route-stop identities
-  - minimum two-stop route guard
+  - minimum two-stop route guard for established routes, while one-stop fresh
+    city drafts can still be cleared
 - Route reader local preview:
   - route reader prefers the locally saved planning preview
   - saved candidate insertions, ordering, and stay-time edits survive refresh
@@ -121,6 +124,10 @@ Phase 4/5 development has a key split:
 - Live POI suggestions for must-visit places are implemented through the proxy.
 - Route polyline sampling and nearby POI search along sampled route points are
   implemented for candidate generation.
+- Local seeded candidate fallback is Nanjing-only. Other cities only show
+  provider-returned same-city POIs; if AMap returns no usable same-city POIs,
+  the UI explains that the current city has no local fallback candidates instead
+  of showing Nanjing places.
 
 Still pending:
 
@@ -150,6 +157,8 @@ Still pending:
 
 - Locally seeded candidates are marked `source_pending` and must not be
   presented as verified AMap results.
+- Locally seeded candidates must stay city-scoped; do not show the Nanjing seed
+  set for Shanghai or other city drafts.
 - AI fallback reasons are templates, not factual claims.
 - AI proposals must only reference route stops or candidates supplied by the
   application.

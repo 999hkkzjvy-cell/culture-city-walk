@@ -211,4 +211,15 @@ describe("route editing", () => {
     expect(edited.stops.map((stop) => stop.id)).not.toContain("gym");
     expect(removeRouteStop(twoStopRoute, "gym").stops).toHaveLength(2);
   });
+
+  it("allows removing the only stop from a new city draft route", () => {
+    const oneStopRoute = {
+      ...demoRoute,
+      id: "local-shanghai-draft",
+      city: "上海",
+      stops: demoRoute.stops.slice(0, 1),
+    };
+
+    expect(removeRouteStop(oneStopRoute, "librairie").stops).toHaveLength(0);
+  });
 });

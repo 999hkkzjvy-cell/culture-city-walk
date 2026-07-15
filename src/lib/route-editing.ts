@@ -43,6 +43,13 @@ export function insertCandidateIntoRoute(
 }
 
 export function removeRouteStop(route: RoutePlan, stopId: string): RoutePlan {
+  if (route.stops.length <= 1) {
+    return rebuildRouteFromStops(
+      route,
+      route.stops.filter((stop) => stop.id !== stopId),
+    );
+  }
+
   if (route.stops.length <= 2) {
     return route;
   }

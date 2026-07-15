@@ -46,6 +46,32 @@ describe("route candidates", () => {
     ).toBe(true);
   });
 
+  it("does not leak Nanjing local fallback candidates into other cities", () => {
+    const shanghaiRoute = {
+      ...demoRoute,
+      city: "上海",
+      stops: [],
+    };
+    const blankCityRoute = {
+      ...demoRoute,
+      city: "",
+      stops: [],
+    };
+
+    expect(
+      generateRouteCandidates(shanghaiRoute, {
+        themes: ["历史", "建筑"],
+        maxResults: 5,
+      }),
+    ).toHaveLength(0);
+    expect(
+      generateRouteCandidates(blankCityRoute, {
+        themes: ["历史", "建筑"],
+        maxResults: 5,
+      }),
+    ).toHaveLength(0);
+  });
+
   it("turns AMap nearby places into route-aware candidates", () => {
     const candidates = generateRouteCandidatesFromPlaces(
       demoRoute,

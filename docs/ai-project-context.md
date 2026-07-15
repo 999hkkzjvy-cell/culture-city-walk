@@ -276,10 +276,13 @@ GitHub Actions repository variables required for Pages build:
   point no longer forces the whole candidate generation to local fallback. If
   AMap is unavailable, every sampled search fails, or the returned POIs do not
   match the route constraints, the app falls back to local seeded candidates
-  with a more specific warning. Provider candidates are filtered before scoring
-  so unknown POIs are not treated as generic scenic spots, supermarket/
-  convenience-store POIs are rejected, and nearby same-name/similar-name route
-  duplicates are removed.
+  with a more specific warning. The local seeded candidate set is Nanjing-only:
+  when users switch to Shanghai or another city, the planning preview is reset
+  to an empty city draft, stale candidates are cleared, and no Nanjing fallback
+  candidates are shown if AMap returns no same-city POIs. Provider candidates
+  are filtered before scoring so unknown POIs are not treated as generic scenic
+  spots, supermarket/convenience-store POIs are rejected, and nearby same-name/
+  similar-name route duplicates are removed.
 - Candidate insertion updates an editable route preview with leg recalculation,
   end-time impact, move, delete, and stay-time controls. Candidate lists support
   type filters, fit-band grouping, and compact expandable candidate rows. The
