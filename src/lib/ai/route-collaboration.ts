@@ -28,14 +28,15 @@ export const routeProposalSchema = z.object({
 
 export const stopThemeContentSchema = z.object({
   placeId: z.string().min(1),
-  shortIntro: z.string().min(20).max(180),
+  shortIntro: z.string().min(20).max(700),
   themeConnections: z.array(
     z.object({
       theme: z.enum(["历史", "文学", "建筑", "音乐", "书店", "美食"]),
-      text: z.string().min(10).max(180),
+      text: z.string().min(10).max(520),
     }),
   ),
   practicalTips: z.array(z.string()).default([]),
+  checkInTasks: z.array(z.string().min(4).max(160)).default([]),
   sourceClaims: z.array(z.string()).default([]),
   sourceStatus: z.enum(["unverified", "verified"]).default("unverified"),
 });
@@ -183,6 +184,10 @@ export function generateStopThemeContentWithFallback(
     practicalTips: [
       `建议停留 ${stop.stayMinutes} 分钟：前半段观察空间和人流，后半段记录与本路线主题相关的细节。`,
       "开放时间、预约、门票和现场管控信息需要出发前再次核验。",
+    ],
+    checkInTasks: [
+      `拍一张能同时看到${stop.name}入口和周边街道关系的照片。`,
+      "记录一个你认为最能代表这里气质的细节：门牌、树影、声音或人流。",
     ],
     sourceClaims: [],
     sourceStatus: "unverified",

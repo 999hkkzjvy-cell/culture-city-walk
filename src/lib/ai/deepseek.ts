@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RouteCandidate } from "@/lib/route-candidates";
-import type { RouteDraft } from "@/lib/route";
+import type { RouteDraft, RoutePlan, RouteStop } from "@/lib/route";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -8,9 +8,11 @@ import {
 import {
   planningIntentSchema,
   promptVersion,
+  stopThemeContentSchema,
   type AiUsageRecord,
   type CollaborationResult,
   type PlanningIntent,
+  type StopThemeContent,
 } from "./route-collaboration";
 
 const deepSeekUsageSchema = z.object({
@@ -118,6 +120,37 @@ export async function rankCandidatesWithDeepSeek(
     data: [...ordered, ...missing],
     usage: toUsageRecord(response.usage),
     warnings: [...response.warnings, ...ranked.warnings],
+  };
+}
+
+export async function generateStopThemeContentWithDeepSeek(
+  stop: RouteStop,
+  route: RoutePlan,
+): Promise<CollaborationResult<StopThemeContent>> {
+  const response = await invokeDeepSeekProxy("stop-deep-reading", {
+    route: {
+      city: route.city,
+      title: route.title,
+      themes: route.themes,
+      stopNames: route.stops.map((item) => item.name),
+    },
+    stop: {
+      id: stop.sourcePlaceId ?? stop.id,
+      name: stop.name,
+      area: stop.area,
+      address: stop.address,
+      themes: stop.themes,
+      note: stop.note,
+      stayMinutes: stop.stayMinutes,
+      verificationStatus: stop.verificationStatus,
+    },
+  });
+  const parsed = stopThemeContentSchema.parse(response.result);
+
+  return {
+    data: parsed,
+    usage: toUsageRecord(response.usage),
+    warnings: response.warnings,
   };
 }
 

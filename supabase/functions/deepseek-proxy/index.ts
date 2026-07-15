@@ -19,6 +19,11 @@ type DeepSeekProxyRequest =
       action: "rank-candidates";
       intent: unknown;
       candidates: unknown[];
+    }
+  | {
+      action: "stop-deep-reading";
+      route: unknown;
+      stop: unknown;
     };
 
 type DeepSeekUsage = {
@@ -65,6 +70,10 @@ Deno.serve(async (request) => {
     if (body.action === "rank-candidates") {
       return await handleRankCandidates(body, apiKey);
     }
+
+    if (body.action === "stop-deep-reading") {
+      return await handleStopDeepReading(body, apiKey);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "deepseek_error";
     return json({ error: message }, 502);
@@ -98,6 +107,42 @@ async function handleParseIntent(
         pace: "轻松漫步",
         maxWalkingKm: 8,
         mealRequirement: "lunch",
+      },
+    }),
+  });
+
+  return json({
+    result: response.result,
+    usage: usageFromDeepSeek(response.usage, response.model, startedAt),
+    warnings: [],
+  });
+}
+
+async function handleStopDeepReading(
+  input: Extract<DeepSeekProxyRequest, { action: "stop-deep-reading" }>,
+  apiKey: string,
+) {
+  const startedAt = performance.now();
+  const response = await callDeepSeek(apiKey, {
+    maxTokens: 1800,
+    systemPrompt:
+      "你是严谨但有趣的城市文化讲解撰稿人。请只基于用户给定站点和常识性公开知识生成内容；不确定的具体年份、人物轶事、开放信息要写成待核验，不要伪造来源。输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。shortIntro 写 180-420 字，包含空间第一印象、可能的建筑/街区观察、历史背景线索。themeConnections 至少 3 条，优先覆盖建筑风格、历史背景、名人轶事/城市记忆。checkInTasks 给 3 个有趣但不打扰他人的打卡任务。sourceStatus 固定 unverified。",
+    userPrompt: JSON.stringify({
+      route: input.route,
+      stop: input.stop,
+      exampleJson: {
+        placeId: "poi-id",
+        shortIntro:
+          "这是一段较长的城市阅读讲解，提醒用户哪些内容需要现场或资料核验。",
+        themeConnections: [
+          { theme: "建筑", text: "观察建筑立面、材料和街道尺度。" },
+          { theme: "历史", text: "梳理它与城市变迁的关系，具体事实待核验。" },
+          { theme: "文学", text: "从路名、店招和人的停留方式读城市文本。" },
+        ],
+        practicalTips: ["出发前核验开放时间、预约和现场管控。"],
+        checkInTasks: ["拍一张入口与街道同框的照片。"],
+        sourceClaims: [],
+        sourceStatus: "unverified",
       },
     }),
   });

@@ -288,7 +288,11 @@ GitHub Actions repository variables required for Pages build:
   route. Signed-in users are prompted to sync unsynced local previews. Saving a
   local/demo route to cloud writes the saved Supabase route ID back to
   localStorage so later share, snapshot, and candidate operations target the
-  cloud route instead of stale `demo` state.
+  cloud route instead of stale `demo` state. Candidate-state sync is best effort
+  and no longer blocks route save/share/snapshot creation when route rows were
+  already saved. Cloud route stops persist coordinate/source/verification data
+  in `route_stops.note`, so maps and AMap walking recalculation still work after
+  reloading a cloud route.
 - Route legs support selectable travel modes: `步行`, `骑行`, `公共交通`,
   `驾车`, and `打车`. The planning preview and route reader edit mode both allow
   changing the mode for each "previous stop to this stop" leg and manually
@@ -303,9 +307,12 @@ GitHub Actions repository variables required for Pages build:
   constrained by de-duplication. Fresh local drafts no longer prefill example
   must-visit places or an example route-goal sentence.
 - Route-reader stop deep-reading cards are only shown for middle stops; start
-  and end stops do not expose the expandable deep-reading UI. The current
-  content remains deterministic, unverified template guidance focused on
-  concrete observation angles rather than factual claims.
+  and end stops do not expose the expandable deep-reading UI. When
+  `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`, expanding a middle stop requests
+  longer DeepSeek content covering architecture, historical context, city-memory
+  anecdotes, practical verification notes, and check-in tasks. Without DeepSeek
+  or on failure, deterministic unverified template guidance remains the
+  fallback.
 - AI collaboration can call the Supabase `deepseek-proxy` Edge Function when
   `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps deterministic
   local fallback behavior. Signed-in users' intent parsing and candidate

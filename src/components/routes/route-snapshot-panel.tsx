@@ -7,6 +7,8 @@ import {
   type RouteSnapshotPayload,
   type RouteSnapshotSummary,
 } from "@/lib/repositories/route-repository";
+import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
+import { demoRoute } from "@/lib/route";
 import type { RoutePlan } from "@/lib/route";
 import {
   readCandidateState,
@@ -54,11 +56,21 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
 
   async function createSnapshot() {
     setMessage("");
-    const repository = createRouteRepository();
-    const candidateState = readCandidateState(route.id);
 
     try {
-      const snapshot = await repository.createSnapshot(route, candidateState);
+      const repository = createRouteRepository();
+      const snapshotInput =
+        route.id === demoRoute.id
+          ? await saveLocalRouteToCloud(repository)
+          : {
+              repository,
+              route,
+              candidateState: readCandidateState(route.id),
+            };
+      const snapshot = await snapshotInput.repository.createSnapshot(
+        snapshotInput.route,
+        snapshotInput.candidateState,
+      );
       const payload = await repository.readSnapshot(snapshot.id);
 
       if (payload && payload.route.id !== route.id) {

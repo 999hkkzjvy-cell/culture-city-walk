@@ -345,9 +345,16 @@ class SupabaseRouteRepository implements RouteRepository {
       return;
     }
 
-    const payload = input.candidates.map((candidate) =>
-      routeCandidateToInsert(routeId, candidate, input.actions[candidate.id]),
+    const payload = dedupeCandidatePayload(
+      input.candidates.map((candidate) =>
+        routeCandidateToInsert(routeId, candidate, input.actions[candidate.id]),
+      ),
     );
+
+    if (payload.length === 0) {
+      return;
+    }
+
     const { error } = await this.client
       .from("route_candidates")
       .insert(payload);
@@ -392,7 +399,7 @@ class SupabaseRouteRepository implements RouteRepository {
       await this.saveCandidates(saved.id, {
         candidates: candidateState.candidates,
         actions: candidateState.actions,
-      });
+      }).catch(() => undefined);
     }
 
     const nextVersion = await this.getNextSnapshotVersion(routeId);
@@ -550,6 +557,12 @@ class SupabaseRouteRepository implements RouteRepository {
         area: stop.area,
         address: stop.address,
         themes: stop.themes,
+        source: stop.source,
+        sourcePlaceId: stop.sourcePlaceId,
+        coordinate: stop.coordinate,
+        coordinateSystem: stop.coordinateSystem,
+        verificationStatus: stop.verificationStatus,
+        mustVisit: Boolean(stop.mustVisit),
       },
       walking_from_previous: stop.walkingFromPrevious ?? null,
     }));
@@ -672,6 +685,23 @@ function routeCandidateToInsert(
   };
 }
 
+function dedupeCandidatePayload(
+  payload: Database["public"]["Tables"]["route_candidates"]["Insert"][],
+) {
+  const seen = new Set<string>();
+
+  return payload.filter((candidate) => {
+    const key = candidate.cache_key;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 function mapCandidateFromRow(row: {
   candidate_place: Json;
   place_type: string;
@@ -750,10 +780,64 @@ function mapStopFromRow(row: {
     stayMinutes: row.stay_minutes,
     time: row.arrival_time?.slice(0, 5) ?? "",
     note: String(note.text ?? ""),
+    source: parseStopSource(note.source),
+    sourcePlaceId:
+      typeof note.sourcePlaceId === "string" ? note.sourcePlaceId : row.id,
+    coordinate: parseCoordinate(note.coordinate),
+    coordinateSystem: parseCoordinateSystem(note.coordinateSystem),
+    verificationStatus: parseVerificationStatus(note.verificationStatus),
+    mustVisit: Boolean(note.mustVisit),
     walkingFromPrevious: row.walking_from_previous
       ? (row.walking_from_previous as RouteStop["walkingFromPrevious"])
       : undefined,
   };
+}
+
+function parseStopSource(value: unknown): RouteStop["source"] {
+  return ["amap", "manual", "seed", "demo"].includes(String(value))
+    ? (value as RouteStop["source"])
+    : "manual";
+}
+
+function parseCoordinate(value: unknown): RouteStop["coordinate"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const coordinate = value as Record<string, unknown>;
+
+  if (
+    !Number.isFinite(coordinate.lng) ||
+    !Number.isFinite(coordinate.lat) ||
+    !["gcj02", "wgs84", "bd09", "unknown"].includes(String(coordinate.system))
+  ) {
+    return null;
+  }
+
+  return {
+    lng: Number(coordinate.lng),
+    lat: Number(coordinate.lat),
+    system: coordinate.system as NonNullable<RouteStop["coordinate"]>["system"],
+  };
+}
+
+function parseCoordinateSystem(value: unknown): RouteStop["coordinateSystem"] {
+  return ["gcj02", "wgs84", "bd09", "unknown"].includes(String(value))
+    ? (value as RouteStop["coordinateSystem"])
+    : "gcj02";
+}
+
+function parseVerificationStatus(
+  value: unknown,
+): RouteStop["verificationStatus"] {
+  return [
+    "verified",
+    "user_confirmed",
+    "source_pending",
+    "possibly_outdated",
+  ].includes(String(value))
+    ? (value as RouteStop["verificationStatus"])
+    : "source_pending";
 }
 
 function parseThemes(value: Json | null): Theme[] {

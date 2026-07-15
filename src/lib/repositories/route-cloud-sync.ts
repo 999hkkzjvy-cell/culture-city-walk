@@ -21,6 +21,7 @@ export type SavedLocalRouteResult = {
   route: RoutePlan;
   candidateState: StoredCandidateState;
   repository: RouteRepository;
+  candidateSyncFailed: boolean;
 };
 
 export async function saveLocalRouteToCloud(
@@ -43,21 +44,28 @@ export async function saveLocalRouteToCloud(
     updatedAt: new Date().toISOString(),
   };
 
-  await repository.saveCandidates(saved.id, {
-    candidates: syncedCandidateState.candidates,
-    actions: syncedCandidateState.actions,
-  });
-
   saveRoutePlan(syncedRoute);
   saveCandidateState(syncedCandidateState);
   markRoutePlanSynced(syncedRoute);
   dispatchRoutePlanSynced();
+
+  let candidateSyncFailed = false;
+
+  try {
+    await repository.saveCandidates(saved.id, {
+      candidates: syncedCandidateState.candidates,
+      actions: syncedCandidateState.actions,
+    });
+  } catch {
+    candidateSyncFailed = true;
+  }
 
   return {
     saved,
     route: syncedRoute,
     candidateState: syncedCandidateState,
     repository,
+    candidateSyncFailed,
   };
 }
 

@@ -47,6 +47,12 @@ Phase 4/5 development has a key split:
   - route-page save/share actions now use the current local route preview
   - route-page cloud actions now expose the same share manager as route library,
     including create/copy/revoke states after the route has a cloud ID
+  - save/share/snapshot creation migrates local `demo` previews to the saved
+    cloud route ID before follow-up operations, preventing repeated cloud route
+    creation after a partial candidate-state sync failure
+  - cloud route stops persist coordinate/source/verification fields in
+    `route_stops.note`, so map rendering and AMap walking recalculation survive
+    cloud reloads
   - library-page save action now saves the current local route preview
   - signed-in auth panel can sync the current local preview to cloud storage
   - signed-in auth panel prompts when the local preview has not been synced yet
@@ -63,6 +69,8 @@ Phase 4/5 development has a key split:
   - fallback story content is labeled as source-pending
   - middle-stop expandable deep-read sections show concrete observation angles
     and practical verification tips; start/end stops do not show deep-read UI
+  - when DeepSeek proxy is enabled, middle-stop deep reads can generate longer
+    architecture/history/anecdote content and check-in tasks on demand
 - Share experience:
   - route-page share button scrolls to cloud share actions
   - generated share links can be copied and revoked from route page or library

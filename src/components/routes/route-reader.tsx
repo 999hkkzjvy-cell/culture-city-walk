@@ -25,10 +25,15 @@ import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import { createAmapWebServiceProvider } from "@/lib/maps/amap-web";
 import { recalculateRouteWithProvider } from "@/lib/maps/route-recalculation";
 import {
+  generateStopThemeContentWithDeepSeek,
+  isDeepSeekProxyConfigured,
+} from "@/lib/ai/deepseek";
+import {
   generateRouteSummaryWithFallback,
   generateStopThemeContentWithFallback,
+  type StopThemeContent,
 } from "@/lib/ai/route-collaboration";
-import { demoRoute, type RoutePlan } from "@/lib/route";
+import { demoRoute, type RoutePlan, type RouteStop } from "@/lib/route";
 import {
   removeRouteStop,
   updateRouteLegMinutes,
@@ -75,6 +80,9 @@ export function RouteReader() {
   const [isEditing, setIsEditing] = useState(false);
   const [expandedStories, setExpandedStories] = useState<
     Record<string, boolean>
+  >({});
+  const [deepReadings, setDeepReadings] = useState<
+    Record<string, DeepReadingState>
   >({});
   const routeSummary = generateRouteSummaryWithFallback(route);
   const sourceLabel =
@@ -175,6 +183,51 @@ export function RouteReader() {
     } catch {
       setMapRecalculationState("error");
       setMapRecalculationMessage("高德复核失败，当前路线仍保留原有步行数据。");
+    }
+  }
+
+  function toggleDeepReading(stop: RouteStop) {
+    const isExpanded = expandedStories[stop.id] ?? false;
+
+    setExpandedStories((current) => ({
+      ...current,
+      [stop.id]: !isExpanded,
+    }));
+
+    if (isExpanded || deepReadings[stop.id] || !isDeepSeekProxyConfigured()) {
+      return;
+    }
+
+    void loadDeepReading(stop);
+  }
+
+  async function loadDeepReading(stop: RouteStop) {
+    setDeepReadings((current) => ({
+      ...current,
+      [stop.id]: {
+        status: "loading",
+        message: "正在生成 DeepSeek 深读...",
+      },
+    }));
+
+    try {
+      const result = await generateStopThemeContentWithDeepSeek(stop, route);
+
+      setDeepReadings((current) => ({
+        ...current,
+        [stop.id]: {
+          status: "ready",
+          content: result.data,
+        },
+      }));
+    } catch {
+      setDeepReadings((current) => ({
+        ...current,
+        [stop.id]: {
+          status: "error",
+          message: "DeepSeek 深读暂时失败，已保留本地模板讲解。",
+        },
+      }));
     }
   }
 
@@ -305,7 +358,9 @@ export function RouteReader() {
         <div className="timeline">
           {routeKernel.stops.map((stop, index) => {
             const previousStop = routeKernel.stops[index - 1];
-            const story = generateStopThemeContentWithFallback(stop);
+            const deepReading = deepReadings[stop.id];
+            const story =
+              deepReading?.content ?? generateStopThemeContentWithFallback(stop);
             const isStoryExpanded = expandedStories[stop.id] ?? false;
             const canExpandStory =
               index > 0 && index < routeKernel.stops.length - 1;
@@ -358,11 +413,21 @@ export function RouteReader() {
                   {canExpandStory ? (
                     <div className="stop-story">
                       <div>
-                        <span>模板讲解 · 来源待核验</span>
+                        <span>
+                          {deepReading?.content
+                            ? "DeepSeek 深读 · 来源待核验"
+                            : "模板讲解 · 来源待核验"}
+                        </span>
                         <strong>{story.shortIntro}</strong>
                       </div>
                       {isStoryExpanded ? (
                         <div className="stop-story-more">
+                          {deepReading?.message ? (
+                            <p>
+                              <Sparkles size={14} />
+                              {deepReading.message}
+                            </p>
+                          ) : null}
                           {story.themeConnections.map((connection) => (
                             <p key={`${stop.id}-${connection.theme}`}>
                               <FileText size={14} />
@@ -375,18 +440,23 @@ export function RouteReader() {
                               {tip}
                             </p>
                           ))}
+                          {story.checkInTasks.map((task) => (
+                            <p key={task}>
+                              <Sparkles size={14} />
+                              打卡任务：{task}
+                            </p>
+                          ))}
                         </div>
                       ) : null}
                       <button
-                        onClick={() =>
-                          setExpandedStories((current) => ({
-                            ...current,
-                            [stop.id]: !isStoryExpanded,
-                          }))
-                        }
+                        onClick={() => toggleDeepReading(stop)}
                         type="button"
                       >
-                        {isStoryExpanded ? "收起深读" : "展开深读"}
+                        {isStoryExpanded
+                          ? "收起深读"
+                          : isDeepSeekProxyConfigured()
+                            ? "生成深读"
+                            : "展开深读"}
                       </button>
                     </div>
                   ) : null}
@@ -512,6 +582,11 @@ export function RouteReader() {
 
 type RemoteRouteState = "idle" | "loading" | "ready" | "not-found" | "error";
 type MapRecalculationState = "idle" | "loading" | "ready" | "partial" | "error";
+type DeepReadingState = {
+  status: "loading" | "ready" | "error";
+  content?: StopThemeContent;
+  message?: string;
+};
 
 function RouteLoadStatus({ state }: { state: RemoteRouteState }) {
   if (state === "idle") {

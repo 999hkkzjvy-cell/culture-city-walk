@@ -3,6 +3,7 @@ import { defaultDraft, demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
   isDeepSeekProxyConfigured,
+  generateStopThemeContentWithDeepSeek,
   parseIntentWithDeepSeek,
   rankCandidatesWithDeepSeek,
 } from "./deepseek";
@@ -133,5 +134,52 @@ describe("DeepSeek proxy client", () => {
     );
     expect(result.data[0].reasons.at(-1)).toContain("文学线索");
     expect(result.warnings).toContain("请复核开放时间。");
+  });
+
+  it("generates longer stop deep-reading content through the proxy", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      data: {
+        result: {
+          placeId: "presidential-palace",
+          shortIntro:
+            "总统府适合作为南京近代城市阅读的核心站点。可以从建筑群的入口秩序、院落空间、展陈动线和长江路街区关系开始观察，再把现场看到的门楼、材料、尺度与近代政治空间的公共性联系起来。具体人物轶事和年份仍需要以官方展陈或可靠资料核验。",
+          themeConnections: [
+            {
+              theme: "建筑",
+              text: "观察门楼、院落、轴线与材料变化，比较传统院落和近代办公空间如何并置。",
+            },
+            {
+              theme: "历史",
+              text: "这里承载近代政治叙事，但具体年份和人物关系需要以现场展陈为准。",
+            },
+            {
+              theme: "文学",
+              text: "可把长江路当作城市文本，记录道路、展牌和游客动线共同形成的叙事。",
+            },
+          ],
+          practicalTips: ["出发前核验预约、门票和开放时间。"],
+          checkInTasks: ["拍一张门楼与街道同框的照片。"],
+          sourceClaims: [],
+          sourceStatus: "unverified",
+        },
+        usage: deepSeekUsage,
+        warnings: [],
+      },
+      error: null,
+    });
+
+    const result = await generateStopThemeContentWithDeepSeek(
+      demoRoute.stops[2],
+      demoRoute,
+    );
+
+    expect(mocks.invoke).toHaveBeenCalledWith("deepseek-proxy", {
+      body: expect.objectContaining({
+        action: "stop-deep-reading",
+      }),
+    });
+    expect(result.data.shortIntro).toContain("近代城市阅读");
+    expect(result.data.checkInTasks[0]).toContain("门楼");
+    expect(result.usage.provider).toBe("deepseek");
   });
 });

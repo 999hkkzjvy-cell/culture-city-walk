@@ -100,4 +100,19 @@ describe("route cloud sync", () => {
       }),
     );
   });
+
+  it("keeps the saved cloud route id when candidate sync fails", async () => {
+    const repository = {
+      save: vi.fn().mockResolvedValue(savedRoute),
+      saveCandidates: vi.fn().mockRejectedValue(new Error("candidate_failed")),
+    } as unknown as RouteRepository;
+
+    saveRoutePlan(demoRoute);
+
+    const result = await saveLocalRouteToCloud(repository);
+
+    expect(result.candidateSyncFailed).toBe(true);
+    expect(readRoutePlan().id).toBe("cloud-route");
+    expect(readCandidateState("cloud-route").routeId).toBe("cloud-route");
+  });
 });

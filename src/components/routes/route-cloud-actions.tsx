@@ -26,10 +26,14 @@ export function RouteCloudActions() {
     setMessage("");
 
     try {
-      const { saved } = await saveLocalRouteToCloud();
+      const { saved, candidateSyncFailed } = await saveLocalRouteToCloud();
       setCloudRouteId(saved.id);
       setSaveState("saved");
-      setMessage(`已保存：${saved.title}`);
+      setMessage(
+        candidateSyncFailed
+          ? `已保存：${saved.title}。候选点状态本次未同步，路线本身已在云端。`
+          : `已保存：${saved.title}`,
+      );
     } catch (error) {
       setSaveState("error");
       setMessage(mapError(error));
