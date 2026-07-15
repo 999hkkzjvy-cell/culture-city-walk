@@ -23,7 +23,7 @@ const sixDynastiesMuseum: PlaceCandidate = {
 describe("route candidate AMap search", () => {
   it("uses stable AMap type codes for route candidate searches", () => {
     expect(getAmapCandidateTypes(["历史建筑", "博物馆", "餐厅"])).toBe(
-      "110000|140000|050000",
+      "110000|140000|050100|050200|050300|050400|051000",
     );
   });
 

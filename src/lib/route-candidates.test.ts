@@ -282,4 +282,86 @@ describe("route candidates", () => {
 
     expect(candidates).toHaveLength(0);
   });
+
+  it("excludes milk tea, coffee, bakery, and dessert places from restaurant recommendations", () => {
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:R001",
+          source: "amap",
+          sourcePlaceId: "R001",
+          name: "巷口南京菜馆",
+          address: "长江路 4 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.799, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;中餐厅",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R002",
+          source: "amap",
+          sourcePlaceId: "R002",
+          name: "喜茶长江路店",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.8, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;冷饮店;茶饮店",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R003",
+          source: "amap",
+          sourcePlaceId: "R003",
+          name: "街角咖啡",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.801, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;咖啡厅",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R004",
+          source: "amap",
+          sourcePlaceId: "R004",
+          name: "原麦面包房",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.802, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;糕饼店",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:R005",
+          source: "amap",
+          sourcePlaceId: "R005",
+          name: "甜品研究所",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.803, lat: 32.044, system: "gcj02" },
+          poiType: "餐饮服务;甜品店",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["美食"],
+        acceptedTypes: ["餐厅"],
+        maxResults: 5,
+      },
+    );
+
+    expect(candidates.map((candidate) => candidate.place.name)).toEqual([
+      "巷口南京菜馆",
+    ]);
+  });
 });

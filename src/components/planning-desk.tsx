@@ -123,7 +123,7 @@ const mealCuisineOptions = [
   "快餐",
   "火锅",
   "烧烤",
-  "咖啡甜品",
+  "地方小吃",
 ];
 
 function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
@@ -305,7 +305,7 @@ export function PlanningDesk() {
   const [mealBudget, setMealBudget] = useState<MealBudget>("50-100元");
   const [mealCuisines, setMealCuisines] = useState<string[]>([
     "炒菜",
-    "咖啡甜品",
+    "地方小吃",
   ]);
   const [expandedCandidateIds, setExpandedCandidateIds] = useState<
     Record<string, boolean>

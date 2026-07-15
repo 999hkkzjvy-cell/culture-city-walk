@@ -504,6 +504,10 @@ function inferPlaceType(place: PlaceCandidate): CandidatePlaceType | null {
     return "咖啡馆";
   }
 
+  if (isExcludedRestaurantPoi(text)) {
+    return null;
+  }
+
   if (matchesAny(text, ["餐饮", "餐厅", "美食", "小吃", "饭店"])) {
     return "餐厅";
   }
@@ -589,6 +593,29 @@ function isExcludedPoi(text: string) {
     "住宅区",
     "生活服务",
     "维修",
+  ]);
+}
+
+function isExcludedRestaurantPoi(text: string) {
+  return matchesAny(text, [
+    "奶茶",
+    "茶饮",
+    "饮品",
+    "饮料",
+    "冷饮",
+    "果汁",
+    "咖啡",
+    "咖啡厅",
+    "咖啡馆",
+    "面包",
+    "面包房",
+    "烘焙",
+    "糕点",
+    "糕饼",
+    "蛋糕",
+    "西点",
+    "甜品",
+    "甜点",
   ]);
 }
 
