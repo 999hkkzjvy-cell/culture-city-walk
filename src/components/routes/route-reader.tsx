@@ -33,7 +33,13 @@ import {
   generateStopThemeContentWithFallback,
   type StopThemeContent,
 } from "@/lib/ai/route-collaboration";
-import { demoRoute, type RoutePlan, type RouteStop } from "@/lib/route";
+import {
+  demoRoute,
+  isExperienceStop,
+  type RoutePlan,
+  type RouteStop,
+} from "@/lib/route";
+import { getOpeningHoursWarning } from "@/lib/opening-hours";
 import {
   removeRouteStop,
   updateRouteLegMinutes,
@@ -48,6 +54,8 @@ import {
   routePlanStorageKey,
   saveCandidateState,
   saveRoutePlan,
+  isRouteFavorited,
+  toggleFavoriteRoute,
   type StoredCandidateAction,
 } from "@/lib/storage";
 import {
@@ -84,6 +92,7 @@ export function RouteReader() {
   const [deepReadings, setDeepReadings] = useState<
     Record<string, DeepReadingState>
   >({});
+  const [isFavorited, setIsFavorited] = useState(false);
   const routeSummary = generateRouteSummaryWithFallback(route);
   const sourceLabel =
     routeKernel.legSource === "provider"
@@ -91,6 +100,10 @@ export function RouteReader() {
       : routeKernel.legSource === "estimated"
         ? "本地估算，待高德复核"
         : "缺少步行数据";
+
+  useEffect(() => {
+    queueMicrotask(() => setIsFavorited(isRouteFavorited(route.id)));
+  }, [route.id]);
 
   useEffect(() => {
     const routeId = readRouteId(new URLSearchParams(window.location.search));
@@ -165,7 +178,7 @@ export function RouteReader() {
     }
 
     setMapRecalculationState("loading");
-    setMapRecalculationMessage("正在用高德复核步行距离和耗时...");
+      setMapRecalculationMessage("正在用高德复核步行、公交和驾车耗时...");
 
     try {
       const result = await recalculateRouteWithProvider(route, provider);
@@ -178,11 +191,11 @@ export function RouteReader() {
       setMapRecalculationMessage(
         result.estimatedLegs > 0
           ? `已复核 ${result.providerLegs} 段，${result.estimatedLegs} 段保留本地估算。`
-          : `已用高德复核 ${result.providerLegs} 段步行路线。`,
+          : `已用高德复核 ${result.providerLegs} 段路线。`,
       );
     } catch {
       setMapRecalculationState("error");
-      setMapRecalculationMessage("高德复核失败，当前路线仍保留原有步行数据。");
+      setMapRecalculationMessage("高德复核失败，当前路线仍保留原有路途数据。");
     }
   }
 
@@ -240,7 +253,7 @@ export function RouteReader() {
             返回规划继续编辑
           </Link>
           <p>{routeSummary.summary}</p>
-          <h1>{route.city} · 文学漫游</h1>
+          <h1>{route.title}</h1>
           <div className="route-meta">
             <span>
               <MapPin size={16} />
@@ -294,9 +307,13 @@ export function RouteReader() {
             <Share2 size={17} />
             分享
           </button>
-          <button type="button">
+          <button
+            className={isFavorited ? "selected" : ""}
+            onClick={() => setIsFavorited(toggleFavoriteRoute(route))}
+            type="button"
+          >
             <Bookmark size={17} />
-            收藏
+            {isFavorited ? "已收藏" : "收藏"}
           </button>
         </div>
         <div className="postmark" aria-hidden="true">
@@ -337,7 +354,7 @@ export function RouteReader() {
             <p>
               当前地图只读取路线内的 GCJ-02 坐标和已保存 polyline，不会把 POI
               写入 places。可用高德 Web 服务复核步行段距离、耗时和
-              polyline；非步行或失败的路段会保留本地估算。
+              polyline；步行、公交、驾车/打车会优先使用高德复核，失败路段保留本地估算。
             </p>
             <div className="map-source-actions">
               <button
@@ -348,7 +365,7 @@ export function RouteReader() {
                 <Route size={15} />
                 {mapRecalculationState === "loading"
                   ? "复核中"
-                  : "用高德复核步行"}
+                  : "用高德复核路途"}
               </button>
               {mapRecalculationMessage ? (
                 <span className={mapRecalculationState}>
@@ -367,8 +384,11 @@ export function RouteReader() {
               deepReading?.content ??
               generateStopThemeContentWithFallback(stop);
             const isStoryExpanded = expandedStories[stop.id] ?? false;
-            const canExpandStory =
-              index > 0 && index < routeKernel.stops.length - 1;
+            const canExpandStory = isExperienceStop(stop);
+            const openingWarning = getOpeningHoursWarning(
+              stop,
+              stop.calculatedTime,
+            );
             const navigationUrl =
               index === 0
                 ? amapPlaceSearchUrl({
@@ -415,6 +435,12 @@ export function RouteReader() {
                     {stop.mustVisit ? <em>必去</em> : null}
                   </h2>
                   <p>{stop.note}</p>
+                  {stop.openingHours ? (
+                    <p className={openingWarning ? "opening-warning" : ""}>
+                      开放时间：{stop.openingHours}
+                      {openingWarning ? ` · ${openingWarning}` : ""}
+                    </p>
+                  ) : null}
                   {canExpandStory ? (
                     <div className="stop-story">
                       <div>
@@ -468,23 +494,27 @@ export function RouteReader() {
                   {isEditing ? (
                     <div className="stop-edit-panel">
                       <label>
-                        停留分钟
-                        <input
-                          max={240}
-                          min={5}
-                          onChange={(event) =>
-                            persistRouteEdit(
-                              updateStopStayMinutes(
-                                route,
-                                stop.id,
-                                Number(event.target.value),
-                              ),
-                            )
-                          }
-                          step={5}
-                          type="number"
-                          value={stop.stayMinutes}
-                        />
+                        {isExperienceStop(stop) ? "停留分钟" : "停留"}
+                        {isExperienceStop(stop) ? (
+                          <input
+                            max={240}
+                            min={5}
+                            onChange={(event) =>
+                              persistRouteEdit(
+                                updateStopStayMinutes(
+                                  route,
+                                  stop.id,
+                                  Number(event.target.value),
+                                ),
+                              )
+                            }
+                            step={5}
+                            type="number"
+                            value={stop.stayMinutes}
+                          />
+                        ) : (
+                          <span>起终点不设置停留</span>
+                        )}
                       </label>
                       {stop.walkingFromPrevious ? (
                         <div className="stop-leg-edit">

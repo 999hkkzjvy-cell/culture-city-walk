@@ -67,14 +67,8 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
 
     try {
       await repository.revokeShare(code);
-      setShares((current) =>
-        current.map((share) =>
-          share.code === code
-            ? { ...share, revokedAt: new Date().toISOString() }
-            : share,
-        ),
-      );
-      setMessage("分享链接已撤销。");
+      setShares((current) => current.filter((share) => share.code !== code));
+      setMessage("分享链接已删除。");
     } catch {
       setMessage("撤销失败，请稍后重试。");
     }
@@ -100,41 +94,28 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
       ) : null}
       {shares.length > 0 ? (
         <div className="share-list">
-          {shares.map((share) => {
-            const revoked = Boolean(share.revokedAt);
-
-            return (
+          {shares.map((share) => (
               <article className="share-item" key={share.code}>
                 <div>
                   <strong>{share.code}</strong>
                   <span>{getShareStatus(share)}</span>
                 </div>
                 <Link
-                  aria-disabled={revoked}
                   className="secondary-link"
                   href={shareUrl(share.code)}
                 >
                   打开
                 </Link>
-                <button
-                  disabled={revoked}
-                  onClick={() => copyShare(share.code)}
-                  type="button"
-                >
+                <button onClick={() => copyShare(share.code)} type="button">
                   <Copy size={14} />
                   复制
                 </button>
-                <button
-                  disabled={revoked}
-                  onClick={() => revokeShare(share.code)}
-                  type="button"
-                >
+                <button onClick={() => revokeShare(share.code)} type="button">
                   <RotateCcw size={14} />
                   撤销
                 </button>
               </article>
-            );
-          })}
+          ))}
         </div>
       ) : null}
     </section>
@@ -142,10 +123,6 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
 }
 
 function getShareStatus(share: ShareRecord) {
-  if (share.revokedAt) {
-    return "已撤销";
-  }
-
   return share.expiresAt ? `有效至 ${share.expiresAt.slice(0, 10)}` : "长期有效";
 }
 

@@ -1,18 +1,18 @@
-# Phase 2 Status
+# 阶段 2 状态
 
-Date: 2026-07-14
+日期：2026-07-14
 
-## Scope
+## 范围
 
-Phase 2 is implemented as a working foundation. The app now has Supabase-backed auth, route saving, and read-only sharing, while preserving local fallback behavior.
+阶段 2 已形成可运行基础。应用已具备 Supabase 支持的认证、路线保存和只读分享能力，同时保留本地 fallback 行为。
 
-## Implemented
+## 已实现
 
-- Supabase cloud project:
-  - Project name: `culture-city-walk`
-  - Project ref: `wedwvcmdbrnbzjwlllgl`
-  - Region: `ap-southeast-1`
-- Applied Supabase migration for:
+- Supabase 云端项目：
+  - 项目名：`culture-city-walk`
+  - Project ref：`wedwvcmdbrnbzjwlllgl`
+  - Region：`ap-southeast-1`
+- 已应用的 Supabase 迁移包含：
   - `profiles`
   - `places`
   - `routes`
@@ -20,36 +20,36 @@ Phase 2 is implemented as a working foundation. The app now has Supabase-backed 
   - `route_constraints`
   - `route_snapshots`
   - `route_shares`
-  - private `route-media` storage bucket
-- RLS policies for owner-only route access.
-- URL-safe share code generation.
-- Deployed Edge Function `share-route` for read-only share route lookup.
-- Browser Supabase client and typed database definitions.
-- Route Repository interface with local fallback and Supabase implementation.
-- Email magic-link auth panel.
-- `/library/` route archive page.
-- `/share/?code=...` read-only share shell.
-- Cloud save/share actions on the route reader page.
-- GitHub Pages build variables for Supabase URL and publishable key.
-- Demo seed data based on the legacy Nanjing route:
-  - Script: `supabase/seed.sql`
-  - Share code: `nanjing-minguo`
-  - URL: `https://999hkkzjvy-cell.github.io/culture-city-walk/share/?code=nanjing-minguo`
-- Home page featured card links to the seeded Nanjing route.
+  - 私有 `route-media` Storage bucket
+- 路线数据 owner-only RLS 策略。
+- URL-safe 分享码生成。
+- 已部署 Edge Function `share-route`，用于只读分享路线查询。
+- 浏览器 Supabase client 和类型化数据库定义。
+- Route Repository 接口，包含本地 fallback 和 Supabase 实现。
+- 邮箱 magic-link 认证面板。
+- `/library/` 路线归档页。
+- `/share/?code=...` 只读分享页壳。
+- 路线阅读页上的云端保存/分享操作。
+- GitHub Pages 构建变量，包含 Supabase URL 和 publishable key。
+- 基于旧南京路线的演示种子数据：
+  - 脚本：`supabase/seed.sql`
+  - 分享码：`nanjing-minguo`
+  - URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/share/?code=nanjing-minguo`
+- 首页精选卡片链接到种子南京路线。
 
-## Not Yet Done
+## 尚未完成
 
-- Confirm Supabase Auth URL configuration in the dashboard:
-  - Site URL: `https://999hkkzjvy-cell.github.io/culture-city-walk/`
-  - Redirect URL: `https://999hkkzjvy-cell.github.io/culture-city-walk/**`
-  - Local redirect URL: `http://localhost:3000/**`
-- Full account onboarding is not done.
-- Local draft migration after login is not done.
-- Route archive empty/loading/error states are still basic.
-- Email templates have not been customized.
+- 在 Supabase Dashboard 中确认 Auth URL 配置：
+  - Site URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/`
+  - Redirect URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/**`
+  - 本地 Redirect URL：`http://localhost:3000/**`
+- 完整账号引导流程尚未完成。
+- 登录后的本地草稿迁移尚未完成。
+- 路线归档的空态、加载态和错误态仍较基础。
+- 邮件模板尚未自定义。
 
-## Notes
+## 备注
 
-- Public sharing is handled by `share-route` with `verify_jwt=false`; access is controlled by share code, revoked state, and expiry checks.
-- Private route data remains protected by RLS owner policies.
-- See `docs/ai-project-context.md` for the current high-level project map.
+- 公开分享由 `share-route` 处理，并设置 `verify_jwt=false`；访问控制依赖分享码、撤销状态和过期时间检查。
+- 私有路线数据仍由 RLS owner 策略保护。
+- 当前项目全局地图见 `docs/ai-project-context.md`。

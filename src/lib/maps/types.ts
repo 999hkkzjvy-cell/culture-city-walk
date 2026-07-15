@@ -22,6 +22,10 @@ export type PlaceCandidate = {
   adcode: string | null;
   coordinate: Coordinate | null;
   poiType: string | null;
+  openingHours?: string | null;
+  telephone?: string | null;
+  providerRating?: string | null;
+  providerCost?: string | null;
   verificationStatus: PlaceVerificationStatus;
 };
 
@@ -33,6 +37,12 @@ export type WalkingRouteLeg = {
   source: "provider" | "estimated";
   provider: "amap" | "local";
   polyline?: Coordinate[];
+};
+
+export type ProviderRouteMode = "walking" | "transit" | "driving";
+
+export type ProviderRouteLeg = WalkingRouteLeg & {
+  mode: ProviderRouteMode;
 };
 
 export type MapProviderErrorCode =
@@ -68,4 +78,11 @@ export interface MapProvider {
     origin: PlaceCandidate;
     destination: PlaceCandidate;
   }): Promise<WalkingRouteLeg>;
+  calculateRoute?(input: {
+    origin: PlaceCandidate;
+    destination: PlaceCandidate;
+    mode: ProviderRouteMode;
+    city?: string;
+    departureTime?: string;
+  }): Promise<ProviderRouteLeg>;
 }

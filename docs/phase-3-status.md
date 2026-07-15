@@ -1,60 +1,55 @@
-# Phase 3 Status
+# 阶段 3 状态
 
-Date: 2026-07-14
+日期：2026-07-15
 
-## Scope
+## 范围
 
-Phase 3 has started. The goal is to build the map and route kernel before adding
-AI: real POI confirmation, real walking-route calculation, clear data-source
-labels, and manual route editing.
+阶段 3 已启动。目标是在加入更完整 AI 能力前，先建立地图与路线内核：真实 POI 确认、真实路线计算、清晰的数据来源标记，以及路线编辑基础。
 
-## Implemented In First Slice
+## 第一轮已实现
 
-- Route kernel pure functions:
-  - timeline recalculation from walking legs and stay time
-  - total walking distance, walking time, stay time, and route duration
-  - repeated POIs are allowed for loops and return routes
-  - fixed appointment conflict detection
-  - missing start/end and missing leg warnings
-- Map provider boundary:
-  - shared coordinate and POI types
-  - explicit coordinate system labels, including `gcj02`
-  - AMap URL helpers for place search and walking navigation
-  - local fallback walking-leg estimator marked as `estimated`
-- Route reader integration:
-  - top-level route source label
-  - per-leg `高德` / `估算` source badge
-  - route validation alert area
-  - "打开高德步行导航" / "在高德查看地点" links
-  - map source note explaining that current demo legs are local estimates
-  - AMap JS route map that renders GCJ-02 stop markers when
-    `NEXT_PUBLIC_AMAP_JS_KEY` is configured
-  - provider-backed polylines drawn as route lines and local coordinate
-    connectors drawn as estimated/dashed lines
-  - paper-map fallback when AMap JS is not configured, fails to load, or route
-    coordinates are missing
-  - no confirmed-POI persistence yet; the map only reads route-local geometry
-- Tests:
-  - timeline pure-function test
-  - fixed appointment conflict test
-  - repeated POI loop test
-  - start/end requirement test
-  - estimated-vs-provider source test
-  - AMap URL and POI parsing tests
+- 路线内核纯函数：
+  - 基于路段耗时和停留时间重新计算时间线。
+  - 统计总步行距离、步行时间、停留时间和路线总时长。
+  - 允许重复 POI，用于环线或返回出发点路线。
+  - 固定预约时间冲突检测。
+  - 起终点缺失和路段缺失警告。
+- 地图 provider 边界：
+  - 共享坐标和 POI 类型。
+  - 显式坐标系标记，包括 `gcj02`。
+  - 高德地点搜索和导航 URL helper。
+  - 标记为 `estimated` 的本地步行路段估算器。
+  - 高德 Web Service 代理路线调用，支持步行、公交、驾车/打车；骑行仍为本地估算。
+- 路线阅读页集成：
+  - 顶层路线来源标记。
+  - 单路段 `高德` / `估算` 来源标记。
+  - 路线校验提示区域。
+  - “打开高德导航” / “在高德查看地点”链接。
+  - 地图来源说明：当前演示路段可能为本地估算。
+  - 配置 `NEXT_PUBLIC_AMAP_JS_KEY` 后，高德 JS 地图可渲染 GCJ-02 站点标记。
+  - provider polyline 渲染为路线线条，本地坐标连接线渲染为估算/虚线。
+  - 未配置高德 JS、加载失败或路线缺少坐标时，回退为纸面地图。
+  - 确认 POI 会通过路线/候选云端保存持久化；地图本身仍读取路线内局部几何数据。
+- 测试：
+  - 时间线纯函数测试。
+  - 固定预约冲突测试。
+  - 重复 POI 环线测试。
+  - 起终点要求测试。
+  - 估算来源与 provider 来源区分测试。
+  - 高德 URL 与 POI 解析测试。
 
-## Not Yet Done
+## 尚未完成
 
-- Configure actual AMap JS API key and domain allowlist.
-- Persist confirmed AMap POIs into `places`.
-- Add richer map viewport behavior and full-screen/mobile navigation map mode.
-- Add provider-backed cycling/transit/driving/taxi route APIs.
-- Add drag sorting UI.
-- Save route-kernel conflict results into the route editing flow.
+- 确认真实高德 JS API key 和域名白名单配置。
+- 增强地图视野行为和全屏/移动端导航地图模式。
+- 如确有需要，再补 provider-backed 骑行路线 API。
+- 增加拖拽排序 UI。
+- 将路线内核冲突结果保存到路线编辑流程中。
 
-## Guardrails
+## 守护规则
 
-- Do not present estimated walking time or distance as provider truth.
-- Keep all map coordinates explicitly labeled with their coordinate system.
-- For MVP, AMap POIs, map display, and walking routes should stay in GCJ-02.
-- The AMap JS browser key can be public with domain restrictions.
-- The AMap Web Service key must remain server-side only.
+- 不要把估算步行时间或距离展示成 provider 真实数据。
+- 所有地图坐标必须显式标记坐标系。
+- MVP 阶段，高德 POI、地图展示和步行路线都应保持 GCJ-02。
+- 高德 JS 浏览器 key 可以公开，但必须配置域名限制。
+- 高德 Web Service key 必须只保存在服务端。

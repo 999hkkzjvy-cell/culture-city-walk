@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, Cloud, FileText, Trash2 } from "lucide-react";
+import { Bookmark, Cloud, Edit3, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/lib/repositories/route-repository";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import type { Theme } from "@/lib/route";
+import { readFavoriteRoutes, saveRoutePlan } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 type LoadState = "loading" | "ready" | "error";
@@ -24,6 +25,9 @@ export function RouteLibrary({
   const [routes, setRoutes] = useState<SavedRouteSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [message, setMessage] = useState("");
+  const [favoriteRoutes] = useState(() =>
+    typeof window === "undefined" ? [] : readFavoriteRoutes(),
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -93,14 +97,56 @@ export function RouteLibrary({
   );
 
   if (view === "favorites") {
+    const filteredFavorites = favoriteRoutes.filter(
+      (route) =>
+        selectedThemes.length === 0 ||
+        selectedThemes.every((theme) => route.themes.includes(theme)),
+    );
+
     return (
       <section className="library-panel">
         <div className="section-heading">
           <h2>我的收藏</h2>
         </div>
-        <div className="library-empty">
-          <Bookmark size={24} />
-          <span>收藏夹还没有路线。之后推荐路线和朋友分享可以在这里归档。</span>
+        <div className="route-list">
+          {filteredFavorites.length > 0 ? (
+            filteredFavorites.map((route) => (
+              <article className="route-list-item" key={route.id}>
+                <Bookmark size={22} aria-hidden="true" />
+                <div>
+                  <h3>{route.title}</h3>
+                  <p>
+                    {route.city} · {route.stops.length} 个站点
+                  </p>
+                  <div className="route-list-tags">
+                    {route.themes.map((theme) => (
+                      <span key={theme}>{theme}</span>
+                    ))}
+                  </div>
+                </div>
+                <Link
+                  className="secondary-link"
+                  href={routeUrl(route.id)}
+                  onClick={() => saveRoutePlan(route)}
+                >
+                  查看
+                </Link>
+                <Link
+                  className="secondary-link"
+                  href="/plan/"
+                  onClick={() => saveRoutePlan(route)}
+                >
+                  <Edit3 size={15} />
+                  修改
+                </Link>
+              </article>
+            ))
+          ) : (
+            <div className="library-empty">
+              <Bookmark size={24} />
+              <span>收藏夹还没有路线。推荐路线和朋友分享可在这里归档。</span>
+            </div>
+          )}
         </div>
       </section>
     );

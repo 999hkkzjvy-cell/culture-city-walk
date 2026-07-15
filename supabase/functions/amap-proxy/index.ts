@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const AMAP_REST_BASE = "https://restapi.amap.com";
-const MAX_POI_LIMIT = 10;
+const MAX_POI_LIMIT = 15;
 
 type AmapProxyRequest =
   | {
@@ -27,6 +27,14 @@ type AmapProxyRequest =
       action: "walking";
       origin: AmapPointInput;
       destination: AmapPointInput;
+    }
+  | {
+      action: "route";
+      origin: AmapPointInput;
+      destination: AmapPointInput;
+      mode: "walking" | "transit" | "driving";
+      city?: string;
+      departureTime?: string;
     };
 
 type AmapPointInput = {
@@ -44,6 +52,12 @@ type AmapPoi = {
   adcode?: string;
   type?: string;
   location?: string;
+  tel?: string;
+  biz_ext?: {
+    open_time?: string;
+    rating?: string;
+    cost?: string;
+  };
 };
 
 type AmapWalkingStep = {
@@ -60,6 +74,19 @@ type AmapWalkingPath = {
   distance?: string;
   duration?: string;
   steps?: AmapWalkingStep[];
+};
+
+type AmapTransitSegment = {
+  walking?: {
+    distance?: string;
+    duration?: string;
+  };
+  bus?: {
+    buslines?: Array<{
+      distance?: string;
+      duration?: string;
+    }>;
+  };
 };
 
 Deno.serve(async (request) => {
@@ -97,6 +124,10 @@ Deno.serve(async (request) => {
     if (body.action === "walking") {
       return await handleWalking(body, amapKey);
     }
+
+    if (body.action === "route") {
+      return await handleRoute(body, amapKey);
+    }
   } catch {
     return json({ error: "amap_network_error" }, 502);
   }
@@ -122,7 +153,7 @@ async function handlePlaceText(
     key: amapKey,
     keywords: keyword,
     output: "JSON",
-    extensions: "base",
+    extensions: "all",
     offset: String(normalizeLimit(input.limit)),
     page: "1",
     citylimit: "true",
@@ -156,6 +187,21 @@ async function handlePlaceText(
   );
 }
 
+async function handleRoute(
+  input: Extract<AmapProxyRequest, { action: "route" }>,
+  amapKey: string,
+) {
+  if (input.mode === "walking") {
+    return handleWalking({ action: "walking", origin: input.origin, destination: input.destination }, amapKey);
+  }
+
+  if (input.mode === "transit") {
+    return handleTransit(input, amapKey);
+  }
+
+  return handleDriving(input, amapKey);
+}
+
 async function handlePlaceAround(
   input: Extract<AmapProxyRequest, { action: "place-around" }>,
   amapKey: string,
@@ -168,7 +214,7 @@ async function handlePlaceAround(
     key: amapKey,
     location: formatPoint(input.center),
     output: "JSON",
-    extensions: "base",
+    extensions: "all",
     offset: String(normalizeLimit(input.limit)),
     page: "1",
     radius: String(normalizeRadius(input.radiusMeters)),
@@ -270,6 +316,112 @@ async function handleWalking(
   );
 }
 
+async function handleDriving(
+  input: Extract<AmapProxyRequest, { action: "route" }>,
+  amapKey: string,
+) {
+  if (!isValidPoint(input.origin) || !isValidPoint(input.destination)) {
+    return json({ error: "invalid_coordinate" }, 400);
+  }
+
+  const params = new URLSearchParams({
+    key: amapKey,
+    origin: formatPoint(input.origin),
+    destination: formatPoint(input.destination),
+    output: "JSON",
+    extensions: "base",
+  });
+
+  const response = await fetchAmap(`/v3/direction/driving?${params.toString()}`);
+
+  if (response.status !== "1") {
+    return json(
+      {
+        error: "amap_provider_error",
+        info: response.info ?? "UNKNOWN",
+        infocode: response.infocode ?? null,
+      },
+      502,
+    );
+  }
+
+  const path = response.route?.paths?.[0] as AmapWalkingPath | undefined;
+
+  if (!path) {
+    return json({ error: "route_not_found" }, 404);
+  }
+
+  return json(
+    {
+      distanceMeters: toNumber(path.distance),
+      durationSeconds: toNumber(path.duration),
+      polyline: flattenPolyline(path.steps ?? []),
+      steps: [],
+    },
+    200,
+  );
+}
+
+async function handleTransit(
+  input: Extract<AmapProxyRequest, { action: "route" }>,
+  amapKey: string,
+) {
+  if (!isValidPoint(input.origin) || !isValidPoint(input.destination)) {
+    return json({ error: "invalid_coordinate" }, 400);
+  }
+
+  if (!input.city?.trim()) {
+    return json({ error: "invalid_city" }, 400);
+  }
+
+  const params = new URLSearchParams({
+    key: amapKey,
+    origin: formatPoint(input.origin),
+    destination: formatPoint(input.destination),
+    city: input.city.trim(),
+    output: "JSON",
+  });
+
+  const response = await fetchAmap(
+    `/v3/direction/transit/integrated?${params.toString()}`,
+  );
+
+  if (response.status !== "1") {
+    return json(
+      {
+        error: "amap_provider_error",
+        info: response.info ?? "UNKNOWN",
+        infocode: response.infocode ?? null,
+      },
+      502,
+    );
+  }
+
+  const transit = response.route?.transits?.[0];
+
+  if (!transit) {
+    return json({ error: "route_not_found" }, 404);
+  }
+
+  const segments = Array.isArray(transit.segments)
+    ? (transit.segments as AmapTransitSegment[])
+    : [];
+  const segmentWalkingDistance = segments.reduce(
+    (total, segment) => total + toNumber(segment.walking?.distance),
+    0,
+  );
+
+  return json(
+    {
+      distanceMeters: toNumber(transit.distance) || segmentWalkingDistance,
+      durationSeconds: toNumber(transit.duration),
+      polyline: [],
+      steps: [],
+    },
+    200,
+  );
+}
+
 async function fetchAmap(path: string) {
   const response = await fetch(`${AMAP_REST_BASE}${path}`, {
     headers: { Accept: "application/json" },
@@ -296,7 +448,15 @@ function normalizePoi(poi: AmapPoi) {
     adcode: poi.adcode ?? null,
     type: poi.type ?? null,
     location: poi.location ?? null,
+    openingHours: normalizeText(poi.biz_ext?.open_time),
+    telephone: normalizeText(poi.tel),
+    providerRating: normalizeText(poi.biz_ext?.rating),
+    providerCost: normalizeText(poi.biz_ext?.cost),
   };
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function flattenPolyline(steps: AmapWalkingStep[]) {

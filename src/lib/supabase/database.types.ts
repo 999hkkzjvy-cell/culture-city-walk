@@ -292,6 +292,34 @@ export type Database = {
         >;
         Relationships: [];
       };
+      route_checkin_photos: {
+        Row: {
+          id: string;
+          route_id: string;
+          stop_id: string;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          byte_size: number;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          route_id: string;
+          stop_id: string;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          byte_size?: number;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["route_checkin_photos"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

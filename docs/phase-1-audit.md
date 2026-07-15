@@ -1,34 +1,34 @@
-# Phase 1 Audit
+# 阶段 1 审核
 
-Date: 2026-07-13
-Product name: Cultural Citywalk
+日期：2026-07-13  
+产品名：Cultural Citywalk
 
-## Verdict
+## 结论
 
-Phase 1 is complete enough to enter Phase 2.
+阶段 1 已达到进入阶段 2 的条件。
 
-## Completed
+## 已完成
 
-- Next.js App Router + TypeScript scaffold.
-- Static export with GitHub Pages deployment.
-- GitHub Actions pipeline with unit tests, Playwright, and static build.
-- Environment variable template.
-- ESLint, Prettier, TypeScript, Vitest, and Playwright.
-- Design tokens in `globals.css` for paper, ink green, archive brown, spacing, and responsive layouts.
-- Header navigation, home page, three planning mode entries, planning page, route reader page.
-- Reading/map layout state represented in the route reader UI.
-- Core route TypeScript types and demo data.
-- URL helpers for static query-param routes.
-- Local draft persistence through localStorage.
+- Next.js App Router + TypeScript 项目脚手架。
+- 静态导出，并适配 GitHub Pages 部署。
+- GitHub Actions 流水线，包含单元测试、Playwright 和静态构建。
+- 环境变量模板。
+- ESLint、Prettier、TypeScript、Vitest 和 Playwright。
+- `globals.css` 中的基础设计变量：纸张色、墨绿色、档案棕、间距和响应式布局。
+- 顶部导航、首页、三种规划模式入口、规划页、路线阅读页。
+- 路线阅读页中的阅读/地图布局状态。
+- 核心路线 TypeScript 类型和演示数据。
+- 面向静态导出的 query 参数路由 URL helper。
+- 基于 localStorage 的本地草稿保存与恢复。
 
-## Verified
+## 已验证
 
 - `npm run lint`
 - `npm test`
 - `NEXT_PUBLIC_BASE_PATH=/culture-city-walk npm run build`
-- GitHub Pages deployment at `https://999hkkzjvy-cell.github.io/culture-city-walk/`
+- GitHub Pages 部署地址：`https://999hkkzjvy-cell.github.io/culture-city-walk/`
 
-## Notes
+## 备注
 
-- Full Lighthouse reporting has not been added yet.
-- Phase 2 starts with Supabase schema/RLS, auth, route save, and read-only share foundations.
+- 尚未加入完整 Lighthouse 报告。
+- 阶段 2 从 Supabase schema/RLS、认证、路线保存和只读分享基础开始。

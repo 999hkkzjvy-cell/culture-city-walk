@@ -15,11 +15,12 @@
 - Playwright 桌面与移动端冒烟测试
 - GitHub Pages workflow
 - Supabase migration、RLS、邮箱登录、我的路线、云端保存、快照与分享管理
-- 高德 JS 地图、高德 Web Service 代理、必去地点搜索、沿途 POI 搜索和步行复核
+- 高德 JS 地图、高德 Web Service 代理、真实 POI 必去点搜索、沿途 POI 搜索、真实绕行复核，以及步行/公交/驾车/打车复核
 - DeepSeek Edge Function 代理，支持规划意图解析、候选排序和 AI 用量记录
 - 顶部导航统一为：首页、开始规划、我的路线、推荐路线、关于我们、如何使用
 - 多城市规划会在切换城市时清空旧城市路线预览；本地候选种子仅用于南京，同城高德 POI 未返回时不会展示南京候选
-- 路线详情页可进入 `/journey/?id=...` 途中模式，按站点查看路线概览、深读内容、打卡任务，并将打卡图压缩后存入本地设备
+- 规划页已移除自由手工添加地点；出发、必去、终点都需要从高德搜索结果中选择真实 POI。规划支持起始时间、含餐偏好、10-15 个沿途候选、开放时间提示和自动路线命名
+- 保存路线和候选时会将确认 POI upsert 到 `places`；路线途中打卡图会先本地存档，云端路线登录后同步到 `route-media`
 
 ## 本地开发
 
@@ -53,7 +54,7 @@ npm run e2e
 已实现的 Edge Functions：
 
 - `share-route`：读取只读分享路线。
-- `amap-proxy`：代理高德 Web 服务，支持 POI 关键字搜索与步行路线规划。
+- `amap-proxy`：代理高德 Web 服务，支持 POI 关键字/周边搜索、步行、公交和驾车路线规划。
 - `deepseek-proxy`：代理 DeepSeek JSON 输出，用于规划意图解析和候选点排序。
 
 部署高德代理时，先在 Supabase Secrets 中设置：

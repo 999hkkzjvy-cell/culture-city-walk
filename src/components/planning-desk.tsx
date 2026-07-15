@@ -31,6 +31,7 @@ import {
   generateRouteCandidates,
   generateRouteCandidatesFromPlaces,
   getCandidateBandLabel,
+  refineCandidatesWithProviderDetours,
   type CandidateFitBand,
   type CandidatePlaceType,
   type RouteCandidate,
@@ -56,18 +57,20 @@ import {
   isAmapWebProxyConfigured,
 } from "@/lib/maps/amap-web";
 import type { Coordinate, PlaceCandidate } from "@/lib/maps/types";
+import { getOpeningHoursWarning } from "@/lib/opening-hours";
 import {
   collectAmapPlacesAround,
   getAmapCandidateTypes,
   getAmapFailureDetail,
 } from "@/lib/maps/route-candidate-search";
 import {
-  appendManualStopToRoute,
   appendPlaceCandidateToRoute,
+  inferStayMinutesForPlace,
   insertCandidateIntoRoute,
   moveRouteStop,
   removeRouteStop,
   type RouteStopPlacement,
+  updateRouteStartTime,
   updateRouteLegMinutes,
   updateRouteLegTravelMode,
   updateStopStayMinutes,
@@ -91,6 +94,8 @@ import {
 const allThemes: Theme[] = ["历史", "文学", "建筑", "音乐", "书店", "美食"];
 type CandidateAction = "joined" | "backup" | "ignored";
 type PlaceSearchState = "idle" | "loading" | "ready" | "error";
+type MealParty = "一人食" | "多人食";
+type MealBudget = "50元以内" | "50-100元" | "100-200元" | "200元以上";
 type PlannedPlaceEntry = {
   id: string;
   name: string;
@@ -106,6 +111,16 @@ const placeRoleOptions: Array<{ value: RouteStopPlacement; label: string }> = [
   { value: "start", label: "出发" },
   { value: "middle", label: "必去" },
   { value: "end", label: "终点" },
+];
+const mealCuisineOptions = [
+  "日料韩餐",
+  "东南亚菜",
+  "炒菜",
+  "西餐",
+  "快餐",
+  "火锅",
+  "烧烤",
+  "咖啡甜品",
 ];
 
 function collectRouteSearchCenters(route: RoutePlan): Coordinate[] {
@@ -205,7 +220,7 @@ function cityDraftId(city: string) {
 
 function createBlankRouteFromDraft(draft: RouteDraft): RoutePlan {
   const city = draft.city.trim();
-  const title = city ? `${city}路线草稿` : "新城市路线草稿";
+  const title = generateRouteTitle(draft, []);
 
   return {
     ...defaultDraft,
@@ -282,6 +297,13 @@ export function PlanningDesk() {
   );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
+  const [includeMeals, setIncludeMeals] = useState(false);
+  const [mealParty, setMealParty] = useState<MealParty>("多人食");
+  const [mealBudget, setMealBudget] = useState<MealBudget>("50-100元");
+  const [mealCuisines, setMealCuisines] = useState<string[]>([
+    "炒菜",
+    "咖啡甜品",
+  ]);
   const [expandedCandidateIds, setExpandedCandidateIds] = useState<
     Record<string, boolean>
   >({});
@@ -298,10 +320,17 @@ export function PlanningDesk() {
   const routeImpactMeters =
     previewKernel.totalWalkingMeters - baseKernel.totalWalkingMeters;
   const previewEndTime = getRouteEndTime(previewKernel.stops);
+  const effectiveCandidateTypes = useMemo(() => {
+    if (!includeMeals || selectedCandidateTypes.includes("餐厅")) {
+      return selectedCandidateTypes;
+    }
+
+    return [...selectedCandidateTypes, "餐厅" as CandidatePlaceType];
+  }, [includeMeals, selectedCandidateTypes]);
   const visibleCandidates = activeCandidates.filter(
     (candidate) =>
       candidateActions[candidate.id] !== "ignored" &&
-      selectedCandidateTypes.includes(candidate.placeType),
+      effectiveCandidateTypes.includes(candidate.placeType),
   );
   const pendingCandidates = visibleCandidates.filter(
     (candidate) => !candidateActions[candidate.id],
@@ -350,6 +379,7 @@ export function PlanningDesk() {
       const nextRoute = {
         ...previewRoute,
         city: city.trim(),
+        title: generateRouteTitle({ ...draft, city }, previewRoute.stops),
         updatedAt: new Date().toISOString(),
       };
 
@@ -381,7 +411,9 @@ export function PlanningDesk() {
   ) {
     const place = placeName.trim();
 
-    if (!place) {
+    if (!place || !placeCandidate) {
+      setMustVisitSearchState("error");
+      setMustVisitSearchMessage("请先从高德搜索结果中选择真实地点。");
       return;
     }
 
@@ -389,23 +421,16 @@ export function PlanningDesk() {
     const currentRoute = previewRoute;
     const routeThemes =
       draft.themes.length > 0 ? draft.themes : (["历史"] as Theme[]);
-    const nextRoute = placeCandidate
-      ? appendPlaceCandidateToRoute(currentRoute, {
+    const nextRoute = withGeneratedRouteTitle(
+      appendPlaceCandidateToRoute(currentRoute, {
           place: placeCandidate,
-          stayMinutes: placeRole === "middle" ? 30 : 5,
+          stayMinutes: inferStayMinutesForPlace(placeCandidate, placeRole),
           themes: routeThemes.slice(0, 2),
           placement: placeRole,
           note: placeRoleNote(placeRole),
-        })
-      : appendManualStopToRoute(currentRoute, {
-          name: place,
-          area: draft.city,
-          address: "手工地点，地址待高德确认",
-          stayMinutes: placeRole === "middle" ? 30 : 5,
-          themes: routeThemes.slice(0, 2),
-          placement: placeRole,
-          note: placeRoleNote(placeRole),
-        });
+        }),
+      draft,
+    );
     const routeStopId = findAddedStopId(currentRoute, nextRoute);
     const nextPlannedPlaces = [
       ...plannedPlaces,
@@ -438,7 +463,11 @@ export function PlanningDesk() {
 
     if (entry?.routeStopId) {
       setPreviewRoute((current) =>
-        persistPreviewRoute(removeRouteStop(current, entry.routeStopId ?? "")),
+        persistPreviewRoute(
+          withGeneratedRouteTitle(
+            removeRouteStop(current, entry.routeStopId ?? ""),
+          ),
+        ),
       );
     }
   }
@@ -449,7 +478,7 @@ export function PlanningDesk() {
     }
 
     event.preventDefault();
-    addMustVisit();
+    void searchMustVisitPlaces();
   }
 
   async function searchMustVisitPlaces() {
@@ -488,8 +517,19 @@ export function PlanningDesk() {
     } catch {
       setMustVisitSuggestions([]);
       setMustVisitSearchState("error");
-      setMustVisitSearchMessage("高德地点搜索失败，可先手工添加。");
+      setMustVisitSearchMessage("高德地点搜索失败，请稍后重试或换个关键词。");
     }
+  }
+
+  function updateStartTime(startTime: string) {
+    setSaved(false);
+    setDraft((current) => ({
+      ...current,
+      startTime,
+    }));
+    setPreviewRoute((current) =>
+      persistPreviewRoute(updateRouteStartTime(current, startTime)),
+    );
   }
 
   function syncDraftMustVisits(entries: PlannedPlaceEntry[]) {
@@ -553,8 +593,8 @@ export function PlanningDesk() {
       const intent = await getPlanningIntent();
       const candidateResult = await getRouteAwareCandidates(previewRoute, {
         themes: intent.data.themeFilters,
-        acceptedTypes: selectedCandidateTypes,
-        maxResults: 5,
+        acceptedTypes: effectiveCandidateTypes,
+        maxResults: includeMeals ? 15 : 12,
       });
       const ranked = await rankCandidateSuggestions(
         candidateResult.candidates,
@@ -632,7 +672,7 @@ export function PlanningDesk() {
           city: route.city,
           types,
           radiusMeters: 1200,
-          limit: 8,
+          limit: 12,
           searchPlacesAround,
         },
       );
@@ -643,17 +683,49 @@ export function PlanningDesk() {
             ]
           : [];
 
-      const providerCandidates = generateRouteCandidatesFromPlaces(
+      const providerCandidates = ensureMealCandidates(
+        generateRouteCandidatesFromPlaces(
+          route,
+          places,
+          {
+            themes: options.themes,
+            acceptedTypes: options.acceptedTypes,
+            maxResults: options.maxResults,
+          },
+        ),
         route,
         places,
-        {
-          themes: options.themes,
-          acceptedTypes: options.acceptedTypes,
-          maxResults: options.maxResults,
-        },
+        options,
       );
 
       if (providerCandidates.length > 0) {
+        if (provider.calculateWalkingRoute) {
+          const detourResult = await refineCandidatesWithProviderDetours(
+            route,
+            providerCandidates,
+            provider.calculateWalkingRoute,
+            options.themes,
+          );
+          const detourWarnings =
+            detourResult.providerLegs > 0
+              ? [
+                  `已用高德步行复核 ${detourResult.providerLegs} 段候选绕行。`,
+                  ...(detourResult.failedLegs > 0
+                    ? [
+                        `${detourResult.failedLegs} 段候选绕行复核失败，已保留本地估算。`,
+                      ]
+                    : []),
+                ]
+              : detourResult.failedLegs > 0
+                ? ["候选绕行复核失败，已保留本地估算。"]
+                : [];
+
+          return {
+            candidates: detourResult.candidates,
+            warnings: [...warnings, ...detourWarnings],
+          };
+        }
+
         return { candidates: providerCandidates, warnings };
       }
 
@@ -687,14 +759,16 @@ export function PlanningDesk() {
   }
 
   async function getPlanningIntent() {
+    const intentText = buildIntentText();
+
     if (!isDeepSeekProxyConfigured()) {
-      return parseIntentWithFallback(requestText, draft);
+      return parseIntentWithFallback(intentText, draft);
     }
 
     try {
-      return await parseIntentWithDeepSeek(requestText, draft);
+      return await parseIntentWithDeepSeek(intentText, draft);
     } catch {
-      const fallback = parseIntentWithFallback(requestText, draft);
+      const fallback = parseIntentWithFallback(intentText, draft);
 
       return {
         ...fallback,
@@ -736,7 +810,7 @@ export function PlanningDesk() {
   ) {
     const routeId = previewRoute.id;
     const inputSummary = JSON.stringify({
-      requestText,
+      requestText: buildIntentText(),
       draft,
       routeId,
     });
@@ -748,6 +822,9 @@ export function PlanningDesk() {
         usage: intent.usage,
         inputPayload: {
           requestText,
+          mealPreferences: includeMeals
+            ? { mealParty, mealBudget, mealCuisines }
+            : null,
           draft,
         },
         outputPayload: intent.data,
@@ -801,14 +878,18 @@ export function PlanningDesk() {
 
     if (candidateActions[candidate.id] === "joined") {
       setPreviewRoute((current) =>
-        persistPreviewRoute(removeRouteStop(current, candidate.id)),
+        persistPreviewRoute(
+          withGeneratedRouteTitle(removeRouteStop(current, candidate.id)),
+        ),
       );
       clearCandidateAction(candidate.id);
       return;
     }
 
     setPreviewRoute((current) =>
-      persistPreviewRoute(insertCandidateIntoRoute(current, candidate)),
+      persistPreviewRoute(
+        withGeneratedRouteTitle(insertCandidateIntoRoute(current, candidate)),
+      ),
     );
     markCandidate(candidate.id, "joined");
   }
@@ -816,7 +897,7 @@ export function PlanningDesk() {
   function removePreviewStop(stopId: string) {
     setSaved(false);
     setPreviewRoute((current) =>
-      persistPreviewRoute(removeRouteStop(current, stopId)),
+      persistPreviewRoute(withGeneratedRouteTitle(removeRouteStop(current, stopId))),
     );
     clearCandidateAction(stopId);
   }
@@ -864,6 +945,71 @@ export function PlanningDesk() {
     });
   }
 
+  function toggleMealCuisine(cuisine: string) {
+    setMealCuisines((current) =>
+      current.includes(cuisine)
+        ? current.filter((item) => item !== cuisine)
+        : [...current, cuisine],
+    );
+  }
+
+  function buildIntentText() {
+    const mealText = includeMeals
+      ? `需要安排餐厅：${mealParty}，人均${mealBudget}，偏好${mealCuisines.join("、") || "不限"}，请优先考虑午餐/晚餐时间、顺路程度和餐厅评分。`
+      : "不需要强制安排餐厅。";
+
+    return [requestText.trim(), mealText].filter(Boolean).join("\n");
+  }
+
+  function ensureMealCandidates(
+    currentCandidates: RouteCandidate[],
+    route: RoutePlan,
+    places: PlaceCandidate[],
+    options: {
+      themes: Theme[];
+      acceptedTypes: CandidatePlaceType[];
+      maxResults: number;
+    },
+  ) {
+    if (!includeMeals) {
+      return currentCandidates;
+    }
+
+    const restaurantCount = currentCandidates.filter(
+      (candidate) => candidate.placeType === "餐厅",
+    ).length;
+
+    if (restaurantCount >= 3) {
+      return currentCandidates;
+    }
+
+    const restaurants = generateRouteCandidatesFromPlaces(route, places, {
+      themes: [...new Set([...options.themes, "美食" as Theme])],
+      acceptedTypes: ["餐厅"],
+      maxResults: 5,
+    });
+    const merged = [...currentCandidates, ...restaurants];
+    const seen = new Set<string>();
+
+    return merged
+      .filter((candidate) => {
+        if (seen.has(candidate.id)) {
+          return false;
+        }
+        seen.add(candidate.id);
+        return true;
+      })
+      .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
+      .slice(0, options.maxResults);
+  }
+
+  function withGeneratedRouteTitle(route: RoutePlan, nextDraft = draft) {
+    return {
+      ...route,
+      title: generateRouteTitle(nextDraft, route.stops, requestText),
+    };
+  }
+
   function persistPreviewRoute(route: typeof previewRoute) {
     saveRoutePlan(route);
     return route;
@@ -895,6 +1041,22 @@ export function PlanningDesk() {
                 value={draft.city}
               />
               <Pencil size={14} aria-hidden="true" />
+            </label>
+          </div>
+        </div>
+
+        <div className="chat-row">
+          <span className="ai-dot">AI</span>
+          <div>
+            <p>从几点开始出发？</p>
+            <label className="answer-input compact">
+              <input
+                aria-label="路线起始时间"
+                onChange={(event) => updateStartTime(event.target.value)}
+                type="time"
+                value={draft.startTime}
+              />
+              <Clock3 size={14} aria-hidden="true" />
             </label>
           </div>
         </div>
@@ -957,14 +1119,6 @@ export function PlanningDesk() {
                 >
                   <Search size={14} aria-hidden="true" />
                   {mustVisitSearchState === "loading" ? "搜索中" : "搜高德"}
-                </button>
-                <button
-                  className="chip"
-                  onClick={() => addMustVisit()}
-                  type="button"
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  添加
                 </button>
               </div>
             </div>
@@ -1072,11 +1226,87 @@ export function PlanningDesk() {
         <div className="chat-row">
           <span className="ai-dot">AI</span>
           <div>
+            <p>这次要安排餐厅吗？</p>
+            <div className="chip-row">
+              <button
+                className={includeMeals ? "chip selected" : "chip"}
+                onClick={() => setIncludeMeals(true)}
+                type="button"
+              >
+                安排餐厅
+              </button>
+              <button
+                className={!includeMeals ? "chip selected" : "chip"}
+                onClick={() => setIncludeMeals(false)}
+                type="button"
+              >
+                不安排
+              </button>
+            </div>
+            {includeMeals ? (
+              <div className="meal-preferences">
+                <div className="chip-row">
+                  {(["一人食", "多人食"] as MealParty[]).map((party) => (
+                    <button
+                      className={mealParty === party ? "chip selected" : "chip"}
+                      key={party}
+                      onClick={() => setMealParty(party)}
+                      type="button"
+                    >
+                      {party}
+                    </button>
+                  ))}
+                </div>
+                <div className="chip-row">
+                  {(
+                    [
+                      "50元以内",
+                      "50-100元",
+                      "100-200元",
+                      "200元以上",
+                    ] as MealBudget[]
+                  ).map((budget) => (
+                    <button
+                      className={
+                        mealBudget === budget ? "chip selected" : "chip"
+                      }
+                      key={budget}
+                      onClick={() => setMealBudget(budget)}
+                      type="button"
+                    >
+                      {budget}
+                    </button>
+                  ))}
+                </div>
+                <div className="chip-grid compact">
+                  {mealCuisineOptions.map((cuisine) => (
+                    <button
+                      className={
+                        mealCuisines.includes(cuisine)
+                          ? "chip selected"
+                          : "chip"
+                      }
+                      key={cuisine}
+                      onClick={() => toggleMealCuisine(cuisine)}
+                      type="button"
+                    >
+                      {cuisine}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="chat-row">
+          <span className="ai-dot">AI</span>
+          <div>
             <p>用一句话补充这次路线目标。</p>
             <textarea
               className="intent-input"
               onChange={(event) => setRequestText(event.target.value)}
-              placeholder="例如：想更偏历史，午饭前不要太赶。"
+              placeholder=""
               rows={3}
               value={requestText}
             />
@@ -1118,7 +1348,7 @@ export function PlanningDesk() {
             {candidatePlaceTypes.map((type) => (
               <button
                 className={
-                  selectedCandidateTypes.includes(type) ? "selected" : ""
+                  effectiveCandidateTypes.includes(type) ? "selected" : ""
                 }
                 key={type}
                 onClick={() => toggleCandidateType(type)}
@@ -1207,6 +1437,24 @@ export function PlanningDesk() {
                                 {candidate.themes.map((theme) => (
                                   <span key={theme}>{theme}</span>
                                 ))}
+                                {candidate.place.openingHours ? (
+                                  <span>
+                                    开放 {candidate.place.openingHours}
+                                  </span>
+                                ) : null}
+                                {candidate.place.telephone ? (
+                                  <span>电话 {candidate.place.telephone}</span>
+                                ) : null}
+                                {candidate.place.providerRating ? (
+                                  <span>
+                                    高德评分 {candidate.place.providerRating}
+                                  </span>
+                                ) : null}
+                                {candidate.place.providerCost ? (
+                                  <span>
+                                    人均 {candidate.place.providerCost}
+                                  </span>
+                                ) : null}
                                 {candidate.risks.map((risk) => (
                                   <span key={risk}>{risk}</span>
                                 ))}
@@ -1352,7 +1600,9 @@ export function PlanningDesk() {
           </div>
           <div>
             <dt>时间</dt>
-            <dd>一天（约 {draft.durationHours} 小时）</dd>
+            <dd>
+              {draft.startTime} 出发 · 一天（约 {draft.durationHours} 小时）
+            </dd>
           </div>
           <div>
             <dt>步行距离</dt>
@@ -1369,6 +1619,14 @@ export function PlanningDesk() {
           <div>
             <dt>兴趣偏好</dt>
             <dd>{summary}</dd>
+          </div>
+          <div>
+            <dt>含餐</dt>
+            <dd>
+              {includeMeals
+                ? `${mealParty} · ${mealBudget} · ${mealCuisines.join("、") || "不限"}`
+                : "不安排"}
+            </dd>
           </div>
           <div>
             <dt>预案结束</dt>
@@ -1395,11 +1653,28 @@ export function PlanningDesk() {
                   {index + 1}. {stop.name}
                 </strong>
                 <span>
-                  {stop.calculatedTime} · 停留 {stop.stayMinutes} 分钟
+                  {stop.calculatedTime}
+                  {stop.routeRole === "start" || stop.routeRole === "end"
+                    ? ""
+                    : ` · 停留 ${stop.stayMinutes} 分钟`}
                   {stop.walkingFromPrevious
                     ? ` · ${getRouteTravelModeLabel(stop.walkingFromPrevious.mode)} ${stop.walkingFromPrevious.minutes} 分钟`
                     : ""}
                 </span>
+                {stop.openingHours ? (
+                  <span
+                    className={
+                      getOpeningHoursWarning(stop, stop.calculatedTime)
+                        ? "opening-warning"
+                        : ""
+                    }
+                  >
+                    开放 {stop.openingHours}
+                    {getOpeningHoursWarning(stop, stop.calculatedTime)
+                      ? ` · ${getOpeningHoursWarning(stop, stop.calculatedTime)}`
+                      : ""}
+                  </span>
+                ) : null}
               </div>
               <div className="route-preview-controls">
                 <button
@@ -1418,20 +1693,24 @@ export function PlanningDesk() {
                 >
                   <ChevronDown size={14} />
                 </button>
-                <label>
-                  <Clock3 size={13} />
-                  <input
-                    aria-label={`${stop.name} 停留分钟`}
-                    max={240}
-                    min={5}
-                    onChange={(event) =>
-                      changeStayMinutes(stop.id, Number(event.target.value))
-                    }
-                    step={5}
-                    type="number"
-                    value={stop.stayMinutes}
-                  />
-                </label>
+                {stop.routeRole === "start" || stop.routeRole === "end" ? (
+                  <span className="route-role-note">无停留</span>
+                ) : (
+                  <label>
+                    <Clock3 size={13} />
+                    <input
+                      aria-label={`${stop.name} 停留分钟`}
+                      max={240}
+                      min={5}
+                      onChange={(event) =>
+                        changeStayMinutes(stop.id, Number(event.target.value))
+                      }
+                      step={5}
+                      type="number"
+                      value={stop.stayMinutes}
+                    />
+                  </label>
+                )}
                 <button
                   aria-label={`删除 ${stop.name}`}
                   disabled={previewKernel.stops.length <= 2}
@@ -1513,4 +1792,30 @@ function getRouteEndTime(
 
 function formatCandidateDistance(candidate: RouteCandidate) {
   return `${(candidate.detourMeters / 1000).toFixed(1)} km`;
+}
+
+function generateRouteTitle(
+  draft: Pick<RouteDraft, "city" | "themes">,
+  stops: Array<{ name: string }> = [],
+  requestText = "",
+) {
+  const city = draft.city.trim() || "城市";
+  const primaryTheme = draft.themes[0] ?? "城市";
+  const secondaryTheme = draft.themes[1];
+  const routeTone =
+    requestText.includes("轻松") || requestText.includes("慢")
+      ? "慢读"
+      : requestText.includes("建筑")
+        ? "建筑漫游"
+        : requestText.includes("历史")
+          ? "历史漫游"
+          : "细读";
+
+  if (stops.length >= 2) {
+    return `${city} · ${stops[0].name}到${stops.at(-1)?.name}${routeTone}`;
+  }
+
+  return secondaryTheme
+    ? `${city} · ${primaryTheme}${secondaryTheme}${routeTone}`
+    : `${city} · ${primaryTheme}${routeTone}`;
 }

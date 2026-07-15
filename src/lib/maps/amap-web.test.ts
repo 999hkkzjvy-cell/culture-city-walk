@@ -65,6 +65,10 @@ describe("amap web service provider", () => {
             adcode: "320102",
             type: "科教文化服务;博物馆",
             location: "118.797000,32.043800",
+            openingHours: "09:00-17:00",
+            telephone: "025-12345678",
+            providerRating: "4.8",
+            providerCost: "35.00",
           },
         ],
       },
@@ -97,6 +101,10 @@ describe("amap web service provider", () => {
         name: "六朝博物馆",
         city: "南京市",
         verificationStatus: "verified",
+        openingHours: "09:00-17:00",
+        telephone: "025-12345678",
+        providerRating: "4.8",
+        providerCost: "35.00",
       }),
     );
   });

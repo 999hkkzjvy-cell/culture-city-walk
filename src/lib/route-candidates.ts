@@ -1,5 +1,6 @@
 import type { PlaceCandidate } from "@/lib/maps/types";
 import { estimateWalkingLeg } from "@/lib/maps/fallback";
+import type { MapProvider } from "@/lib/maps/types";
 import type { RoutePlan, RouteStop, Theme } from "@/lib/route";
 
 export type CandidatePlaceType =
@@ -193,12 +194,73 @@ export function getCandidateBandLabel(band: CandidateFitBand) {
   }
 }
 
+export type ProviderDetourResult = {
+  candidates: RouteCandidate[];
+  providerLegs: number;
+  failedLegs: number;
+};
+
+type CandidateInsertion = {
+  index: number;
+  detourMinutes: number;
+  detourMeters: number;
+  providerLegs?: number;
+  failedLegs?: number;
+};
+
+export async function refineCandidatesWithProviderDetours(
+  route: RoutePlan,
+  candidates: RouteCandidate[],
+  calculateWalkingRoute: NonNullable<MapProvider["calculateWalkingRoute"]>,
+  preferredThemes: Theme[],
+): Promise<ProviderDetourResult> {
+  if (route.stops.length < 2 || candidates.length === 0) {
+    return {
+      candidates,
+      providerLegs: 0,
+      failedLegs: 0,
+    };
+  }
+
+  let providerLegs = 0;
+  let failedLegs = 0;
+  const insertions = await Promise.all(
+    candidates.map((candidate) =>
+      refineProviderInsertion(
+        route.stops,
+        candidate.place,
+        candidate.insertionIndex,
+        calculateWalkingRoute,
+      ),
+    ),
+  );
+  const refined = candidates.map((candidate, index) => {
+    const insertion = insertions[index];
+    providerLegs += insertion.providerLegs ?? 0;
+    failedLegs += insertion.failedLegs ?? 0;
+    return scoreCandidate(route, candidate, preferredThemes, insertion, {
+      providerVerified: (insertion.providerLegs ?? 0) > 0,
+    });
+  });
+
+  return {
+    candidates: refined
+      .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
+      .slice(0, candidates.length),
+    providerLegs,
+    failedLegs,
+  };
+}
+
 function scoreCandidate(
   route: RoutePlan,
   candidate: SeedCandidate,
   preferredThemes: Theme[],
+  insertionOverride?: CandidateInsertion,
+  scoringOptions: { providerVerified?: boolean } = {},
 ): RouteCandidate {
-  const insertion = findBestInsertion(route.stops, candidate.place);
+  const insertion =
+    insertionOverride ?? findBestInsertion(route.stops, candidate.place);
   const matchedThemes = candidate.themes.filter((theme) =>
     preferredThemes.includes(theme),
   );
@@ -208,18 +270,18 @@ function scoreCandidate(
   const detourPenalty = Math.min(34, insertion.detourMinutes * 2.2);
   const themeScore = matchedThemes.length * 18;
   const diversityScore = typeAlreadyUsed ? 4 : 12;
-  const baseScore = 58 + themeScore + diversityScore - detourPenalty;
+  const providerQualityScore = getProviderQualityScore(candidate.place);
+  const baseScore =
+    58 + themeScore + diversityScore + providerQualityScore - detourPenalty;
   const score = clamp(Math.round(baseScore), 0, 100);
   const fitBand = getFitBand(score, insertion.detourMinutes);
   const reasons = buildReasons(
     candidate,
     matchedThemes,
     insertion.detourMinutes,
+    scoringOptions.providerVerified,
   );
-  const risks =
-    candidate.place.verificationStatus === "source_pending"
-      ? ["地点信息待高德复核"]
-      : [];
+  const risks = buildRisks(candidate.place);
 
   return {
     id: candidate.place.id,
@@ -237,6 +299,110 @@ function scoreCandidate(
       insertion.index,
     ].join(":"),
   };
+}
+
+async function refineProviderInsertion(
+  stops: RouteStop[],
+  candidate: PlaceCandidate,
+  insertionIndex: number,
+  calculateWalkingRoute: NonNullable<MapProvider["calculateWalkingRoute"]>,
+): Promise<CandidateInsertion> {
+  if (stops.length < 2) {
+    return { index: 0, detourMinutes: 0, detourMeters: 0 };
+  }
+
+  const index = Math.min(Math.max(insertionIndex, 0), stops.length - 2);
+  const stop = stops[index];
+  const nextStop = stops[index + 1];
+  const origin = routeStopAsPlaceCandidate(stop);
+  const destination = routeStopAsPlaceCandidate(nextStop);
+  const originalMinutes =
+    nextStop.walkingFromPrevious?.minutes ??
+    estimateWalkingLeg({ origin, destination }).durationMinutes;
+  const originalMeters =
+    nextStop.walkingFromPrevious?.distanceMeters ??
+    estimateWalkingLeg({ origin, destination }).distanceMeters;
+  const [originToCandidate, candidateToDestination] = await Promise.all([
+    calculateProviderOrEstimatedLeg(origin, candidate, calculateWalkingRoute),
+    calculateProviderOrEstimatedLeg(
+      candidate,
+      destination,
+      calculateWalkingRoute,
+    ),
+  ]);
+
+  return {
+    index,
+    detourMinutes: Math.max(
+      0,
+      originToCandidate.durationMinutes +
+        candidateToDestination.durationMinutes -
+        originalMinutes,
+    ),
+    detourMeters: Math.max(
+      0,
+      originToCandidate.distanceMeters +
+        candidateToDestination.distanceMeters -
+        originalMeters,
+    ),
+    providerLegs:
+      originToCandidate.providerLegs + candidateToDestination.providerLegs,
+    failedLegs:
+      originToCandidate.failedLegs + candidateToDestination.failedLegs,
+  };
+}
+
+async function calculateProviderOrEstimatedLeg(
+  origin: PlaceCandidate,
+  destination: PlaceCandidate,
+  calculateWalkingRoute: NonNullable<MapProvider["calculateWalkingRoute"]>,
+) {
+  if (
+    origin.coordinate?.system === "gcj02" &&
+    destination.coordinate?.system === "gcj02"
+  ) {
+    try {
+      const leg = await withTimeout(
+        calculateWalkingRoute({ origin, destination }),
+        3500,
+      );
+      return {
+        durationMinutes: leg.durationMinutes,
+        distanceMeters: leg.distanceMeters,
+        providerLegs: 1,
+        failedLegs: 0,
+      };
+    } catch {
+      const estimated = estimateWalkingLeg({ origin, destination });
+      return {
+        durationMinutes: estimated.durationMinutes,
+        distanceMeters: estimated.distanceMeters,
+        providerLegs: 0,
+        failedLegs: 1,
+      };
+    }
+  }
+
+  const estimated = estimateWalkingLeg({ origin, destination });
+  return {
+    durationMinutes: estimated.durationMinutes,
+    distanceMeters: estimated.distanceMeters,
+    providerLegs: 0,
+    failedLegs: 0,
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(() => {
+      reject(new Error("provider_detour_timeout"));
+    }, timeoutMs);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => globalThis.clearTimeout(timeoutId));
+  });
 }
 
 function findBestInsertion(stops: RouteStop[], candidate: PlaceCandidate) {
@@ -284,12 +450,19 @@ function findBestInsertion(stops: RouteStop[], candidate: PlaceCandidate) {
   );
 }
 
-function routeStopAsPlaceCandidate(
-  stop: RouteStop,
-): Pick<PlaceCandidate, "id" | "coordinate"> {
+function routeStopAsPlaceCandidate(stop: RouteStop): PlaceCandidate {
   return {
     id: stop.sourcePlaceId ?? stop.id,
+    source: stop.source === "amap" ? "amap" : "manual",
+    sourcePlaceId: stop.sourcePlaceId ?? stop.id,
+    name: stop.name,
+    address: stop.address,
+    city: stop.area,
+    district: stop.area,
+    adcode: null,
     coordinate: stop.coordinate ?? null,
+    poiType: null,
+    verificationStatus: stop.verificationStatus ?? "source_pending",
   };
 }
 
@@ -541,20 +714,65 @@ function buildReasons(
   candidate: SeedCandidate,
   matchedThemes: Theme[],
   detourMinutes: number,
+  providerVerified = false,
 ) {
   const reasons = [
-    detourMinutes <= 8
-      ? "绕行时间很低"
-      : `预计新增约 ${detourMinutes} 分钟步行`,
+    providerVerified
+      ? detourMinutes <= 8
+        ? "高德步行复核显示绕行时间很低"
+        : `高德步行复核预计新增约 ${detourMinutes} 分钟`
+      : detourMinutes <= 8
+        ? "绕行时间很低"
+        : `预计新增约 ${detourMinutes} 分钟步行`,
   ];
 
   if (matchedThemes.length > 0) {
     reasons.push(`匹配${matchedThemes.join("、")}偏好`);
   }
 
+  if (candidate.place.providerRating) {
+    reasons.push(`高德评分 ${candidate.place.providerRating}`);
+  }
+
   reasons.push(`${candidate.placeType}类型补足路线层次`);
 
   return reasons;
+}
+
+function getProviderQualityScore(place: PlaceCandidate) {
+  const rating = Number(place.providerRating);
+
+  if (!Number.isFinite(rating)) {
+    return 0;
+  }
+
+  if (rating >= 4.6) {
+    return 8;
+  }
+
+  if (rating >= 4.2) {
+    return 5;
+  }
+
+  if (rating >= 3.8) {
+    return 2;
+  }
+
+  return -4;
+}
+
+function buildRisks(place: PlaceCandidate) {
+  const risks: string[] = [];
+
+  if (place.verificationStatus === "source_pending") {
+    risks.push("地点信息待高德复核");
+  }
+
+  if (place.source === "amap" && !place.openingHours) {
+    risks.push("开放时间待现场核验");
+  }
+
+  return risks;
 }
 
 function clamp(value: number, min: number, max: number) {

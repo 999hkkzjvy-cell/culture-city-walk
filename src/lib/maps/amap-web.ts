@@ -4,6 +4,7 @@ import {
   type Coordinate,
   type MapProvider,
   type PlaceCandidate,
+  type ProviderRouteMode,
 } from "@/lib/maps/types";
 import {
   createBrowserSupabaseClient,
@@ -19,6 +20,10 @@ type AmapProxyPlace = {
   adcode: string | null;
   type: string | null;
   location: string | null;
+  openingHours?: string | null;
+  telephone?: string | null;
+  providerRating?: string | null;
+  providerCost?: string | null;
 };
 
 type AmapWalkingProxyResponse = {
@@ -96,6 +101,37 @@ export function createAmapWebServiceProvider(): MapProvider | null {
         polyline: data.polyline,
       };
     },
+
+    async calculateRoute(input) {
+      const origin = toAmapPoint(input.origin);
+      const destination = toAmapPoint(input.destination);
+
+      if (!origin || !destination) {
+        throw new MapProviderError(
+          "invalid_place",
+          "Route calculation requires GCJ-02 coordinates.",
+        );
+      }
+
+      const data = await invokeAmapProxy<AmapWalkingProxyResponse>("route", {
+        origin,
+        destination,
+        mode: input.mode,
+        city: input.city,
+        departureTime: input.departureTime,
+      });
+
+      return {
+        fromPlaceId: input.origin.id,
+        toPlaceId: input.destination.id,
+        distanceMeters: data.distanceMeters,
+        durationMinutes: Math.max(1, Math.round(data.durationSeconds / 60)),
+        source: "provider",
+        provider: "amap",
+        polyline: data.polyline,
+        mode: input.mode as ProviderRouteMode,
+      };
+    },
   };
 }
 
@@ -134,6 +170,10 @@ function mapProxyPlaceToCandidate(place: AmapProxyPlace): PlaceCandidate {
     adcode: place.adcode ?? undefined,
     type: place.type ?? undefined,
     location: place.location ?? undefined,
+    openingHours: place.openingHours ?? null,
+    telephone: place.telephone ?? null,
+    providerRating: place.providerRating ?? null,
+    providerCost: place.providerCost ?? null,
   });
 }
 

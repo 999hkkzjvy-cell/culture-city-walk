@@ -1,6 +1,6 @@
 import { estimateWalkingLeg } from "@/lib/maps/fallback";
 import type { MapProvider, PlaceCandidate } from "@/lib/maps/types";
-import type { RoutePlan, RouteStop } from "@/lib/route";
+import type { RoutePlan, RouteStop, RouteTravelMode } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 import { estimateTravelLeg } from "@/lib/transport";
 
@@ -32,6 +32,45 @@ export async function recalculateRouteWithProvider(
     const origin = routeStopAsPlaceCandidate(previousStop);
     const destination = routeStopAsPlaceCandidate(stop);
     const mode = stop.walkingFromPrevious?.mode ?? "walking";
+
+    const providerMode = toProviderMode(mode);
+
+    if (provider.calculateRoute && providerMode) {
+      const leg = await provider
+        .calculateRoute({
+          origin,
+          destination,
+          mode: providerMode,
+          city: route.city,
+          departureTime: stop.time,
+        })
+        .then((providerLeg) => {
+          providerLegs += 1;
+          return providerLeg;
+        })
+        .catch((error) => {
+          estimatedLegs += 1;
+          errors.push(
+            error instanceof Error
+              ? `${previousStop.name} → ${stop.name}: ${error.message}`
+              : `${previousStop.name} → ${stop.name}: provider failed`,
+          );
+          return estimateTravelLeg({ origin, destination, mode });
+        });
+
+      stops.push({
+        ...stop,
+        walkingFromPrevious: {
+          minutes: leg.durationMinutes,
+          distanceMeters: leg.distanceMeters,
+          mode,
+          source: leg.source,
+          provider: leg.provider,
+          polyline: leg.polyline,
+        },
+      });
+      continue;
+    }
 
     if (mode !== "walking") {
       const estimatedLeg = estimateTravelLeg({ origin, destination, mode });
@@ -98,6 +137,18 @@ export async function recalculateRouteWithProvider(
     estimatedLegs,
     errors,
   };
+}
+
+function toProviderMode(mode: RouteTravelMode) {
+  if (mode === "walking" || mode === "transit") {
+    return mode;
+  }
+
+  if (mode === "driving" || mode === "taxi") {
+    return "driving";
+  }
+
+  return null;
 }
 
 function routeStopAsPlaceCandidate(stop: RouteStop): PlaceCandidate {

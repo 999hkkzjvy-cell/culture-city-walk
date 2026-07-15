@@ -122,6 +122,7 @@ describe("route kernel", () => {
       title: "测试路线",
       mode: "complete",
       dateLabel: "今天",
+      startTime: "09:00",
       durationHours: 3,
       walkingRangeKm: "3-5 km",
       themes: ["历史"],

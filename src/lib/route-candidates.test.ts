@@ -4,6 +4,7 @@ import {
   generateRouteCandidatesFromPlaces,
   generateRouteCandidates,
   getCandidateBandLabel,
+  refineCandidatesWithProviderDetours,
 } from "@/lib/route-candidates";
 
 describe("route candidates", () => {
@@ -117,9 +118,113 @@ describe("route candidates", () => {
         stayMinutes: 50,
         insertionIndex: expect.any(Number),
         fitBand: expect.any(String),
-        risks: [],
+        risks: ["开放时间待现场核验"],
       }),
     );
+  });
+
+  it("keeps AMap fact metadata and flags missing opening hours", () => {
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:B030",
+          source: "amap",
+          sourcePlaceId: "B030",
+          name: "城市历史展馆",
+          address: "长江路 1 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.797, lat: 32.0438, system: "gcj02" },
+          poiType: "科教文化服务;博物馆",
+          openingHours: "09:00-17:00",
+          telephone: "025-12345678",
+          providerRating: "4.7",
+          providerCost: null,
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:B031",
+          source: "amap",
+          sourcePlaceId: "B031",
+          name: "城市记忆馆",
+          address: "长江路 2 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.798, lat: 32.044, system: "gcj02" },
+          poiType: "科教文化服务;博物馆",
+          openingHours: null,
+          telephone: null,
+          providerRating: null,
+          providerCost: null,
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["历史"],
+        acceptedTypes: ["博物馆"],
+        maxResults: 2,
+      },
+    );
+    const withOpeningHours = candidates.find(
+      (candidate) => candidate.place.sourcePlaceId === "B030",
+    );
+    const withoutOpeningHours = candidates.find(
+      (candidate) => candidate.place.sourcePlaceId === "B031",
+    );
+
+    expect(withOpeningHours?.place.openingHours).toBe("09:00-17:00");
+    expect(withOpeningHours?.place.telephone).toBe("025-12345678");
+    expect(withOpeningHours?.risks).not.toContain("开放时间待现场核验");
+    expect(withoutOpeningHours?.risks).toContain("开放时间待现场核验");
+  });
+
+  it("can refine candidate detours with provider walking routes", async () => {
+    const [candidate] = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:B040",
+          source: "amap",
+          sourcePlaceId: "B040",
+          name: "六朝文化空间",
+          address: "长江路 3 号",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.797, lat: 32.0438, system: "gcj02" },
+          poiType: "科教文化服务;博物馆",
+          openingHours: "09:00-17:00",
+          telephone: null,
+          providerRating: null,
+          providerCost: null,
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["历史"],
+        acceptedTypes: ["博物馆"],
+        maxResults: 1,
+      },
+    );
+    const refined = await refineCandidatesWithProviderDetours(
+      demoRoute,
+      [candidate],
+      async ({ origin, destination }) => ({
+        fromPlaceId: origin.id,
+        toPlaceId: destination.id,
+        distanceMeters: 240,
+        durationMinutes: 4,
+        source: "provider",
+        provider: "amap",
+      }),
+      ["历史"],
+    );
+
+    expect(refined.providerLegs).toBeGreaterThan(0);
+    expect(refined.candidates[0].reasons[0]).toContain("高德步行复核");
   });
 
   it("rejects nearby duplicate AMap places with similar names", () => {

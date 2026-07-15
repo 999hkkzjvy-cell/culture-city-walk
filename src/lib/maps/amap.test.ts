@@ -39,6 +39,8 @@ describe("amap url helpers", () => {
         name: "测试地点",
         cityname: "南京市",
         location: "118.78,32.05",
+        openingHours: "09:00-17:00",
+        telephone: "025-12345678",
       }),
     ).toEqual(
       expect.objectContaining({
@@ -46,6 +48,8 @@ describe("amap url helpers", () => {
         sourcePlaceId: "poi-1",
         verificationStatus: "verified",
         coordinate: { lng: 118.78, lat: 32.05, system: "gcj02" },
+        openingHours: "09:00-17:00",
+        telephone: "025-12345678",
       }),
     );
   });

@@ -19,11 +19,16 @@ export type Place = {
   themes: Theme[];
   mustVisit?: boolean;
   stayMinutes: number;
+  routeRole?: "start" | "middle" | "end";
   source?: "amap" | "manual" | "seed" | "demo";
   sourcePlaceId?: string | null;
   coordinate?: Coordinate | null;
   coordinateSystem?: CoordinateSystem;
   verificationStatus?: PlaceVerificationStatus;
+  openingHours?: string | null;
+  telephone?: string | null;
+  providerRating?: string | null;
+  providerCost?: string | null;
 };
 
 export type RouteStop = Place & {
@@ -47,6 +52,7 @@ export type RouteDraft = {
   title: string;
   mode: PlanningMode;
   dateLabel: string;
+  startTime: string;
   durationHours: number;
   walkingRangeKm: string;
   themes: Theme[];
@@ -68,6 +74,7 @@ export const defaultDraft: RouteDraft = {
   title: "书页与旧城之间",
   mode: "complete",
   dateLabel: "今天",
+  startTime: "09:30",
   durationHours: 5,
   walkingRangeKm: "5-10 km",
   themes: ["文学", "历史", "建筑", "书店"],
@@ -88,6 +95,7 @@ export const demoRoute: RoutePlan = {
       themes: ["文学", "书店"],
       mustVisit: true,
       stayMinutes: 45,
+      routeRole: "middle",
       source: "demo",
       sourcePlaceId: "librairie",
       coordinate: { lng: 118.7734, lat: 32.0526, system: "gcj02" },
@@ -103,6 +111,7 @@ export const demoRoute: RoutePlan = {
       address: "五台山片区",
       themes: ["建筑", "历史"],
       stayMinutes: 25,
+      routeRole: "middle",
       source: "demo",
       sourcePlaceId: "gym",
       coordinate: { lng: 118.7716, lat: 32.055, system: "gcj02" },
@@ -126,6 +135,7 @@ export const demoRoute: RoutePlan = {
       themes: ["历史", "建筑"],
       mustVisit: true,
       stayMinutes: 70,
+      routeRole: "middle",
       source: "demo",
       sourcePlaceId: "presidential-palace",
       coordinate: { lng: 118.7953, lat: 32.0454, system: "gcj02" },
@@ -148,6 +158,7 @@ export const demoRoute: RoutePlan = {
       address: "汉府街",
       themes: ["历史"],
       stayMinutes: 35,
+      routeRole: "middle",
       source: "demo",
       sourcePlaceId: "meiyuan",
       coordinate: { lng: 118.8032, lat: 32.044, system: "gcj02" },
@@ -170,6 +181,7 @@ export const demoRoute: RoutePlan = {
       address: "长江路周边",
       themes: ["建筑", "历史"],
       stayMinutes: 30,
+      routeRole: "middle",
       source: "demo",
       sourcePlaceId: "xuanwu",
       coordinate: { lng: 118.8061, lat: 32.0468, system: "gcj02" },
@@ -202,6 +214,10 @@ export function calculateRouteTotals(stops: RouteStop[]) {
       walkingMeters: 0,
     },
   );
+}
+
+export function isExperienceStop(stop: Pick<RouteStop, "routeRole">) {
+  return stop.routeRole !== "start" && stop.routeRole !== "end";
 }
 
 export function getThemeSummary(themes: Theme[]) {

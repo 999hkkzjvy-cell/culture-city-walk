@@ -1,4 +1,5 @@
 import type { RouteCandidate } from "@/lib/route-candidates";
+import type { PlaceCandidate } from "@/lib/maps/types";
 import {
   demoRoute,
   type RouteDraft,
@@ -68,6 +69,11 @@ export type RouteSnapshotSummary = {
   candidateCount: number;
   createdAt: string;
 };
+
+type PlaceInsertWithLocalId =
+  Database["public"]["Tables"]["places"]["Insert"] & {
+    localId: string;
+  };
 
 export interface RouteRepository {
   list(): Promise<SavedRouteSummary[]>;
@@ -266,6 +272,7 @@ class SupabaseRouteRepository implements RouteRepository {
       title: route.title,
       mode: route.explore_mode as RoutePlan["mode"],
       dateLabel: String(preferences.dateLabel ?? "今天"),
+      startTime: String(preferences.startTime ?? "09:30"),
       durationHours: Number(preferences.durationHours ?? 5),
       walkingRangeKm: String(preferences.walkingRangeKm ?? "5-10 km"),
       themes: Array.isArray(route.theme_filters)
@@ -297,6 +304,7 @@ class SupabaseRouteRepository implements RouteRepository {
       theme_filters: route.themes as Json,
       preferences: {
         dateLabel: route.dateLabel,
+        startTime: route.startTime,
         durationHours: route.durationHours,
         walkingRangeKm: route.walkingRangeKm,
         mustVisits: route.mustVisits,
@@ -315,7 +323,8 @@ class SupabaseRouteRepository implements RouteRepository {
       throw error;
     }
 
-    await this.replaceStops(savedRoute.id, route.stops);
+    const stopPlaceIds = await this.upsertStopPlaces(route.stops);
+    await this.replaceStops(savedRoute.id, route.stops, stopPlaceIds);
 
     return {
       id: savedRoute.id,
@@ -345,9 +354,17 @@ class SupabaseRouteRepository implements RouteRepository {
       return;
     }
 
+    const candidatePlaceIds = await this.upsertCandidatePlaces(
+      input.candidates,
+    );
     const payload = dedupeCandidatePayload(
       input.candidates.map((candidate) =>
-        routeCandidateToInsert(routeId, candidate, input.actions[candidate.id]),
+        routeCandidateToInsert(
+          routeId,
+          candidate,
+          input.actions[candidate.id],
+          candidatePlaceIds.get(candidate.id) ?? null,
+        ),
       ),
     );
 
@@ -513,20 +530,22 @@ class SupabaseRouteRepository implements RouteRepository {
       throw error;
     }
 
-    return (data ?? []).map((share) => ({
-      code: share.share_code,
-      url: `/share/?code=${encodeURIComponent(share.share_code)}`,
-      expiresAt: share.expires_at,
-      allowCopy: share.allow_copy,
-      revokedAt: share.revoked_at,
-      createdAt: share.created_at,
-    }));
+    return (data ?? [])
+      .filter((share) => !share.revoked_at)
+      .map((share) => ({
+        code: share.share_code,
+        url: `/share/?code=${encodeURIComponent(share.share_code)}`,
+        expiresAt: share.expires_at,
+        allowCopy: share.allow_copy,
+        revokedAt: share.revoked_at,
+        createdAt: share.created_at,
+      }));
   }
 
   async revokeShare(code: string) {
     const { error } = await this.client
       .from("route_shares")
-      .update({ revoked_at: new Date().toISOString() })
+      .delete()
       .eq("share_code", code);
 
     if (error) {
@@ -534,7 +553,11 @@ class SupabaseRouteRepository implements RouteRepository {
     }
   }
 
-  private async replaceStops(routeId: string, stops: RouteStop[]) {
+  private async replaceStops(
+    routeId: string,
+    stops: RouteStop[],
+    placeIds = new Map<string, string>(),
+  ) {
     const { error: deleteError } = await this.client
       .from("route_stops")
       .delete()
@@ -546,10 +569,11 @@ class SupabaseRouteRepository implements RouteRepository {
 
     const payload = stops.map((stop, index) => ({
       route_id: routeId,
+      place_id: placeIds.get(stop.id) ?? null,
       sort_order: index,
       arrival_time: stop.time,
       stay_minutes: stop.stayMinutes,
-      constraint_type: stop.mustVisit ? "must_visit" : "recommended",
+      constraint_type: routeStopConstraintType(stop),
       source_type: "user",
       title_snapshot: stop.name,
       note: {
@@ -563,6 +587,11 @@ class SupabaseRouteRepository implements RouteRepository {
         coordinateSystem: stop.coordinateSystem,
         verificationStatus: stop.verificationStatus,
         mustVisit: Boolean(stop.mustVisit),
+        routeRole: stop.routeRole ?? "middle",
+        openingHours: stop.openingHours ?? null,
+        telephone: stop.telephone ?? null,
+        providerRating: stop.providerRating ?? null,
+        providerCost: stop.providerCost ?? null,
       },
       walking_from_previous: stop.walkingFromPrevious ?? null,
     }));
@@ -576,6 +605,56 @@ class SupabaseRouteRepository implements RouteRepository {
     if (error) {
       throw error;
     }
+  }
+
+  private async upsertStopPlaces(stops: RouteStop[]) {
+    const places = stops.map((stop) => placeInsertFromStop(stop));
+    return this.upsertPlaces(places);
+  }
+
+  private async upsertCandidatePlaces(candidates: RouteCandidate[]) {
+    const places = candidates.map((candidate) =>
+      placeInsertFromCandidate(candidate.place, candidate.id),
+    );
+    return this.upsertPlaces(places);
+  }
+
+  private async upsertPlaces(places: PlaceInsertWithLocalId[]) {
+    const payload = dedupePlacePayload(places);
+    const result = new Map<string, string>();
+
+    if (payload.length === 0) {
+      return result;
+    }
+
+    const { data, error } = await this.client
+      .from("places")
+      .upsert(payload.map(stripLocalId), {
+        onConflict: "source,source_place_id",
+      })
+      .select("id,source,source_place_id");
+
+    if (error) {
+      throw error;
+    }
+
+    const rowsByKey = new Map(
+      (data ?? []).map((row) => [
+        placeKey(row.source, row.source_place_id),
+        row.id,
+      ]),
+    );
+
+    payload.forEach((place) => {
+      const placeId = rowsByKey.get(
+        placeKey(place.source, place.source_place_id),
+      );
+      if (placeId) {
+        result.set(place.localId, placeId);
+      }
+    });
+
+    return result;
   }
 
   private async getNextSnapshotVersion(routeId: string) {
@@ -663,9 +742,11 @@ function routeCandidateToInsert(
   routeId: string,
   candidate: RouteCandidate,
   action: StoredCandidateAction | undefined,
+  placeId: string | null,
 ): Database["public"]["Tables"]["route_candidates"]["Insert"] {
   return {
     route_id: routeId,
+    place_id: placeId,
     source: candidate.place.source,
     source_place_id: candidate.place.sourcePlaceId,
     title_snapshot: candidate.place.name,
@@ -683,6 +764,89 @@ function routeCandidateToInsert(
     risks: candidate.risks as Json,
     cache_key: candidate.cacheKey,
   };
+}
+
+function placeInsertFromStop(stop: RouteStop): PlaceInsertWithLocalId {
+  const source = stop.source ?? "manual";
+  const sourcePlaceId = stop.sourcePlaceId ?? stop.id;
+
+  return {
+    localId: stop.id,
+    source,
+    source_place_id: sourcePlaceId,
+    name: stop.name,
+    address: stop.address || null,
+    city: stop.area || "未知城市",
+    district: stop.area || null,
+    adcode: null,
+    amap_lng: stop.coordinate?.lng ?? null,
+    amap_lat: stop.coordinate?.lat ?? null,
+    coordinate_system:
+      stop.coordinate?.system ?? stop.coordinateSystem ?? "gcj02",
+    poi_type: null,
+    verification_status: stop.verificationStatus ?? "source_pending",
+    raw_provider_data: {
+      routeStopId: stop.id,
+      themes: stop.themes,
+      mustVisit: Boolean(stop.mustVisit),
+      routeRole: stop.routeRole ?? "middle",
+      openingHours: stop.openingHours ?? null,
+      telephone: stop.telephone ?? null,
+      providerRating: stop.providerRating ?? null,
+      providerCost: stop.providerCost ?? null,
+    },
+  };
+}
+
+function placeInsertFromCandidate(
+  place: PlaceCandidate,
+  localId: string,
+): PlaceInsertWithLocalId {
+  return {
+    localId,
+    source: place.source,
+    source_place_id: place.sourcePlaceId ?? place.id,
+    name: place.name,
+    address: place.address,
+    city: place.city || "未知城市",
+    district: place.district,
+    adcode: place.adcode,
+    amap_lng: place.coordinate?.lng ?? null,
+    amap_lat: place.coordinate?.lat ?? null,
+    coordinate_system: place.coordinate?.system ?? "gcj02",
+    poi_type: place.poiType,
+    verification_status: place.verificationStatus,
+    raw_provider_data: {
+      openingHours: place.openingHours ?? null,
+      telephone: place.telephone ?? null,
+      providerRating: place.providerRating ?? null,
+      providerCost: place.providerCost ?? null,
+    },
+  };
+}
+
+function dedupePlacePayload(places: PlaceInsertWithLocalId[]) {
+  const seen = new Set<string>();
+
+  return places.filter((place) => {
+    const key = placeKey(place.source, place.source_place_id);
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function placeKey(source: string, sourcePlaceId: string | null | undefined) {
+  return `${source}:${sourcePlaceId ?? ""}`;
+}
+
+function stripLocalId({ localId, ...place }: PlaceInsertWithLocalId) {
+  void localId;
+  return place;
 }
 
 function dedupeCandidatePayload(
@@ -787,10 +951,40 @@ function mapStopFromRow(row: {
     coordinateSystem: parseCoordinateSystem(note.coordinateSystem),
     verificationStatus: parseVerificationStatus(note.verificationStatus),
     mustVisit: Boolean(note.mustVisit),
+    routeRole: parseRouteRole(note.routeRole),
+    openingHours:
+      typeof note.openingHours === "string" ? note.openingHours : null,
+    telephone: typeof note.telephone === "string" ? note.telephone : null,
+    providerRating:
+      typeof note.providerRating === "string" ? note.providerRating : null,
+    providerCost:
+      typeof note.providerCost === "string" ? note.providerCost : null,
     walkingFromPrevious: row.walking_from_previous
       ? (row.walking_from_previous as RouteStop["walkingFromPrevious"])
       : undefined,
   };
+}
+
+function routeStopConstraintType(stop: RouteStop) {
+  if (stop.routeRole === "start") {
+    return "start";
+  }
+
+  if (stop.routeRole === "end") {
+    return "end";
+  }
+
+  if (stop.themes.includes("美食")) {
+    return "meal";
+  }
+
+  return stop.mustVisit ? "must_visit" : "recommended";
+}
+
+function parseRouteRole(value: unknown): RouteStop["routeRole"] {
+  return ["start", "middle", "end"].includes(String(value))
+    ? (value as RouteStop["routeRole"])
+    : "middle";
 }
 
 function parseStopSource(value: unknown): RouteStop["source"] {

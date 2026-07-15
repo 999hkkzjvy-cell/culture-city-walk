@@ -47,11 +47,13 @@ test("planning page can save a local draft and open route reader", async ({
 
   await page.getByRole("link", { name: /查看生成路线/ }).click();
   await expect(
-    page.getByRole("heading", { name: /南京 · 文学漫游/ }),
+    page.getByRole("heading", { name: /书页与旧城之间/ }),
   ).toBeVisible();
 });
 
-test("planning page can edit city and must-visit places", async ({ page }) => {
+test("planning page requires real provider places for must-visit stops", async ({
+  page,
+}) => {
   await page.goto("/plan/");
 
   await expect(
@@ -65,13 +67,9 @@ test("planning page can edit city and must-visit places", async ({ page }) => {
   await page.getByLabel("新增必去地点").press("Enter");
   await expect(
     page.getByRole("button", { name: "移除地点 拙政园" }),
-  ).toBeVisible();
-  await expect(page.getByLabel("路线预案站点")).toContainText("拙政园");
-
-  await page.getByRole("button", { name: "移除地点 拙政园" }).click();
-  await expect(
-    page.getByRole("button", { name: "移除地点 拙政园" }),
   ).toHaveCount(0);
+  await expect(page.getByLabel("路线预案站点")).not.toContainText("拙政园");
+  await expect(page.locator(".must-visit-search-status")).toBeVisible();
 
   await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page.getByRole("button", { name: "草稿已保存" })).toBeVisible();
@@ -189,7 +187,9 @@ test("route journey mode archives check-in photos", async ({ page }) => {
     ),
   });
 
-  await expect(page.getByText("打卡图已存档在本地设备。")).toBeVisible();
+  await expect(
+    page.getByText(/打卡图已存入本地|打卡图已同步到云端/),
+  ).toBeVisible();
   await expect(page.getByRole("img", { name: /打卡图/ })).toBeVisible();
 
   await page.getByRole("button", { name: /删除打卡图/ }).click();

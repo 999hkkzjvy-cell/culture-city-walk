@@ -1705,6 +1705,45 @@ button {
   line-height: 1.7;
 }
 
+.shared-route-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
+.shared-route .route-list-item {
+  width: 100%;
+  text-align: left;
+}
+
+.shared-route .route-list-item.selected {
+  border-color: rgb(101 73 38 / 55%);
+  background: rgb(255 250 240 / 82%);
+}
+
+.shared-reading {
+  padding: 16px;
+  border: 1px solid rgb(41 37 30 / 12%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 78%);
+}
+
+.shared-reading span {
+  color: #7a4f38;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shared-reading h3 {
+  margin: 6px 0 8px;
+  font-family: var(--serif);
+}
+
+.shared-reading p {
+  margin: 8px 0;
+  line-height: 1.75;
+}
+
 .auth-panel p,
 .auth-note,
 .auth-message,
@@ -2299,6 +2338,31 @@ button {
 
 .route-share-manager p {
   margin: 0;
+}
+
+.meal-preferences {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chip-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.answer-input.compact {
+  max-width: 180px;
+}
+
+.opening-warning {
+  color: #b42318 !important;
+  font-weight: 800;
+}
+
+.route-role-note {
+  color: #6f746c;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .share-list {
@@ -3209,6 +3273,33 @@ button {
   align-items: start;
 }
 
+.journey-completion {
+  display: grid;
+  width: min(1120px, calc(100% - 48px));
+  gap: 8px;
+  margin: 18px auto 0;
+  padding: 20px;
+  border: 1px solid rgb(41 37 30 / 14%);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.journey-completion p,
+.journey-completion h2,
+.journey-completion span,
+.journey-completion strong {
+  margin: 0;
+}
+
+.journey-completion h2 {
+  font-size: 36px;
+}
+
+.journey-completion button {
+  width: max-content;
+  margin-top: 6px;
+}
+
 .journey-route-overview {
   position: sticky;
   top: 88px;
@@ -3413,6 +3504,10 @@ button {
 
 .journey-upload-status.ready {
   color: var(--green-primary);
+}
+
+.journey-upload-status.local {
+  color: #7a5a27;
 }
 
 .journey-upload-status.error {

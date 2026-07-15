@@ -26,17 +26,24 @@ import {
   type StopThemeContent,
 } from "@/lib/ai/route-collaboration";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
-import { demoRoute, type RoutePlan, type RouteStop } from "@/lib/route";
+import {
+  demoRoute,
+  isExperienceStop,
+  type RoutePlan,
+  type RouteStop,
+} from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
 import {
-  readCheckInPhotos,
+  archiveCheckInPhoto,
+  deleteCheckInPhoto,
+  listCheckInPhotos,
+} from "@/lib/repositories/checkin-photo-repository";
+import {
   readJourneyState,
   readRoutePlan,
-  removeCheckInPhoto,
   routePlanStorageKey,
   saveCandidateState,
-  saveCheckInPhoto,
   saveJourneyState,
   saveRoutePlan,
   type StoredCandidateAction,
@@ -54,7 +61,7 @@ let cachedJourneyRoute:
   | undefined;
 
 type RemoteRouteState = "idle" | "loading" | "ready" | "not-found" | "error";
-type UploadState = "idle" | "loading" | "ready" | "error";
+type UploadState = "idle" | "loading" | "ready" | "local" | "error";
 type DeepReadingState = {
   status: "loading" | "ready" | "error";
   content?: StopThemeContent;
@@ -82,11 +89,10 @@ export function RouteJourneyMode() {
   const [deepReadings, setDeepReadings] = useState<
     Record<string, DeepReadingState>
   >({});
-  const [photos, setPhotos] = useState<StoredCheckInPhoto[]>(() =>
-    typeof window === "undefined" ? [] : readCheckInPhotos(route.id),
-  );
+  const [photos, setPhotos] = useState<StoredCheckInPhoto[]>([]);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadMessage, setUploadMessage] = useState("");
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const selectedStop =
     routeKernel.stops.find((stop) => stop.id === selectedStopId) ??
@@ -104,8 +110,21 @@ export function RouteJourneyMode() {
     ? (deepReadings[selectedStop.id]?.content ??
       generateStopThemeContentWithFallback(selectedStop))
     : null;
-  const completedCount = journey.arrivedStopIds.length;
-  const skippedCount = journey.skippedStopIds.length;
+  const experienceStops = routeKernel.stops.filter(isExperienceStop);
+  const experienceStopIds = new Set(experienceStops.map((stop) => stop.id));
+  const completedCount = journey.arrivedStopIds.filter((id) =>
+    experienceStopIds.has(id),
+  ).length;
+  const skippedCount = journey.skippedStopIds.filter((id) =>
+    experienceStopIds.has(id),
+  ).length;
+  const checkInPhotoCount = photos.filter((photo) =>
+    experienceStopIds.has(photo.stopId),
+  ).length;
+  const journeyScore = Math.min(
+    100,
+    completedCount * 18 + checkInPhotoCount * 10,
+  );
   const totalStayMinutes = useMemo(
     () => route.stops.reduce((total, stop) => total + stop.stayMinutes, 0),
     [route.stops],
@@ -125,7 +144,11 @@ export function RouteJourneyMode() {
           : (route.stops[0]?.id ?? ""),
       );
       setJourney(readJourneyState(route.id));
-      setPhotos(readCheckInPhotos(route.id));
+      void listCheckInPhotos(route.id).then((nextPhotos) => {
+        if (isMounted) {
+          setPhotos(nextPhotos);
+        }
+      });
     });
 
     return () => {
@@ -201,6 +224,12 @@ export function RouteJourneyMode() {
   }
 
   function markArrived(stopId: string) {
+    const stop = route.stops.find((item) => item.id === stopId);
+
+    if (stop && !isExperienceStop(stop)) {
+      return;
+    }
+
     updateJourney({
       ...journey,
       arrivedStopIds: [...new Set([...journey.arrivedStopIds, stopId])],
@@ -219,6 +248,12 @@ export function RouteJourneyMode() {
   }
 
   function skipStop(stopId: string) {
+    const stop = route.stops.find((item) => item.id === stopId);
+
+    if (stop && !isExperienceStop(stop)) {
+      return;
+    }
+
     updateJourney({
       ...journey,
       skippedStopIds: [...new Set([...journey.skippedStopIds, stopId])],
@@ -229,6 +264,7 @@ export function RouteJourneyMode() {
 
   function resetJourney() {
     updateJourney(emptyJourneyState(route.id));
+    setIsCompleted(false);
   }
 
   function requestDeepReading(stop: RouteStop) {
@@ -295,19 +331,19 @@ export function RouteJourneyMode() {
 
     try {
       const photo = await buildStoredPhoto(file, route.id, selectedStop.id);
-      saveCheckInPhoto(photo);
-      setPhotos(readCheckInPhotos(route.id));
-      setUploadState("ready");
-      setUploadMessage("打卡图已存档在本地设备。");
+      const result = await archiveCheckInPhoto(photo);
+      setPhotos(await listCheckInPhotos(route.id));
+      setUploadState(result.synced ? "ready" : "local");
+      setUploadMessage(result.message);
     } catch {
       setUploadState("error");
       setUploadMessage("打卡图存档失败，可能是浏览器本地空间不足。");
     }
   }
 
-  function deletePhoto(photoId: string) {
-    removeCheckInPhoto(photoId);
-    setPhotos(readCheckInPhotos(route.id));
+  async function deletePhoto(photo: StoredCheckInPhoto) {
+    await deleteCheckInPhoto(photo);
+    setPhotos(await listCheckInPhotos(route.id));
   }
 
   const navigationUrl =
@@ -354,13 +390,28 @@ export function RouteJourneyMode() {
             </span>
             <span>
               <CheckCircle2 size={16} />
-              已到达 {completedCount}/{route.stops.length}
+              已到达 {completedCount}/{experienceStops.length}
             </span>
           </div>
         </div>
       </section>
 
       <RouteLoadStatus state={remoteRouteState} />
+
+      {isCompleted ? (
+        <section className="journey-completion">
+          <p>路线完成</p>
+          <h2>{journeyScore} 分</h2>
+          <span>
+            完成 {completedCount}/{experienceStops.length} 个体验站点，上传{" "}
+            {checkInPhotoCount} 张打卡图。
+          </span>
+          <strong>{buildPraiseCopy(journeyScore, route.city)}</strong>
+          <button onClick={() => setIsCompleted(false)} type="button">
+            继续查看行程存档
+          </button>
+        </section>
+      ) : null}
 
       <section className="journey-mode-layout">
         <aside className="journey-route-overview" aria-label="路线概览">
@@ -377,7 +428,7 @@ export function RouteJourneyMode() {
           <div className="journey-progress-summary">
             <span>已到达 {completedCount}</span>
             <span>
-              未完成 {route.stops.length - completedCount - skippedCount}
+              未完成 {experienceStops.length - completedCount - skippedCount}
             </span>
             <span>暂不游玩 {skippedCount}</span>
           </div>
@@ -400,7 +451,10 @@ export function RouteJourneyMode() {
                   <span className="journey-stop-copy">
                     <strong>{stop.name}</strong>
                     <small>
-                      {stop.calculatedTime} · 拟游玩 {stop.stayMinutes} 分钟
+                      {stop.calculatedTime}
+                      {isExperienceStop(stop)
+                        ? ` · 拟游玩 ${stop.stayMinutes} 分钟`
+                        : " · 导航节点"}
                     </small>
                     <small>
                       {stop.walkingFromPrevious
@@ -409,7 +463,15 @@ export function RouteJourneyMode() {
                     </small>
                   </span>
                   <em>
-                    {isArrived ? "已到达" : isSkipped ? "已跳过" : "进行中"}
+                    {!isExperienceStop(stop)
+                      ? stop.routeRole === "end"
+                        ? "终点"
+                        : "起点"
+                      : isArrived
+                        ? "已到达"
+                        : isSkipped
+                          ? "已跳过"
+                          : "进行中"}
                   </em>
                 </button>
               );
@@ -427,47 +489,53 @@ export function RouteJourneyMode() {
                   </p>
                   <h2>{selectedStop.name}</h2>
                   <span>
-                    拟游玩 {selectedStop.stayMinutes} 分钟 ·{" "}
+                    {isExperienceStop(selectedStop)
+                      ? `拟游玩 ${selectedStop.stayMinutes} 分钟 · `
+                      : "导航节点 · "}
                     {selectedStop.address}
                   </span>
                 </div>
                 <div className="journey-stop-actions">
-                  <button
-                    className={
-                      journey.arrivedStopIds.includes(selectedStop.id)
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      journey.arrivedStopIds.includes(selectedStop.id)
-                        ? markActive(selectedStop.id)
-                        : markArrived(selectedStop.id)
-                    }
-                    type="button"
-                  >
-                    <CheckCircle2 size={15} />
-                    {journey.arrivedStopIds.includes(selectedStop.id)
-                      ? "取消到达"
-                      : "标记到达"}
-                  </button>
-                  <button
-                    className={
-                      journey.skippedStopIds.includes(selectedStop.id)
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      journey.skippedStopIds.includes(selectedStop.id)
-                        ? markActive(selectedStop.id)
-                        : skipStop(selectedStop.id)
-                    }
-                    type="button"
-                  >
-                    <SkipForward size={15} />
-                    {journey.skippedStopIds.includes(selectedStop.id)
-                      ? "恢复游玩"
-                      : "暂不游玩"}
-                  </button>
+                  {isExperienceStop(selectedStop) ? (
+                    <>
+                      <button
+                        className={
+                          journey.arrivedStopIds.includes(selectedStop.id)
+                            ? "selected"
+                            : ""
+                        }
+                        onClick={() =>
+                          journey.arrivedStopIds.includes(selectedStop.id)
+                            ? markActive(selectedStop.id)
+                            : markArrived(selectedStop.id)
+                        }
+                        type="button"
+                      >
+                        <CheckCircle2 size={15} />
+                        {journey.arrivedStopIds.includes(selectedStop.id)
+                          ? "取消到达"
+                          : "标记到达"}
+                      </button>
+                      <button
+                        className={
+                          journey.skippedStopIds.includes(selectedStop.id)
+                            ? "selected"
+                            : ""
+                        }
+                        onClick={() =>
+                          journey.skippedStopIds.includes(selectedStop.id)
+                            ? markActive(selectedStop.id)
+                            : skipStop(selectedStop.id)
+                        }
+                        type="button"
+                      >
+                        <SkipForward size={15} />
+                        {journey.skippedStopIds.includes(selectedStop.id)
+                          ? "恢复游玩"
+                          : "暂不游玩"}
+                      </button>
+                    </>
+                  ) : null}
                   <a href={navigationUrl} rel="noreferrer" target="_blank">
                     <Navigation size={15} />
                     {selectedIndex === 0 ? "高德查看" : "高德导航"}
@@ -475,7 +543,8 @@ export function RouteJourneyMode() {
                 </div>
               </div>
 
-              <article className="journey-reading-block">
+              {isExperienceStop(selectedStop) ? (
+                <article className="journey-reading-block">
                 <div className="journey-reading-title">
                   <span>
                     {deepReadings[selectedStop.id]?.content
@@ -510,9 +579,20 @@ export function RouteJourneyMode() {
                     </section>
                   ))}
                 </div>
-              </article>
+                </article>
+              ) : (
+                <article className="journey-reading-block">
+                  <div className="journey-reading-title">
+                    <span>导航节点</span>
+                  </div>
+                  <p>
+                    这一站用于确定路线起终点，不生成深度讲解、停留时间和打卡任务。
+                  </p>
+                </article>
+              )}
 
-              <section className="journey-task-block">
+              {isExperienceStop(selectedStop) ? (
+                <section className="journey-task-block">
                 <div>
                   <p>打卡任务</p>
                   <h3>把现场观察留下来</h3>
@@ -530,9 +610,11 @@ export function RouteJourneyMode() {
                     <p key={tip}>{tip}</p>
                   ))}
                 </div>
-              </section>
+                </section>
+              ) : null}
 
-              <section className="journey-photo-archive">
+              {isExperienceStop(selectedStop) ? (
+                <section className="journey-photo-archive">
                 <div className="journey-photo-heading">
                   <div>
                     <p>打卡图存档</p>
@@ -570,7 +652,9 @@ export function RouteJourneyMode() {
                           <span>{formatArchiveTime(photo.createdAt)}</span>
                           <button
                             aria-label={`删除打卡图 ${photo.fileName}`}
-                            onClick={() => deletePhoto(photo.id)}
+                            onClick={() => {
+                              void deletePhoto(photo);
+                            }}
                             type="button"
                           >
                             <Trash2 size={14} />
@@ -585,7 +669,18 @@ export function RouteJourneyMode() {
                     <span>还没有为这一站上传打卡图。</span>
                   </div>
                 )}
-              </section>
+                </section>
+              ) : null}
+              {selectedStop.routeRole === "end" ? (
+                <button
+                  className="primary-action compact"
+                  onClick={() => setIsCompleted(true)}
+                  type="button"
+                >
+                  <CheckCircle2 size={15} />
+                  完成路线
+                </button>
+              ) : null}
             </>
           ) : (
             <div className="journey-photo-empty">
@@ -722,4 +817,16 @@ function formatArchiveTime(value: string) {
   } catch {
     return value;
   }
+}
+
+function buildPraiseCopy(score: number, city: string) {
+  if (score >= 90) {
+    return `你把${city}读得很细：路线、现场和影像都留下了自己的证据。`;
+  }
+
+  if (score >= 60) {
+    return `这是一份扎实的${city}行程存档，已经有足够多的现场观察可以回看。`;
+  }
+
+  return `这次先留下路线骨架也很好，下次可以多上传几张现场照片，把记忆补完整。`;
 }

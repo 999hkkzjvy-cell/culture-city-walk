@@ -1,175 +1,157 @@
-# Phase 4/5 Status
+# 阶段 4/5 状态
 
-Date: 2026-07-15
+日期：2026-07-15
 
-## Scope
+## 范围
 
-Phase 4/5 development has a key split:
+阶段 4/5 的开发分为两层：
 
-- Product flow, data contracts, validation, scoring, and fallback UI can be
-  developed before external API keys are available.
-- Real AMap POI search, real detour calculation, and DeepSeek calls still need
-  API configuration before they can be treated as provider-backed output.
+- 产品流程、数据契约、校验、评分和 fallback UI 可以在外部 API 完全稳定前先开发。
+- 真实高德 POI 搜索、真实绕行计算和 DeepSeek 调用，需要 API 配置可用后才能视为 provider-backed 输出。
 
-## Implemented Before API Configuration
+当前应用已按“provider 可能可用”的方式实现，并在 provider 未配置或调用失败时保留本地 fallback。
 
-- Complete-mode route candidate pipeline:
-  - candidate type taxonomy
-  - repeated route POIs are allowed so loops and return-to-origin routes can be planned
-  - best insertion-point estimation
-  - detour, theme, and diversity scoring
-  - `非常顺路` / `推荐` / `可考虑` bands
-  - candidate cache keys
-  - provenance and risk labels for locally seeded candidates
-- Planning page Complete-mode UI:
-  - natural-language route goal input
-  - city changes reset stale route preview and candidate state so old-city stops
-    are not reused as new-city route context
-  - generate along-route candidates
-  - candidate type filters
-  - grouped candidate bands
-  - separate pending, processed, and ignored candidate sections
-  - restore ignored candidates and withdraw processed candidate decisions
-  - add to route plan, mark as backup, or ignore
-  - undo candidate insertion
-  - editable route preview with move, delete, and stay-time controls
-  - recalculated timeline, walking distance, end time, and route impact summary
-  - local persistence for route preview and candidate actions
-  - local template source and zero-cost usage label
-- Route editing foundation:
-  - pure candidate insertion function
-  - estimated leg recalculation after insert, delete, move, or stay-time edits
-  - repeated POI support with distinct route-stop identities
-  - minimum two-stop route guard for established routes, while one-stop fresh
-    city drafts can still be cleared
-- Route reader local preview:
-  - route reader prefers the locally saved planning preview
-  - saved candidate insertions, ordering, and stay-time edits survive refresh
-  - route reader falls back to the demo route when no local preview exists
-- Cloud/local bridge:
-  - route-page save/share actions now use the current local route preview
-  - route-page cloud actions now expose the same share manager as route library,
-    including create/copy/revoke states after the route has a cloud ID
-  - save/share/snapshot creation migrates local `demo` previews to the saved
-    cloud route ID before follow-up operations, preventing repeated cloud route
-    creation after a partial candidate-state sync failure
-  - cloud route stops persist coordinate/source/verification fields in
-    `route_stops.note`, so map rendering and AMap walking recalculation survive
-    cloud reloads
-  - library-page save action now saves the current local route preview
-  - signed-in auth panel can sync the current local preview to cloud storage
-  - signed-in auth panel prompts when the local preview has not been synced yet
-  - route-candidate snapshots and `joined` / `backup` / `ignored` actions are
-    saved through the route repository
-- Route reader editing:
-  - route reader exposes an edit mode
-  - stop stay time and note can be edited from the reader
-  - stops can be deleted from the reader while preserving the two-stop minimum
-  - edits are saved to the local route preview and survive refresh
-- Route reader fallback content:
-  - route title and summary can be generated from deterministic templates
-  - stop-level history/literature style content uses template fallback
-  - fallback story content is labeled as source-pending
-  - middle-stop expandable deep-read sections show concrete observation angles
-    and practical verification tips; start/end stops do not show deep-read UI
-  - when DeepSeek proxy is enabled, middle-stop deep reads can generate longer
-    architecture/history/anecdote content and check-in tasks on demand
-- Route in-progress experience:
-  - route detail links to `/journey/?id=...`
-  - journey mode uses a two-column layout with route overview on the left and
-    selected-stop deep reading/check-in tasks on the right
-  - left overview shows every stop's arrival time, transportation/walking data,
-    planned stay time, and progress state
-  - selected stop supports arrival/skip controls and AMap navigation
-  - check-in images are resized in the browser and archived in localStorage per
-    route and stop
-- Share experience:
-  - route-page share button scrolls to cloud share actions
-  - generated share links can be copied and revoked from route page or library
-  - share reader shows expiry state and source-verification note when connected
-- Repository candidate persistence:
-  - local repository stores candidate snapshots in localStorage
-  - Supabase repository replaces the current route's `route_candidates` rows on
-    save
-  - candidate rows include source, source POI ID, score, fit band, insertion
-    point, detour, stay time, reasons, risks, cache key, and status
-- Developer status panel:
-  - Supabase client configuration state
-  - AMap JS key configuration state
-  - AMap Web Service and AI provider pending states
-- Supabase schema foundation:
-  - `route_candidates` table for suggested / joined / backup / ignored states
-  - `route_ai_runs` table for prompt version, schema version, token, cost,
-    latency, and idempotency tracking
-  - owner-scoped RLS policies for both tables
-- AI collaboration fallback:
-  - structured intent schema
-  - route proposal schema
-  - stop theme-content schema
-  - local intent parser
-  - template candidate ranking and recommendation reasons
-  - proposal validation that rejects POI IDs outside the supplied set
-  - deterministic route title and summary fallback
-- Tests:
-  - candidate sorting and provenance tests
-  - candidate type-filter test
-  - route candidate insertion, move, delete, and stay-time tests
-  - local route plan and candidate-state storage tests
-  - route-reader local edit smoke test
-  - candidate processed-state smoke test
-- route-reader fallback story smoke test
-- route journey mode check-in photo smoke test
-- local intent parsing test
-  - invalid AI-created POI rejection test
-  - fallback candidate ranking test
-  - AI usage logging test
-  - Playwright Complete-mode candidate insertion smoke test
-  - Playwright saved-preview-to-route-reader smoke test
+## 已实现
 
-## AMap Integration Status
+- Complete 模式路线候选管线：
+  - 候选类型分类。
+  - 允许路线中重复 POI，以支持环线和回到起点的路线。
+  - 最佳插入点估算。
+  - 绕行、主题和多样性评分。
+  - `非常顺路` / `推荐` / `可考虑` 分组。
+  - 候选 cache key。
+  - 本地种子候选的来源和风险标签。
+- 规划页 Complete 模式 UI：
+  - 自然语言路线目标输入。
+  - 起始时间输入，并驱动预览时间线。
+  - 出发/必去/终点添加必须选择真实高德 provider 结果；自由文本手工插入已从 UI 移除。
+  - 可选含餐规划，询问人数、人均和菜系标签，并把餐厅纳入沿途候选。
+  - 切换城市会清空旧城市路线预览和候选状态，避免旧城市站点被误用为新城市路线上下文。
+  - 生成 10-15 个沿途候选。
+  - 候选类型筛选。
+  - 候选按适配分组。
+  - 待处理、已处理、已忽略候选分区。
+  - 可恢复已忽略候选，也可撤回已处理候选操作。
+  - 可加入路线、设为备用或忽略。
+  - 可撤销候选插入。
+  - 可编辑路线预览，包含移动、删除、按角色控制停留时间、路线标题生成和开放时间警告。
+  - 重新计算时间线、步行距离、结束时间和路线影响摘要。
+  - 本地持久化路线预览和候选操作状态。
+  - 本地模板来源与零成本 usage 标签。
+- 路线编辑基础：
+  - 纯函数候选插入。
+  - 插入、删除、移动或修改停留时间后重新估算路段。
+  - 使用不同 route-stop identity 支持重复 POI。
+  - 成熟路线保留至少两站保护；新城市一站草稿仍可清空。
+- 路线阅读页本地预览：
+  - 优先读取本地保存的规划预览。
+  - 保存后的候选插入、排序和停留时间编辑可在刷新后保留。
+  - 没有本地预览时回退到 demo route。
+- 云端/本地桥接：
+  - 路线页保存/分享操作使用当前本地路线预览。
+  - 路线页云端操作区接入与路线库一致的分享管理；云端 ID 可用后支持创建、复制、撤销/删除分享。
+  - 保存/分享/快照会先把本地 `demo` 预览迁移到云端 route id，避免候选状态同步部分失败后反复创建云端路线。
+  - 云端路线站点在 `route_stops.note` 中保存坐标、来源和核验字段，云端重新读取后地图和高德复核仍可用。
+  - 保存云端路线/候选时会 upsert 确认的站点和候选 POI 到 `places`，并关联 `route_stops.place_id` / `route_candidates.place_id`。
+  - 路线库保存动作保存当前本地路线预览。
+  - 登录后的认证面板可把当前本地预览同步到云端。
+  - 当本地预览尚未同步时，会提示登录用户同步。
+  - 路线候选快照和 `joined` / `backup` / `ignored` 状态通过 route repository 保存。
+- 路线阅读页编辑：
+  - 路线阅读页提供编辑模式。
+  - 可从阅读页编辑站点停留时间和备注。
+  - 可在保留两站最小限制的前提下删除站点。
+  - 编辑保存到本地路线预览并可在刷新后保留。
+- 路线阅读页 fallback 内容：
+  - 路线标题和摘要可由确定性模板生成。
+  - 站点级历史/文学风格内容使用模板 fallback。
+  - fallback 讲解标记为待核验来源。
+  - 体验站点可展开深读，展示具体观察角度和实践核验建议；显式出发/终点不展示深读、停留控制或打卡任务。
+  - DeepSeek proxy 启用时，体验站点深读可按需生成更长的建筑、历史、轶事内容和打卡任务。
+  - 路线阅读页展示高德开放时间元数据，并对可识别的到达时间冲突标红。
+  - 路线详情收藏按钮已有可见的 `已收藏` 状态。
+- 途中体验：
+  - 路线详情链接到 `/journey/?id=...`。
+  - 途中模式为两栏布局：左侧路线概览，右侧选中站点深读和打卡任务。
+  - 左侧展示每个站点的到达时间、交通/步行数据、计划停留和进度状态。
+  - 选中站点支持到达/跳过控制和高德导航。
+  - 显式出发/终点只是导航节点；只有体验站点计入到达和打卡进度。
+  - 打卡图片在浏览器中压缩，并按 route/stop 存入 localStorage；已登录的云端路线还会上传到私有 `route-media` Storage，并写入 `route_checkin_photos` 元数据。
+  - 终点站提供路线完成结算，按到达体验站点和上传照片生成分数与夸夸文案。
+- 分享体验：
+  - 路线页分享按钮滚动到云端分享操作区。
+  - 分享链接可在路线页或路线库创建、复制、撤销/删除，UI 不保留已撤销分享码。
+  - 分享页接入后展示过期状态和来源核验提示。
+  - 分享页提供深读文案，但不提供打卡任务，并支持本地收藏。
+  - 路线库 `我的收藏` 读取本地收藏路线，支持查看或载入 `/plan/` 修改。
+- Repository 候选持久化：
+  - 本地 repository 将候选快照保存到 localStorage。
+  - Supabase repository 保存时替换当前路线的 `route_candidates` 行。
+  - 候选行包含来源、来源 POI ID、分数、适配分组、插入点、绕行、停留时间、理由、风险、cache key 和状态。
+- 开发状态面板：
+  - Supabase client 配置状态。
+  - 高德 JS key 配置状态。
+  - 高德 Web Service 和 AI provider 状态。
+- Supabase schema 基础：
+  - `route_candidates` 表，用于 suggested / joined / backup / ignored 状态。
+  - `route_ai_runs` 表，用于 prompt 版本、schema 版本、token、成本、延迟和幂等追踪。
+  - `route_checkin_photos` 表，用于 route/stop 照片元数据，背后使用私有 `route-media` bucket。
+  - 这些表具备 owner-scoped RLS 策略。
+- AI 协作 fallback：
+  - 结构化 intent schema。
+  - 路线 proposal schema。
+  - 站点主题内容 schema。
+  - 本地 intent 解析器。
+  - 模板候选排序和推荐理由。
+  - proposal 校验会拒绝应用未提供的 POI ID。
+  - 确定性路线标题和摘要 fallback。
+- 测试：
+  - 候选排序和来源测试。
+  - 候选类型筛选测试。
+  - 路线候选插入、移动、删除和停留时间测试。
+  - 本地路线计划和候选状态存储测试。
+  - 路线阅读页本地编辑冒烟测试。
+  - 候选已处理状态冒烟测试。
+  - 路线阅读页 fallback 深读冒烟测试。
+  - 途中模式打卡图冒烟测试。
+  - 本地 intent 解析测试。
+  - 非法 AI POI 拒绝测试。
+  - fallback 候选排序测试。
+  - AI 用量记录测试。
+  - Playwright Complete 模式候选插入冒烟测试。
+  - Playwright 保存预览到路线阅读页冒烟测试。
 
-- AMap JS browser map rendering is implemented when the public JS key and
-  domain allowlist are configured.
-- AMap Web Service proxy is implemented through `amap-proxy`.
-- Live POI suggestions for must-visit places are implemented through the proxy.
-- Route polyline sampling and nearby POI search along sampled route points are
-  implemented for candidate generation.
-- Local seeded candidate fallback is Nanjing-only. Other cities only show
-  provider-returned same-city POIs; if AMap returns no usable same-city POIs,
-  the UI explains that the current city has no local fallback candidates instead
-  of showing Nanjing places.
+## 高德集成状态
 
-Still pending:
+- 配置公开 JS key 和域名白名单后，可渲染高德 JS 浏览器地图。
+- 高德 Web Service 通过 `amap-proxy` 代理。
+- 必去地点实时 POI 搜索通过代理实现。
+- 代理已支持步行、公交和驾车路线耗时；打车复用驾车耗时；骑行仍为本地估算。
+- 候选生成已实现 route polyline 采样和采样点附近 POI 搜索。
+- 候选绕行可用高德步行路线做 provider-backed 复核；失败路段回退本地估算。
+- 高德返回时会保留开放时间、电话、评分和人均；缺少开放时间时展示为待核验风险。
+- 本地种子候选仅限南京。其他城市只展示 provider 返回的同城 POI；如果高德没有返回可用同城 POI，UI 会说明当前城市没有本地 fallback，而不会展示南京地点。
 
-- Provider-backed detour calculation.
-- Persisting confirmed AMap POIs into `places`.
-- Provider-backed cycling/transit/driving/taxi route APIs.
-- Opening-hours/facts verification beyond provider category/name/address
-  filtering.
+仍待完成：
 
-## DeepSeek Integration Status
+- 如产品确实需要，补 provider-backed 骑行路线 API。
+- 高德元数据之外的事实核验，例如官方开放公告、预约/闭馆状态和来源引用。
 
-- `deepseek-proxy` Edge Function proxies DeepSeek JSON-mode requests for
-  planning intent parsing and candidate ranking.
-- The planning page uses DeepSeek when
-  `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`, and falls back to local templates
-  on missing config or provider failure.
-- Signed-in users' planning intent and candidate ranking runs are logged to
-  `route_ai_runs` with prompt version, model, token counts, latency, estimated
-  cost, and idempotency key.
+## DeepSeek 集成状态
 
-Still pending:
+- `deepseek-proxy` Edge Function 代理 DeepSeek JSON-mode 请求，用于规划 intent 解析和候选排序。
+- 当 `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true` 时，规划页使用 DeepSeek；缺少配置或 provider 失败时回退本地模板。
+- 登录用户的规划 intent 和候选排序运行记录会写入 `route_ai_runs`，包括 prompt 版本、model、token、延迟、估算成本和幂等键。
 
-- One repair retry on schema validation failure.
-- Enforcing daily user/project AI limits from the logged usage records.
+仍待完成：
 
-## Guardrails
+- schema 校验失败时增加一次修复重试。
+- 基于已记录 usage 执行每日用户限制和项目成本限制。
 
-- Locally seeded candidates are marked `source_pending` and must not be
-  presented as verified AMap results.
-- Locally seeded candidates must stay city-scoped; do not show the Nanjing seed
-  set for Shanghai or other city drafts.
-- AI fallback reasons are templates, not factual claims.
-- AI proposals must only reference route stops or candidates supplied by the
-  application.
-- AI failure must not block route saving or sharing.
+## 守护规则
+
+- 本地种子候选标记为 `source_pending`，不能展示成已验证高德结果。
+- 本地种子候选必须保持城市作用域，不要在上海或其他城市草稿中展示南京种子。
+- AI fallback 理由是模板，不是事实声明。
+- AI proposal 只能引用应用提供的路线站点或候选。
+- AI 失败不能阻塞路线保存或分享。

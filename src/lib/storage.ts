@@ -41,6 +41,8 @@ export type StoredCheckInPhoto = {
   fileName: string;
   mimeType: string;
   dataUrl: string;
+  storagePath?: string | null;
+  syncStatus?: "local" | "cloud";
   createdAt: string;
 };
 
@@ -49,6 +51,7 @@ export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
 export const routeSnapshotsStorageKey = "cultural-citywalk:route-snapshots";
 export const journeyStateStorageKey = "cultural-citywalk:journey-state";
 export const checkInPhotosStorageKey = "cultural-citywalk:check-in-photos";
+export const favoriteRoutesStorageKey = "cultural-citywalk:favorite-routes";
 export const syncedRouteSignatureStorageKey =
   "cultural-citywalk:synced-route-signature";
 
@@ -266,6 +269,44 @@ export function removeCheckInPhoto(photoId: string) {
   );
 }
 
+export function readFavoriteRoutes(): RoutePlan[] {
+  try {
+    const raw = window.localStorage.getItem(favoriteRoutesStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    return Array.isArray(parsed)
+      ? parsed.map((route) => normalizeRoutePlan(route))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isRouteFavorited(routeId: string) {
+  return readFavoriteRoutes().some((route) => route.id === routeId);
+}
+
+export function toggleFavoriteRoute(route: RoutePlan) {
+  const favorites = readFavoriteRoutes();
+  const exists = favorites.some((item) => item.id === route.id);
+  const nextFavorites = exists
+    ? favorites.filter((item) => item.id !== route.id)
+    : [
+        {
+          ...route,
+          updatedAt: new Date().toISOString(),
+        },
+        ...favorites,
+      ];
+
+  window.localStorage.setItem(
+    favoriteRoutesStorageKey,
+    JSON.stringify(nextFavorites.slice(0, 50)),
+  );
+
+  return !exists;
+}
+
 export function getRoutePlanSignature(route = readRoutePlan()) {
   return [
     route.id,
@@ -319,6 +360,8 @@ function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {
     mustVisits: Array.isArray(value.mustVisits)
       ? value.mustVisits
       : demoRoute.mustVisits,
+    startTime:
+      typeof value.startTime === "string" ? value.startTime : demoRoute.startTime,
     stops: Array.isArray(value.stops) ? value.stops : demoRoute.stops,
   };
 }

@@ -77,13 +77,14 @@ export function appendManualStopToRoute(
     area: input.area.trim() || route.city,
     address: input.address.trim() || "手工地点，地址待补充",
     themes: input.themes.length > 0 ? input.themes : route.themes.slice(0, 1),
-    stayMinutes: Math.min(240, Math.max(5, Math.round(input.stayMinutes))),
+    stayMinutes: normalizeStayMinutes(input.stayMinutes, input.placement),
+    routeRole: input.placement ?? "middle",
     source: "manual",
     sourcePlaceId: stopId,
     coordinate: null,
     coordinateSystem: "gcj02",
     verificationStatus: "user_confirmed",
-    time: "09:00",
+    time: getRouteStartTime(route),
     note:
       input.note?.trim() ||
       "手工确认地点。接入高德后可再补充坐标、开放状态和真实步行路线。",
@@ -105,13 +106,18 @@ export function appendPlaceCandidateToRoute(
     area: input.place.district ?? input.place.city,
     address: input.place.address ?? "地址待高德复核",
     themes: input.themes.length > 0 ? input.themes : route.themes.slice(0, 1),
-    stayMinutes: Math.min(240, Math.max(5, Math.round(input.stayMinutes))),
+    stayMinutes: normalizeStayMinutes(input.stayMinutes, input.placement),
+    routeRole: input.placement ?? "middle",
     source: input.place.source === "amap" ? "amap" : "manual",
     sourcePlaceId: input.place.sourcePlaceId ?? input.place.id,
     coordinate: input.place.coordinate,
     coordinateSystem: input.place.coordinate?.system ?? "gcj02",
     verificationStatus: input.place.verificationStatus,
-    time: "09:00",
+    openingHours: input.place.openingHours ?? null,
+    telephone: input.place.telephone ?? null,
+    providerRating: input.place.providerRating ?? null,
+    providerCost: input.place.providerCost ?? null,
+    time: getRouteStartTime(route),
     note:
       input.note?.trim() ||
       "高德已确认地点。出发前仍建议核验开放时间、预约和现场状态。",
@@ -185,13 +191,33 @@ export function updateStopStayMinutes(
   stopId: string,
   stayMinutes: number,
 ): RoutePlan {
-  const safeStayMinutes = Math.min(240, Math.max(5, Math.round(stayMinutes)));
-
   return rebuildRouteTimeline(
     route,
     route.stops.map((stop) =>
-      stop.id === stopId ? { ...stop, stayMinutes: safeStayMinutes } : stop,
+      stop.id === stopId
+        ? {
+            ...stop,
+            stayMinutes: normalizeStayMinutes(stayMinutes, stop.routeRole),
+          }
+        : stop,
     ),
+  );
+}
+
+export function updateRouteStartTime(route: RoutePlan, startTime: string) {
+  const nextStartTime = /^\d{2}:\d{2}$/.test(startTime)
+    ? startTime
+    : route.startTime;
+  const stops = route.stops.map((stop, index) =>
+    index === 0 ? { ...stop, time: nextStartTime } : stop,
+  );
+
+  return rebuildRouteTimeline(
+    {
+      ...route,
+      startTime: nextStartTime,
+    },
+    stops,
   );
 }
 
@@ -359,11 +385,16 @@ function routeStopFromCandidate(candidate: RouteCandidate): RouteStop {
     address: candidate.place.address ?? "地址待高德复核",
     themes: candidate.themes,
     stayMinutes: candidate.stayMinutes,
+    routeRole: "middle",
     source: candidate.place.source === "amap" ? "amap" : "manual",
     sourcePlaceId: candidate.place.sourcePlaceId,
     coordinate: candidate.place.coordinate,
     coordinateSystem: candidate.place.coordinate?.system,
     verificationStatus: candidate.place.verificationStatus,
+    openingHours: candidate.place.openingHours ?? null,
+    telephone: candidate.place.telephone ?? null,
+    providerRating: candidate.place.providerRating ?? null,
+    providerCost: candidate.place.providerCost ?? null,
     time: "09:00",
     note: `${candidate.placeType}候选点。${candidate.reasons[0] ?? "加入后会重新计算时间轴。"}`,
   };
@@ -376,4 +407,52 @@ function routeStopAsPlaceCandidate(
     id: stop.sourcePlaceId ?? stop.id,
     coordinate: stop.coordinate ?? null,
   };
+}
+
+export function inferStayMinutesForPlace(
+  place: PlaceCandidate,
+  placement: RouteStopPlacement = "middle",
+) {
+  if (placement === "start" || placement === "end") {
+    return 0;
+  }
+
+  const text = `${place.name} ${place.address ?? ""} ${place.poiType ?? ""}`;
+
+  if (/博物馆|展览馆|纪念馆|美术馆/.test(text)) {
+    return 55;
+  }
+
+  if (/餐饮|餐厅|饭店|美食|小吃|火锅|烧烤|咖啡/.test(text)) {
+    return 55;
+  }
+
+  if (/书店|图书|书局|书房/.test(text)) {
+    return 35;
+  }
+
+  if (/旧址|故居|公馆|历史|文物|建筑/.test(text)) {
+    return 35;
+  }
+
+  if (/公园|园林|景区|风景名胜/.test(text)) {
+    return 45;
+  }
+
+  return 40;
+}
+
+function normalizeStayMinutes(
+  stayMinutes: number,
+  placement: RouteStopPlacement | RouteStop["routeRole"] = "middle",
+) {
+  if (placement === "start" || placement === "end") {
+    return 0;
+  }
+
+  return Math.min(240, Math.max(5, Math.round(stayMinutes)));
+}
+
+function getRouteStartTime(route: RoutePlan) {
+  return route.startTime || route.stops[0]?.time || "09:00";
 }

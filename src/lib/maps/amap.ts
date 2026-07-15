@@ -76,6 +76,10 @@ export function placeCandidateFromAmapPoi(poi: {
   adcode?: string;
   type?: string;
   location?: string;
+  openingHours?: string | null;
+  telephone?: string | null;
+  providerRating?: string | null;
+  providerCost?: string | null;
 }): PlaceCandidate {
   return {
     id: `amap:${poi.id}`,
@@ -88,6 +92,10 @@ export function placeCandidateFromAmapPoi(poi: {
     adcode: poi.adcode ?? null,
     coordinate: parseAmapLocation(poi.location),
     poiType: poi.type ?? null,
+    openingHours: poi.openingHours ?? null,
+    telephone: poi.telephone ?? null,
+    providerRating: poi.providerRating ?? null,
+    providerCost: poi.providerCost ?? null,
     verificationStatus: "verified",
   };
 }
