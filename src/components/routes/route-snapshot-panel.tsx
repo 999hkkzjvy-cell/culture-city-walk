@@ -7,6 +7,7 @@ import {
   type RouteSnapshotPayload,
   type RouteSnapshotSummary,
 } from "@/lib/repositories/route-repository";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import { demoRoute } from "@/lib/route";
 import type { RoutePlan } from "@/lib/route";
@@ -84,7 +85,7 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
       setState("ready");
       setMessage("快照已创建。");
     } catch (error) {
-      setMessage(mapSnapshotError(error));
+      setMessage(mapCloudError(error, "snapshot"));
     }
   }
 
@@ -102,8 +103,8 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
 
       persistSnapshotPayload(payload);
       setMessage("已恢复为当前本地预案，可继续编辑或保存云端。");
-    } catch {
-      setMessage("快照恢复失败，当前预案没有被修改。");
+    } catch (error) {
+      setMessage(mapCloudError(error, "snapshot"));
     }
   }
 
@@ -155,20 +156,6 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
       ) : null}
     </section>
   );
-}
-
-function mapSnapshotError(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message === "auth_required") {
-      return "请先登录，再创建云端快照。";
-    }
-
-    if (error.message === "supabase_not_configured") {
-      return "Supabase 尚未配置，当前只保留本地快照。";
-    }
-  }
-
-  return "快照创建失败，云端暂时无法写入。";
 }
 
 function persistSnapshotPayload(payload: RouteSnapshotPayload) {

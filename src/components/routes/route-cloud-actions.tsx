@@ -3,6 +3,7 @@
 import { Cloud } from "lucide-react";
 import { useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import { demoRoute } from "@/lib/route";
 import { readRoutePlan } from "@/lib/storage";
@@ -36,7 +37,7 @@ export function RouteCloudActions() {
       );
     } catch (error) {
       setSaveState("error");
-      setMessage(mapError(error));
+      setMessage(mapCloudError(error, "save"));
     }
   }
 
@@ -62,18 +63,4 @@ export function RouteCloudActions() {
       {message ? <p>{message}</p> : null}
     </section>
   );
-}
-
-function mapError(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message === "auth_required") {
-      return "请先在“我的路线”页面登录，再保存到云端。";
-    }
-
-    if (error.message === "supabase_not_configured") {
-      return "Supabase 尚未配置，当前只保留本地草稿。";
-    }
-  }
-
-  return "云端操作暂时失败，请稍后重试。";
 }

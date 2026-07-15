@@ -41,13 +41,16 @@ import {
 } from "@/lib/repositories/checkin-photo-repository";
 import {
   readJourneyState,
+  readJourneyArchives,
   readRoutePlan,
   routePlanStorageKey,
   saveCandidateState,
+  saveJourneyArchive,
   saveJourneyState,
   saveRoutePlan,
   type StoredCandidateAction,
   type StoredCheckInPhoto,
+  type StoredJourneyArchive,
   type StoredJourneyState,
 } from "@/lib/storage";
 import { getRouteTravelModeLabel } from "@/lib/transport";
@@ -90,6 +93,9 @@ export function RouteJourneyMode() {
     Record<string, DeepReadingState>
   >({});
   const [photos, setPhotos] = useState<StoredCheckInPhoto[]>([]);
+  const [archives, setArchives] = useState<StoredJourneyArchive[]>(() =>
+    typeof window === "undefined" ? [] : readJourneyArchives(route.id),
+  );
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadMessage, setUploadMessage] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
@@ -129,6 +135,7 @@ export function RouteJourneyMode() {
     () => route.stops.reduce((total, stop) => total + stop.stayMinutes, 0),
     [route.stops],
   );
+  const latestArchive = archives[0] ?? null;
 
   useEffect(() => {
     let isMounted = true;
@@ -144,6 +151,7 @@ export function RouteJourneyMode() {
           : (route.stops[0]?.id ?? ""),
       );
       setJourney(readJourneyState(route.id));
+      setArchives(readJourneyArchives(route.id));
       void listCheckInPhotos(route.id).then((nextPhotos) => {
         if (isMounted) {
           setPhotos(nextPhotos);
@@ -265,6 +273,26 @@ export function RouteJourneyMode() {
   function resetJourney() {
     updateJourney(emptyJourneyState(route.id));
     setIsCompleted(false);
+  }
+
+  function completeJourney() {
+    const completedAt = new Date().toISOString();
+    const archive: StoredJourneyArchive = {
+      id: `journey-${route.id}-${completedAt}`,
+      routeId: route.id,
+      routeTitle: route.title,
+      city: route.city,
+      score: journeyScore,
+      arrivedCount: completedCount,
+      skippedCount,
+      photoCount: checkInPhotoCount,
+      experienceStopCount: experienceStops.length,
+      completedAt,
+    };
+
+    saveJourneyArchive(archive);
+    setArchives((current) => [archive, ...current]);
+    setIsCompleted(true);
   }
 
   function requestDeepReading(stop: RouteStop) {
@@ -397,6 +425,20 @@ export function RouteJourneyMode() {
       </section>
 
       <RouteLoadStatus state={remoteRouteState} />
+
+      {latestArchive ? (
+        <section className="journey-archive-strip">
+          <div>
+            <p>最近行程存档</p>
+            <strong>
+              {latestArchive.score} 分 · 到达 {latestArchive.arrivedCount}/
+              {latestArchive.experienceStopCount} · 打卡图{" "}
+              {latestArchive.photoCount} 张
+            </strong>
+          </div>
+          <span>{formatArchiveTime(latestArchive.completedAt)} 完成</span>
+        </section>
+      ) : null}
 
       {isCompleted ? (
         <section className="journey-completion">
@@ -674,7 +716,7 @@ export function RouteJourneyMode() {
               {selectedStop.routeRole === "end" ? (
                 <button
                   className="primary-action compact"
-                  onClick={() => setIsCompleted(true)}
+                  onClick={completeJourney}
                   type="button"
                 >
                   <CheckCircle2 size={15} />

@@ -1,14 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BookOpen, Bookmark, Clock } from "lucide-react";
+import { BookOpen, Bookmark, Clock, Edit3 } from "lucide-react";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
 import { generateStopThemeContentWithFallback } from "@/lib/ai/route-collaboration";
 import { defaultDraft, type RoutePlan, type RouteStop } from "@/lib/route";
-import { toggleFavoriteRoute } from "@/lib/storage";
+import { importRouteForPlanning, toggleFavoriteRoute } from "@/lib/storage";
 import { readShareCode } from "@/lib/urls";
 
 type SharedStop = {
@@ -22,15 +23,27 @@ type SharedStop = {
     address?: string;
     themes?: RouteStop["themes"];
     source?: RouteStop["source"];
-    sourcePlaceId?: string;
+    sourcePlaceId?: string | null;
+    coordinate?: RouteStop["coordinate"];
+    coordinateSystem?: RouteStop["coordinateSystem"];
+    verificationStatus?: RouteStop["verificationStatus"];
+    mustVisit?: boolean;
     routeRole?: RouteStop["routeRole"];
+    openingHours?: string | null;
+    telephone?: string | null;
+    providerRating?: string | null;
+    providerCost?: string | null;
   } | null;
+  walking_from_previous: RouteStop["walkingFromPrevious"] | null;
 };
 
 type SharedRoutePayload = {
   route: {
+    id: string;
     title: string;
     city: string;
+    theme_filters: unknown;
+    preferences: unknown;
     version: number;
   };
   stops: SharedStop[];
@@ -151,6 +164,19 @@ export function SharedRouteReader() {
           <Bookmark size={15} />
           收藏路线
         </button>
+        <Link
+          className="secondary-link"
+          href="/plan/"
+          onClick={() =>
+            importRouteForPlanning(sharedRoute, {
+              source: "shared",
+              label: "分享路线",
+            })
+          }
+        >
+          <Edit3 size={15} />
+          修改为我的路线
+        </Link>
       </div>
       {favoriteMessage ? <p className="auth-note">{favoriteMessage}</p> : null}
       <div className="shared-source-note">
@@ -202,11 +228,16 @@ export function SharedRouteReader() {
 }
 
 function routeFromSharePayload(payload: SharedRoutePayload): RoutePlan {
+  const themes = parseSharedThemes(payload.route.theme_filters);
+  const preferences = parseSharedPreferences(payload.route.preferences);
+
   return {
     ...defaultDraft,
-    id: `share-${payload.share.code}`,
+    ...preferences,
+    id: payload.route.id || `share-${payload.share.code}`,
     title: payload.route.title,
     city: payload.route.city,
+    themes,
     updatedAt: new Date().toISOString(),
     stops: payload.stops.map((stop) => ({
       id: `share-${payload.share.code}-${stop.sort_order}`,
@@ -218,9 +249,72 @@ function routeFromSharePayload(payload: SharedRoutePayload): RoutePlan {
       routeRole: stop.note?.routeRole ?? "middle",
       source: stop.note?.source ?? "manual",
       sourcePlaceId: stop.note?.sourcePlaceId ?? null,
+      coordinate: stop.note?.coordinate ?? null,
+      coordinateSystem: stop.note?.coordinateSystem,
+      verificationStatus: stop.note?.verificationStatus,
+      mustVisit: stop.note?.mustVisit,
+      openingHours: stop.note?.openingHours ?? null,
+      telephone: stop.note?.telephone ?? null,
+      providerRating: stop.note?.providerRating ?? null,
+      providerCost: stop.note?.providerCost ?? null,
       time: stop.arrival_time?.slice(0, 5) ?? defaultDraft.startTime,
       note: stop.note?.text ?? "",
+      walkingFromPrevious: stop.walking_from_previous ?? undefined,
     })),
-    distanceKm: 0,
+    distanceKm: preferences.distanceKm ?? 0,
+  };
+}
+
+function parseSharedThemes(value: unknown): RoutePlan["themes"] {
+  if (!Array.isArray(value)) {
+    return defaultDraft.themes;
+  }
+
+  const themes = value.filter((theme): theme is RoutePlan["themes"][number] =>
+    defaultDraft.themes.includes(theme as RoutePlan["themes"][number]),
+  );
+
+  return themes.length > 0 ? themes : defaultDraft.themes;
+}
+
+function parseSharedPreferences(value: unknown): Partial<RoutePlan> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const preferences = value as Record<string, unknown>;
+
+  return {
+    dateLabel:
+      typeof preferences.dateLabel === "string"
+        ? preferences.dateLabel
+        : defaultDraft.dateLabel,
+    startTime:
+      typeof preferences.startTime === "string"
+        ? preferences.startTime
+        : defaultDraft.startTime,
+    durationHours:
+      typeof preferences.durationHours === "number"
+        ? preferences.durationHours
+        : defaultDraft.durationHours,
+    walkingRangeKm:
+      typeof preferences.walkingRangeKm === "string"
+        ? preferences.walkingRangeKm
+        : defaultDraft.walkingRangeKm,
+    mustVisits: Array.isArray(preferences.mustVisits)
+      ? preferences.mustVisits.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : defaultDraft.mustVisits,
+    pace:
+      preferences.pace === "轻松漫步" ||
+      preferences.pace === "平衡" ||
+      preferences.pace === "充实紧凑"
+        ? preferences.pace
+        : defaultDraft.pace,
+    distanceKm:
+      typeof preferences.distanceKm === "number"
+        ? preferences.distanceKm
+        : 0,
   };
 }

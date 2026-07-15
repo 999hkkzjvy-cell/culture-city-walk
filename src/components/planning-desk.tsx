@@ -78,10 +78,13 @@ import {
 import {
   readCandidateState,
   readDraft,
+  readPlanningImportSource,
   readRoutePlan,
+  clearPlanningImportSource,
   saveCandidateState,
   saveDraft,
   saveRoutePlan,
+  type PlanningImportSource,
   type StoredCandidateAction,
 } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
@@ -307,6 +310,10 @@ export function PlanningDesk() {
   const [expandedCandidateIds, setExpandedCandidateIds] = useState<
     Record<string, boolean>
   >({});
+  const [planningImportSource, setPlanningImportSource] =
+    useState<PlanningImportSource | null>(() =>
+      typeof window === "undefined" ? null : readPlanningImportSource(),
+    );
 
   const summary = useMemo(() => getThemeSummary(draft.themes), [draft.themes]);
   const activeCandidates = candidates;
@@ -1027,9 +1034,25 @@ export function PlanningDesk() {
     });
   }
 
+  function dismissPlanningImportSource() {
+    clearPlanningImportSource();
+    setPlanningImportSource(null);
+  }
+
   return (
     <section className="plan-shell">
       <div className="conversation">
+        {planningImportSource?.routeId === previewRoute.id ? (
+          <div className="planning-import-banner">
+            <div>
+              <p>已从{planningImportSource.label}导入为本地规划副本。</p>
+              <span>接下来修改不会覆盖原路线，保存到云端会生成你的个人版本。</span>
+            </div>
+            <button onClick={dismissPlanningImportSource} type="button">
+              知道了
+            </button>
+          </div>
+        ) : null}
         <div className="chat-row">
           <span className="ai-dot">AI</span>
           <div>

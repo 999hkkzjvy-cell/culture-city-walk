@@ -46,12 +46,37 @@ export type StoredCheckInPhoto = {
   createdAt: string;
 };
 
+export type StoredJourneyArchive = {
+  id: string;
+  routeId: string;
+  routeTitle: string;
+  city: string;
+  score: number;
+  arrivedCount: number;
+  skippedCount: number;
+  photoCount: number;
+  experienceStopCount: number;
+  completedAt: string;
+};
+
+export type PlanningImportSource = {
+  routeId: string;
+  originalRouteId: string;
+  source: "favorite" | "shared" | "route";
+  label: string;
+  importedAt: string;
+};
+
 export const routePlanStorageKey = "cultural-citywalk:route-plan";
 export const candidateStateStorageKey = "cultural-citywalk:candidate-state";
 export const routeSnapshotsStorageKey = "cultural-citywalk:route-snapshots";
 export const journeyStateStorageKey = "cultural-citywalk:journey-state";
 export const checkInPhotosStorageKey = "cultural-citywalk:check-in-photos";
+export const journeyArchivesStorageKey =
+  "cultural-citywalk:journey-archives";
 export const favoriteRoutesStorageKey = "cultural-citywalk:favorite-routes";
+export const planningImportSourceStorageKey =
+  "cultural-citywalk:planning-import-source";
 export const syncedRouteSignatureStorageKey =
   "cultural-citywalk:synced-route-signature";
 
@@ -269,6 +294,36 @@ export function removeCheckInPhoto(photoId: string) {
   );
 }
 
+export function readJourneyArchives(routeId?: string): StoredJourneyArchive[] {
+  try {
+    const raw = window.localStorage.getItem(journeyArchivesStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const archives = Array.isArray(parsed) ? parsed : [];
+
+    return archives
+      .filter(
+        (archive): archive is StoredJourneyArchive =>
+          typeof archive?.id === "string" &&
+          typeof archive.routeId === "string" &&
+          (!routeId || archive.routeId === routeId),
+      )
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  } catch {
+    return [];
+  }
+}
+
+export function saveJourneyArchive(archive: StoredJourneyArchive) {
+  const archives = readJourneyArchives().filter(
+    (item) => item.id !== archive.id,
+  );
+
+  window.localStorage.setItem(
+    journeyArchivesStorageKey,
+    JSON.stringify([archive, ...archives].slice(0, 80)),
+  );
+}
+
 export function readFavoriteRoutes(): RoutePlan[] {
   try {
     const raw = window.localStorage.getItem(favoriteRoutesStorageKey);
@@ -305,6 +360,70 @@ export function toggleFavoriteRoute(route: RoutePlan) {
   );
 
   return !exists;
+}
+
+export function importRouteForPlanning(
+  route: RoutePlan,
+  source: Pick<PlanningImportSource, "source" | "label">,
+) {
+  const importedAt = new Date().toISOString();
+  const importedRoute: RoutePlan = {
+    ...route,
+    id: `local-import-${Date.now()}`,
+    title: route.title.includes("（我的版本）")
+      ? route.title
+      : `${route.title}（我的版本）`,
+    updatedAt: importedAt,
+  };
+
+  saveRoutePlan(importedRoute);
+  saveDraft(importedRoute);
+  saveCandidateState(emptyCandidateState(importedRoute.id));
+  window.localStorage.setItem(
+    planningImportSourceStorageKey,
+    JSON.stringify({
+      routeId: importedRoute.id,
+      originalRouteId: route.id,
+      source: source.source,
+      label: source.label,
+      importedAt,
+    } satisfies PlanningImportSource),
+  );
+
+  return importedRoute;
+}
+
+export function readPlanningImportSource(): PlanningImportSource | null {
+  try {
+    const raw = window.localStorage.getItem(planningImportSourceStorageKey);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PlanningImportSource>;
+
+    if (!parsed.routeId || !parsed.originalRouteId || !parsed.label) {
+      return null;
+    }
+
+    return {
+      routeId: parsed.routeId,
+      originalRouteId: parsed.originalRouteId,
+      source:
+        parsed.source === "shared" || parsed.source === "route"
+          ? parsed.source
+          : "favorite",
+      label: parsed.label,
+      importedAt: parsed.importedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPlanningImportSource() {
+  window.localStorage.removeItem(planningImportSourceStorageKey);
 }
 
 export function getRoutePlanSignature(route = readRoutePlan()) {

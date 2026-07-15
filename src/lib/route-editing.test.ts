@@ -3,7 +3,6 @@ import { demoRoute } from "@/lib/route";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
-  appendManualStopToRoute,
   appendPlaceCandidateToRoute,
   insertCandidateIntoRoute,
   moveRouteStop,
@@ -53,42 +52,9 @@ describe("route editing", () => {
     );
   });
 
-  it("appends a manual stop with user-confirmed provenance", () => {
-    const edited = appendManualStopToRoute(demoRoute, {
-      name: "临时集合点",
-      area: "鼓楼",
-      address: "地铁口附近",
-      stayMinutes: 20,
-      themes: ["历史"],
-    });
-    const stop = edited.stops.at(-1);
-
-    expect(stop).toEqual(
-      expect.objectContaining({
-        name: "临时集合点",
-        source: "manual",
-        verificationStatus: "user_confirmed",
-        stayMinutes: 20,
-      }),
-    );
-    expect(calculateRouteKernel(edited).legSource).toBe("estimated");
-  });
-
   it("appends a verified AMap place with provider identity", () => {
     const edited = appendPlaceCandidateToRoute(demoRoute, {
-      place: {
-        id: "amap:B001905YQ1",
-        source: "amap",
-        sourcePlaceId: "B001905YQ1",
-        name: "先锋书店(五台山总店)",
-        address: "广州路173号",
-        city: "南京市",
-        district: "鼓楼区",
-        adcode: "320106",
-        coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
-        poiType: "购物服务;专卖店;书店",
-        verificationStatus: "verified",
-      },
+      place: amapPlace("B001905YQ1", "先锋书店(五台山总店)", "购物服务;专卖店;书店"),
       stayMinutes: 40,
       themes: ["书店", "文学"],
     });
@@ -104,19 +70,11 @@ describe("route editing", () => {
     );
     expect(
       appendPlaceCandidateToRoute(edited, {
-        place: {
-          id: "amap:B001905YQ1",
-          source: "amap",
-          sourcePlaceId: "B001905YQ1",
-          name: "先锋书店(五台山总店)",
-          address: "广州路173号",
-          city: "南京市",
-          district: "鼓楼区",
-          adcode: "320106",
-          coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" },
-          poiType: "购物服务;专卖店;书店",
-          verificationStatus: "verified",
-        },
+        place: amapPlace(
+          "B001905YQ1",
+          "先锋书店(五台山总店)",
+          "购物服务;专卖店;书店",
+        ),
         stayMinutes: 40,
         themes: ["书店", "文学"],
       }).stops,
@@ -125,19 +83,7 @@ describe("route editing", () => {
 
   it("can insert a confirmed place as the route start", () => {
     const edited = appendPlaceCandidateToRoute(demoRoute, {
-      place: {
-        id: "amap:start",
-        source: "amap",
-        sourcePlaceId: "start",
-        name: "酒店",
-        address: "集合点",
-        city: "南京市",
-        district: "鼓楼区",
-        adcode: "320106",
-        coordinate: { lng: 118.77, lat: 32.05, system: "gcj02" },
-        poiType: "住宿服务",
-        verificationStatus: "verified",
-      },
+      place: amapPlace("start", "酒店", "住宿服务"),
       stayMinutes: 5,
       themes: ["历史"],
       placement: "start",
@@ -147,8 +93,67 @@ describe("route editing", () => {
       expect.objectContaining({
         name: "酒店",
         sourcePlaceId: "start",
+        routeRole: "start",
+        stayMinutes: 0,
       }),
     );
+  });
+
+  it("can insert a confirmed place as the route end", () => {
+    const edited = appendPlaceCandidateToRoute(demoRoute, {
+      place: amapPlace("end", "地铁站", "交通设施服务;地铁站"),
+      stayMinutes: 20,
+      themes: ["历史"],
+      placement: "end",
+    });
+    const stop = edited.stops.at(-1);
+
+    expect(stop).toEqual(
+      expect.objectContaining({
+        name: "地铁站",
+        sourcePlaceId: "end",
+        routeRole: "end",
+        stayMinutes: 0,
+      }),
+    );
+  });
+
+  it("keeps explicit navigation roles when stops are moved", () => {
+    const withStart = appendPlaceCandidateToRoute(demoRoute, {
+      place: amapPlace("start", "酒店", "住宿服务"),
+      stayMinutes: 5,
+      themes: ["历史"],
+      placement: "start",
+    });
+    const moved = moveRouteStop(withStart, 0, 2);
+
+    expect(moved.stops[2]).toEqual(
+      expect.objectContaining({
+        name: "酒店",
+        routeRole: "start",
+        stayMinutes: 0,
+      }),
+    );
+  });
+
+  it("keeps route candidates as experience stops even when they land at an edge", () => {
+    const [candidate] = generateRouteCandidates(demoRoute, {
+      themes: ["历史"],
+      maxResults: 1,
+    });
+    const inserted = insertCandidateIntoRoute(demoRoute, {
+      ...candidate,
+      insertionIndex: demoRoute.stops.length - 1,
+    });
+    const stop = inserted.stops.at(-1);
+
+    expect(stop).toEqual(
+      expect.objectContaining({
+        id: candidate.place.id,
+        routeRole: "middle",
+      }),
+    );
+    expect(stop?.stayMinutes).toBeGreaterThan(0);
   });
 
   it("moves a stop and recalculates route distance", () => {
@@ -165,6 +170,23 @@ describe("route editing", () => {
     expect(edited.stops[0].stayMinutes).toBe(240);
     expect(calculateRouteKernel(edited).totalStayMinutes).toBeGreaterThan(
       calculateRouteKernel(demoRoute).totalStayMinutes,
+    );
+  });
+
+  it("keeps start and end stop stay minutes at zero", () => {
+    const withStart = appendPlaceCandidateToRoute(demoRoute, {
+      place: amapPlace("start", "酒店", "住宿服务"),
+      stayMinutes: 5,
+      themes: ["历史"],
+      placement: "start",
+    });
+    const edited = updateStopStayMinutes(withStart, withStart.stops[0].id, 45);
+
+    expect(edited.stops[0]).toEqual(
+      expect.objectContaining({
+        routeRole: "start",
+        stayMinutes: 0,
+      }),
     );
   });
 
@@ -223,3 +245,19 @@ describe("route editing", () => {
     expect(removeRouteStop(oneStopRoute, "librairie").stops).toHaveLength(0);
   });
 });
+
+function amapPlace(id: string, name: string, poiType: string) {
+  return {
+    id: `amap:${id}`,
+    source: "amap" as const,
+    sourcePlaceId: id,
+    name,
+    address: "广州路173号",
+    city: "南京市",
+    district: "鼓楼区",
+    adcode: "320106",
+    coordinate: { lng: 118.773496, lat: 32.05072, system: "gcj02" as const },
+    poiType,
+    verificationStatus: "verified" as const,
+  };
+}

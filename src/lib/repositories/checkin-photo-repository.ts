@@ -10,6 +10,7 @@ import {
   createBrowserSupabaseClient,
   type AppSupabaseClient,
 } from "@/lib/supabase/client";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 
 const routeMediaBucket = "route-media";
 
@@ -96,11 +97,11 @@ export async function archiveCheckInPhoto(
       synced: true,
       message: "打卡图已同步到云端相册。",
     };
-  } catch {
+  } catch (error) {
     return {
       photo: { ...photo, syncStatus: "local" },
       synced: false,
-      message: "云端同步暂时失败，打卡图已保留在本地设备。",
+      message: `${mapCloudError(error, "photo_upload")} 打卡图已保留在本地设备。`,
     };
   }
 }

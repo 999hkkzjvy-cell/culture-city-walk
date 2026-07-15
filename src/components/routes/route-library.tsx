@@ -4,13 +4,18 @@ import Link from "next/link";
 import { Bookmark, Cloud, Edit3, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import {
   createRouteRepository,
   type SavedRouteSummary,
 } from "@/lib/repositories/route-repository";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import type { Theme } from "@/lib/route";
-import { readFavoriteRoutes, saveRoutePlan } from "@/lib/storage";
+import {
+  importRouteForPlanning,
+  readFavoriteRoutes,
+  saveRoutePlan,
+} from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 type LoadState = "loading" | "ready" | "error";
@@ -42,10 +47,11 @@ export function RouteLibrary({
         setRoutes(items);
         setState("ready");
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) {
           return;
         }
+        setMessage(mapCloudError(error, "route_list"));
         setState("error");
       });
 
@@ -66,18 +72,18 @@ export function RouteLibrary({
       ]);
       setMessage("当前本地预案已保存。");
     } catch (error) {
-      setMessage(
-        error instanceof Error && error.message === "auth_required"
-          ? "请先登录，再保存到云端。"
-          : "保存失败，当前仍可使用本地草稿。",
-      );
+      setMessage(mapCloudError(error, "save"));
     }
   }
 
   async function deleteRoute(routeId: string) {
     const repository = createRouteRepository();
-    await repository.delete(routeId);
-    setRoutes((current) => current.filter((route) => route.id !== routeId));
+    try {
+      await repository.delete(routeId);
+      setRoutes((current) => current.filter((route) => route.id !== routeId));
+    } catch (error) {
+      setMessage(mapCloudError(error, "route_delete"));
+    }
   }
 
   if (state === "loading") {
@@ -86,7 +92,9 @@ export function RouteLibrary({
 
   if (state === "error") {
     return (
-      <p className="auth-note">云端路线暂时无法读取，本地草稿仍可继续使用。</p>
+      <p className="auth-note">
+        {message || "云端路线暂时无法读取，本地草稿仍可继续使用。"}
+      </p>
     );
   }
 
@@ -134,7 +142,12 @@ export function RouteLibrary({
                 <Link
                   className="secondary-link"
                   href="/plan/"
-                  onClick={() => saveRoutePlan(route)}
+                  onClick={() =>
+                    importRouteForPlanning(route, {
+                      source: "favorite",
+                      label: "我的收藏",
+                    })
+                  }
                 >
                   <Edit3 size={15} />
                   修改

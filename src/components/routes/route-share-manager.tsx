@@ -7,6 +7,7 @@ import {
   createRouteRepository,
   type ShareRecord,
 } from "@/lib/repositories/route-repository";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import { shareUrl } from "@/lib/urls";
 
 type ShareLoadState = "loading" | "ready" | "error";
@@ -29,8 +30,9 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
         setShares(items);
         setState("ready");
       })
-      .catch(() => {
+      .catch((error) => {
         if (isMounted) {
+          setMessage(mapCloudError(error, "share"));
           setState("error");
         }
       });
@@ -50,7 +52,7 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
       setState("ready");
       setMessage("分享链接已生成。");
     } catch (error) {
-      setMessage(mapShareError(error));
+      setMessage(mapCloudError(error, "share"));
     }
   }
 
@@ -69,8 +71,8 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
       await repository.revokeShare(code);
       setShares((current) => current.filter((share) => share.code !== code));
       setMessage("分享链接已删除。");
-    } catch {
-      setMessage("撤销失败，请稍后重试。");
+    } catch (error) {
+      setMessage(mapCloudError(error, "share"));
     }
   }
 
@@ -124,18 +126,4 @@ export function RouteShareManager({ routeId }: { routeId: string }) {
 
 function getShareStatus(share: ShareRecord) {
   return share.expiresAt ? `有效至 ${share.expiresAt.slice(0, 10)}` : "长期有效";
-}
-
-function mapShareError(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message === "auth_required") {
-      return "请先登录，再生成分享链接。";
-    }
-
-    if (error.message === "supabase_not_configured") {
-      return "Supabase 尚未配置，暂时不能生成分享。";
-    }
-  }
-
-  return "分享操作失败，请稍后重试。";
 }

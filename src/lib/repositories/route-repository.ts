@@ -1043,3 +1043,9 @@ function parseThemes(value: Json | null): Theme[] {
     ["历史", "文学", "建筑", "音乐", "书店", "美食"].includes(String(theme)),
   );
 }
+
+export const routeRepositoryTestUtils = {
+  mapStopFromRow,
+  placeInsertFromStop,
+  routeStopConstraintType,
+};
