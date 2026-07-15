@@ -141,6 +141,9 @@ passed through query strings rather than dynamic App Router segments.
 - `src/lib/repositories/route-repository.ts` - local/Supabase route repository.
   It also persists route-candidate snapshots and candidate action states through
   localStorage or the `route_candidates` table.
+- `src/lib/repositories/route-cloud-sync.ts` - browser helper for saving the
+  current local route to the repository, migrating demo/local route IDs to the
+  saved Supabase route ID, and syncing candidate state back to localStorage.
 - `src/lib/supabase/client.ts` - browser Supabase client.
 - `src/lib/supabase/database.types.ts` - generated/hand-maintained DB types.
 - `src/lib/urls.ts` - static-export URL helpers.
@@ -271,13 +274,19 @@ GitHub Actions repository variables required for Pages build:
   point no longer forces the whole candidate generation to local fallback. If
   AMap is unavailable, every sampled search fails, or the returned POIs do not
   match the route constraints, the app falls back to local seeded candidates
-  with a more specific warning.
+  with a more specific warning. Provider candidates are filtered before scoring
+  so unknown POIs are not treated as generic scenic spots, supermarket/
+  convenience-store POIs are rejected, and nearby same-name/similar-name route
+  duplicates are removed.
 - Candidate insertion updates an editable route preview with leg recalculation,
   end-time impact, move, delete, and stay-time controls. Candidate lists support
-  type filters and fit-band grouping. The route preview and candidate actions
-  are persisted in localStorage, and `/route/?id=demo` reads that saved preview
-  before falling back to the demo route. Signed-in users are prompted to sync
-  unsynced local previews.
+  type filters, fit-band grouping, and compact expandable candidate rows. The
+  route preview and candidate actions are persisted in localStorage, and
+  `/route/?id=demo` reads that saved preview before falling back to the demo
+  route. Signed-in users are prompted to sync unsynced local previews. Saving a
+  local/demo route to cloud writes the saved Supabase route ID back to
+  localStorage so later share, snapshot, and candidate operations target the
+  cloud route instead of stale `demo` state.
 - Route legs support selectable travel modes: `步行`, `骑行`, `公共交通`,
   `驾车`, and `打车`. The planning preview and route reader edit mode both allow
   changing the mode for each "previous stop to this stop" leg and manually
@@ -289,7 +298,12 @@ GitHub Actions repository variables required for Pages build:
   users can select `出发`, `必去`, or `终点`, search AMap or manually add a place,
   and the chosen place automatically appears in the right-side route preview.
   Duplicate occurrences of the same place are allowed so loop routes are not
-  constrained by de-duplication.
+  constrained by de-duplication. Fresh local drafts no longer prefill example
+  must-visit places or an example route-goal sentence.
+- Route-reader stop deep-reading cards are only shown for middle stops; start
+  and end stops do not expose the expandable deep-reading UI. The current
+  content remains deterministic, unverified template guidance focused on
+  concrete observation angles rather than factual claims.
 - AI collaboration can call the Supabase `deepseek-proxy` Edge Function when
   `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true`; otherwise it keeps deterministic
   local fallback behavior.

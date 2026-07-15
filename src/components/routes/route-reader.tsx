@@ -307,6 +307,8 @@ export function RouteReader() {
             const previousStop = routeKernel.stops[index - 1];
             const story = generateStopThemeContentWithFallback(stop);
             const isStoryExpanded = expandedStories[stop.id] ?? false;
+            const canExpandStory =
+              index > 0 && index < routeKernel.stops.length - 1;
             const navigationUrl =
               index === 0
                 ? amapPlaceSearchUrl({
@@ -353,39 +355,41 @@ export function RouteReader() {
                     {stop.mustVisit ? <em>必去</em> : null}
                   </h2>
                   <p>{stop.note}</p>
-                  <div className="stop-story">
-                    <div>
-                      <span>模板讲解 · 来源待核验</span>
-                      <strong>{story.shortIntro}</strong>
-                    </div>
-                    {isStoryExpanded ? (
-                      <div className="stop-story-more">
-                        {story.themeConnections.map((connection) => (
-                          <p key={`${stop.id}-${connection.theme}`}>
-                            <FileText size={14} />
-                            {connection.theme}：{connection.text}
-                          </p>
-                        ))}
-                        {story.practicalTips.map((tip) => (
-                          <p key={tip}>
-                            <Clock size={14} />
-                            {tip}
-                          </p>
-                        ))}
+                  {canExpandStory ? (
+                    <div className="stop-story">
+                      <div>
+                        <span>模板讲解 · 来源待核验</span>
+                        <strong>{story.shortIntro}</strong>
                       </div>
-                    ) : null}
-                    <button
-                      onClick={() =>
-                        setExpandedStories((current) => ({
-                          ...current,
-                          [stop.id]: !isStoryExpanded,
-                        }))
-                      }
-                      type="button"
-                    >
-                      {isStoryExpanded ? "收起深读" : "展开深读"}
-                    </button>
-                  </div>
+                      {isStoryExpanded ? (
+                        <div className="stop-story-more">
+                          {story.themeConnections.map((connection) => (
+                            <p key={`${stop.id}-${connection.theme}`}>
+                              <FileText size={14} />
+                              {connection.theme}：{connection.text}
+                            </p>
+                          ))}
+                          {story.practicalTips.map((tip) => (
+                            <p key={tip}>
+                              <Clock size={14} />
+                              {tip}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
+                      <button
+                        onClick={() =>
+                          setExpandedStories((current) => ({
+                            ...current,
+                            [stop.id]: !isStoryExpanded,
+                          }))
+                        }
+                        type="button"
+                      >
+                        {isStoryExpanded ? "收起深读" : "展开深读"}
+                      </button>
+                    </div>
+                  ) : null}
                   {isEditing ? (
                     <div className="stop-edit-panel">
                       <label>

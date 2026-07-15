@@ -160,24 +160,55 @@ export function generateStopThemeContentWithFallback(
   stop: RouteStop,
 ): StopThemeContent {
   const theme = stop.themes[0] ?? "历史";
+  const stopArea = stop.area ? `${stop.area}片区` : "这片街区";
+  const stopAddress = stop.address ? `地址线索是${stop.address}` : "";
   const shortIntro =
     stop.note.trim().length >= 20
       ? stop.note.trim().slice(0, 170)
-      : `${stop.name} 适合作为这条路线中的${theme}观察点，具体故事和来源后续需要继续核验。`;
+      : `${stop.name} 适合作为这条路线中的${theme}观察点。到现场时，可以把门面、街道尺度、周边业态和人流节奏一起看，先形成自己的城市阅读，再补充史料核验。`;
+  const themeConnections = (stop.themes.length > 0 ? stop.themes : [theme])
+    .slice(0, 3)
+    .map((item) => ({
+      theme: item,
+      text: buildThemeConnection(stop, item, stopArea, stopAddress).slice(
+        0,
+        178,
+      ),
+    }));
 
   return stopThemeContentSchema.parse({
     placeId: stop.sourcePlaceId ?? stop.id,
     shortIntro,
-    themeConnections: [
-      {
-        theme,
-        text: `这里暂以${theme}作为阅读角度，后续 AI 接入后再生成更完整的站点讲解。`,
-      },
+    themeConnections,
+    practicalTips: [
+      `建议停留 ${stop.stayMinutes} 分钟：前半段观察空间和人流，后半段记录与本路线主题相关的细节。`,
+      "开放时间、预约、门票和现场管控信息需要出发前再次核验。",
     ],
-    practicalTips: ["开放时间、预约和门票信息需要出发前再次核验。"],
     sourceClaims: [],
     sourceStatus: "unverified",
   });
+}
+
+function buildThemeConnection(
+  stop: RouteStop,
+  theme: Theme,
+  stopArea: string,
+  stopAddress: string,
+) {
+  switch (theme) {
+    case "历史":
+      return `${stop.name} 可以从“城市记忆如何被保留”切入：看建筑边界、门牌、纪念性标识和周边街巷关系。${stopAddress}，适合作为后续查证地方志、展陈说明或官方介绍的索引。`;
+    case "文学":
+      return `把这里当作一段城市文本来读：记录店招、路名、橱窗、行人停留方式和声音层次，再和路线中的书店或文学站点互相对照。`;
+    case "建筑":
+      return `重点看立面比例、入口尺度、材料颜色和新旧建筑的连接方式。${stopArea}的街道肌理能帮助判断它在路线中的空间角色。`;
+    case "音乐":
+      return `适合用声音来观察：留意街面噪声、室内外声场变化、是否有演出或公共广播，让音乐主题落到真实步行体验。`;
+    case "书店":
+      return `如果这里与阅读或出版有关，可以看选书、陈列、活动海报和读者停留方式；如果不是书店，则把它作为前后阅读站点之间的城市语境。`;
+    case "美食":
+      return `美食线索不只看吃什么，也看排队、出餐节奏、街角气味和午间人流。适合判断这段路线是否需要安排休息或用餐。`;
+  }
 }
 
 function inferThemes(input: string, fallbackThemes: Theme[]) {

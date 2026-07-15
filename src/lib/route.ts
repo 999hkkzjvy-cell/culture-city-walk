@@ -71,7 +71,7 @@ export const defaultDraft: RouteDraft = {
   durationHours: 5,
   walkingRangeKm: "5-10 km",
   themes: ["文学", "历史", "建筑", "书店"],
-  mustVisits: ["先锋书店", "总统府"],
+  mustVisits: [],
   pace: "轻松漫步",
   updatedAt: "2026-07-13T00:00:00.000Z",
 };

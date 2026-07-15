@@ -1223,11 +1223,12 @@ button {
 
 .candidate-item {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 0;
   border: 1px solid rgb(216 208 195 / 80%);
   border-radius: 7px;
   background: rgb(255 251 244 / 78%);
+  overflow: hidden;
 }
 
 .candidate-item h3,
@@ -1253,6 +1254,46 @@ button {
   display: grid;
   gap: 3px;
   padding-left: 18px;
+}
+
+.candidate-summary-row {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: minmax(0, 1fr) auto auto 18px;
+  gap: 10px;
+  align-items: center;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.candidate-summary-row strong {
+  overflow: hidden;
+  color: var(--green-primary);
+  font-family: var(--serif);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-summary-row span {
+  color: #5f675f;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.candidate-summary-row svg {
+  color: var(--archive-brown);
+}
+
+.candidate-detail {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
 }
 
 .candidate-band {

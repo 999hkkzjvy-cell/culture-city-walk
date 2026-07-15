@@ -72,11 +72,7 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
       setState("ready");
       setMessage("快照已创建。");
     } catch (error) {
-      setMessage(
-        error instanceof Error && error.message === "auth_required"
-          ? "请先登录，再创建云端快照。"
-          : "快照创建失败，当前预案没有被修改。",
-      );
+      setMessage(mapSnapshotError(error));
     }
   }
 
@@ -147,6 +143,20 @@ export function RouteSnapshotPanel({ route }: { route: RoutePlan }) {
       ) : null}
     </section>
   );
+}
+
+function mapSnapshotError(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message === "auth_required") {
+      return "请先登录，再创建云端快照。";
+    }
+
+    if (error.message === "supabase_not_configured") {
+      return "Supabase 尚未配置，当前只保留本地快照。";
+    }
+  }
+
+  return "快照创建失败，云端暂时无法写入。";
 }
 
 function persistSnapshotPayload(payload: RouteSnapshotPayload) {

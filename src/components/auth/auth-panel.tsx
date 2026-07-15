@@ -2,12 +2,9 @@
 
 import { LogIn, LogOut, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { createRouteRepository } from "@/lib/repositories/route-repository";
+import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import {
   hasSyncedRoutePlan,
-  markRoutePlanSynced,
-  readCandidateState,
-  readRoutePlan,
 } from "@/lib/storage";
 import {
   createBrowserSupabaseClient,
@@ -91,12 +88,7 @@ export function AuthPanel() {
     setMessage("");
 
     try {
-      const repository = createRouteRepository();
-      const route = readRoutePlan();
-      const saved = await repository.save(route);
-      const candidateState = readCandidateState(route.id);
-      await repository.saveCandidates(saved.id, candidateState);
-      markRoutePlanSynced(route);
+      const { saved } = await saveLocalRouteToCloud();
       setHasPendingLocalPreview(false);
       setMessage(`已同步：${saved.title}`);
     } catch {

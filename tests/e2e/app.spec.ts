@@ -54,6 +54,9 @@ test("planning page can save a local draft and open route reader", async ({
 test("planning page can edit city and must-visit places", async ({ page }) => {
   await page.goto("/plan/");
 
+  await expect(
+    page.getByRole("button", { name: "移除地点 先锋书店" }),
+  ).toHaveCount(0);
   await page.getByLabel("去哪座城市").fill("苏州");
   await expect(page.getByLabel("去哪座城市")).toHaveValue("苏州");
 
@@ -65,9 +68,9 @@ test("planning page can edit city and must-visit places", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByLabel("路线预案站点")).toContainText("拙政园");
 
-  await page.getByRole("button", { name: "移除地点 先锋书店" }).click();
+  await page.getByRole("button", { name: "移除地点 拙政园" }).click();
   await expect(
-    page.getByRole("button", { name: "移除地点 先锋书店" }),
+    page.getByRole("button", { name: "移除地点 拙政园" }),
   ).toHaveCount(0);
 
   await page.getByRole("button", { name: "保存草稿" }).click();
@@ -80,14 +83,15 @@ test("planning page can add a candidate to the editable route preview", async ({
   await page.goto("/plan/");
 
   await page.getByRole("button", { name: /生成沿途候选/ }).click();
-  await expect(
-    page
-      .getByLabel("沿途可选点")
-      .getByRole("button", { name: "加入路线" })
-      .first(),
-  ).toBeVisible();
+  await page.locator(".candidate-summary-row").first().click();
+  const joinButton = page
+    .getByLabel("沿途可选点")
+    .getByRole("button", { name: "加入路线" })
+    .first();
 
-  await page.getByRole("button", { name: "加入路线" }).first().click();
+  await expect(joinButton).toBeVisible();
+
+  await joinButton.click();
   await expect(page.getByRole("heading", { name: "已处理" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "撤回" }).first(),
@@ -110,9 +114,10 @@ test("saved planning preview appears in the route reader", async ({ page }) => {
   await page.goto("/plan/");
 
   await page.getByRole("button", { name: /生成沿途候选/ }).click();
+  await page.locator(".candidate-summary-row").first().click();
   const candidateName = await page
     .getByLabel("沿途可选点")
-    .locator(".candidate-item h3")
+    .locator(".candidate-summary-row strong")
     .first()
     .innerText();
 
@@ -142,7 +147,7 @@ test("route reader supports direct refresh with query string", async ({
   await expect(page.getByText("模板讲解 · 来源待核验").first()).toBeVisible();
   await page.getByRole("button", { name: "展开深读" }).first().click();
   await expect(
-    page.getByText(/出发前请再次核验|阅读角度/).first(),
+    page.getByText(/城市记忆如何被保留|建议停留/).first(),
   ).toBeVisible();
 });
 

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { Cloud, Copy, Share2 } from "lucide-react";
 import { useState } from "react";
-import { createRouteRepository } from "@/lib/repositories/route-repository";
-import { readCandidateState, readRoutePlan } from "@/lib/storage";
+import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import { shareUrl } from "@/lib/urls";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -19,11 +18,7 @@ export function RouteCloudActions() {
     setMessage("");
 
     try {
-      const repository = createRouteRepository();
-      const route = readRoutePlan();
-      const saved = await repository.save(route);
-      const candidateState = readCandidateState(route.id);
-      await repository.saveCandidates(saved.id, candidateState);
+      const { saved } = await saveLocalRouteToCloud();
       setSaveState("saved");
       setMessage(`已保存：${saved.title}`);
     } catch (error) {
@@ -36,11 +31,7 @@ export function RouteCloudActions() {
     setMessage("");
 
     try {
-      const repository = createRouteRepository();
-      const route = readRoutePlan();
-      const saved = await repository.save(route);
-      const candidateState = readCandidateState(route.id);
-      await repository.saveCandidates(saved.id, candidateState);
+      const { repository, saved } = await saveLocalRouteToCloud();
       const share = await repository.createShare(saved.id);
       setShareCode(share.code);
       setMessage("分享链接已生成。");

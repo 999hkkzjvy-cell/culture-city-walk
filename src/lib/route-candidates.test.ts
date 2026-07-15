@@ -95,4 +95,60 @@ describe("route candidates", () => {
       }),
     );
   });
+
+  it("rejects nearby duplicate AMap places with similar names", () => {
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:B010",
+          source: "amap",
+          sourcePlaceId: "B010",
+          name: "先锋书店五台山店",
+          address: "广州路 173 号",
+          city: "南京市",
+          district: "鼓楼区",
+          adcode: "320106",
+          coordinate: { lng: 118.77342, lat: 32.05262, system: "gcj02" },
+          poiType: "购物服务;专卖店;书店",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["文学", "书店"],
+        acceptedTypes: ["书店"],
+        maxResults: 3,
+      },
+    );
+
+    expect(candidates).toHaveLength(0);
+  });
+
+  it("does not turn supermarket POIs into scenic fallback candidates", () => {
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:B020",
+          source: "amap",
+          sourcePlaceId: "B020",
+          name: "苏果超市",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.799, lat: 32.044, system: "gcj02" },
+          poiType: "购物服务;超级市场;超市",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["历史"],
+        acceptedTypes: ["景点", "书店", "餐厅"],
+        maxResults: 3,
+      },
+    );
+
+    expect(candidates).toHaveLength(0);
+  });
 });

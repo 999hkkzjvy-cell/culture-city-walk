@@ -169,9 +169,14 @@ export function generateRouteCandidatesFromPlaces(
   const acceptedTypes = options.acceptedTypes ?? candidatePlaceTypes;
   const maxResults = options.maxResults ?? 6;
 
-  return dedupeCandidates(places.map((place) => seedCandidateFromPlace(place)))
+  return dedupeCandidates(
+    places
+      .map((place) => seedCandidateFromPlace(place))
+      .filter((candidate): candidate is SeedCandidate => Boolean(candidate)),
+  )
     .filter((candidate) => isSameCity(candidate.place.city, route.city))
     .filter((candidate) => acceptedTypes.includes(candidate.placeType))
+    .filter((candidate) => !isDuplicateRouteStop(route, candidate.place))
     .map((candidate) => scoreCandidate(route, candidate, options.themes))
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
     .slice(0, maxResults);
@@ -288,8 +293,12 @@ function routeStopAsPlaceCandidate(
   };
 }
 
-function seedCandidateFromPlace(place: PlaceCandidate): SeedCandidate {
+function seedCandidateFromPlace(place: PlaceCandidate): SeedCandidate | null {
   const placeType = inferPlaceType(place);
+
+  if (!placeType) {
+    return null;
+  }
 
   return {
     place,
@@ -299,8 +308,12 @@ function seedCandidateFromPlace(place: PlaceCandidate): SeedCandidate {
   };
 }
 
-function inferPlaceType(place: PlaceCandidate): CandidatePlaceType {
+function inferPlaceType(place: PlaceCandidate): CandidatePlaceType | null {
   const text = `${place.name} ${place.address ?? ""} ${place.poiType ?? ""}`;
+
+  if (isExcludedPoi(text)) {
+    return null;
+  }
 
   if (matchesAny(text, ["博物馆", "展览馆", "纪念馆", "美术馆"])) {
     return "博物馆";
@@ -326,7 +339,23 @@ function inferPlaceType(place: PlaceCandidate): CandidatePlaceType {
     return "公园";
   }
 
-  return "景点";
+  if (
+    matchesAny(text, [
+      "风景名胜",
+      "景区",
+      "景点",
+      "名胜",
+      "遗址",
+      "牌坊",
+      "城墙",
+      "街区",
+      "广场",
+    ])
+  ) {
+    return "景点";
+  }
+
+  return null;
 }
 
 function inferThemes(placeType: CandidatePlaceType, poiType: string | null) {
@@ -371,6 +400,25 @@ function matchesAny(text: string, keywords: string[]) {
   return keywords.some((keyword) => text.includes(keyword));
 }
 
+function isExcludedPoi(text: string) {
+  return matchesAny(text, [
+    "超级市场",
+    "便民商店",
+    "便利店",
+    "小卖部",
+    "烟酒",
+    "彩票",
+    "药房",
+    "药店",
+    "停车场",
+    "公共厕所",
+    "写字楼",
+    "住宅区",
+    "生活服务",
+    "维修",
+  ]);
+}
+
 function isSameCity(candidateCity: string, routeCity: string) {
   const normalize = (city: string) => city.trim().replace(/市$/, "");
   const normalizedCandidateCity = normalize(candidateCity);
@@ -396,6 +444,81 @@ function dedupeCandidates(candidates: SeedCandidate[]) {
     seen.add(key);
     return true;
   });
+}
+
+function isDuplicateRouteStop(route: RoutePlan, place: PlaceCandidate) {
+  return route.stops.some((stop) => {
+    if (
+      place.sourcePlaceId &&
+      stop.sourcePlaceId &&
+      place.sourcePlaceId === stop.sourcePlaceId
+    ) {
+      return true;
+    }
+
+    const distanceMeters = distanceBetweenCoordinates(
+      place.coordinate,
+      stop.coordinate,
+    );
+
+    return (
+      distanceMeters !== null &&
+      distanceMeters <= 250 &&
+      areNamesSimilar(place.name, stop.name)
+    );
+  });
+}
+
+function areNamesSimilar(candidateName: string, stopName: string) {
+  const candidate = normalizePlaceName(candidateName);
+  const stop = normalizePlaceName(stopName);
+
+  if (candidate.length < 2 || stop.length < 2) {
+    return false;
+  }
+
+  if (candidate.includes(stop) || stop.includes(candidate)) {
+    return Math.min(candidate.length, stop.length) >= 3;
+  }
+
+  const candidateChars = [...new Set(candidate)];
+  const stopChars = new Set(stop);
+  const overlap = candidateChars.filter((char) => stopChars.has(char)).length;
+
+  return overlap / Math.min(candidateChars.length, stopChars.size) >= 0.68;
+}
+
+function normalizePlaceName(value: string) {
+  return value
+    .replace(/[（(].*?[）)]/g, "")
+    .replace(/南京|中国|景区|景点|旧址|遗址|纪念馆|博物馆/g, "")
+    .replace(/[^\p{Script=Han}a-z0-9]/giu, "")
+    .toLowerCase();
+}
+
+function distanceBetweenCoordinates(
+  a: PlaceCandidate["coordinate"],
+  b: RouteStop["coordinate"],
+) {
+  if (!a || !b) {
+    return null;
+  }
+
+  const toRadians = (degree: number) => (degree * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const deltaLat = toRadians(b.lat - a.lat);
+  const deltaLng = toRadians(b.lng - a.lng);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+
+  return (
+    2 *
+    earthRadiusMeters *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
 }
 
 function getFitBand(score: number, detourMinutes: number): CandidateFitBand {

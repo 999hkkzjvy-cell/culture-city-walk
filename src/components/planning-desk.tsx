@@ -183,9 +183,7 @@ export function PlanningDesk() {
     typeof window === "undefined" ? defaultDraft : readDraft(),
   );
   const [saved, setSaved] = useState(false);
-  const [requestText, setRequestText] = useState(
-    "我已有先锋书店和总统府，想补一点历史和文学线索，中午不要太赶。",
-  );
+  const [requestText, setRequestText] = useState("");
   const [placeRole, setPlaceRole] = useState<RouteStopPlacement>("middle");
   const [mustVisitInput, setMustVisitInput] = useState("");
   const [plannedPlaces, setPlannedPlaces] = useState<PlannedPlaceEntry[]>(() =>
@@ -225,6 +223,9 @@ export function PlanningDesk() {
   );
   const [selectedCandidateTypes, setSelectedCandidateTypes] =
     useState<CandidatePlaceType[]>(candidatePlaceTypes);
+  const [expandedCandidateIds, setExpandedCandidateIds] = useState<
+    Record<string, boolean>
+  >({});
 
   const summary = useMemo(() => getThemeSummary(draft.themes), [draft.themes]);
   const activeCandidates = candidates;
@@ -469,6 +470,7 @@ export function PlanningDesk() {
 
       setCandidates(ranked.data);
       setCandidateActions({});
+      setExpandedCandidateIds({});
       persistCandidateActions({}, ranked.data);
       setAiWarnings([
         ...intent.warnings,
@@ -932,6 +934,7 @@ export function PlanningDesk() {
             <textarea
               className="intent-input"
               onChange={(event) => setRequestText(event.target.value)}
+              placeholder="例如：想更偏历史，午饭前不要太赶。"
               rows={3}
               value={requestText}
             />
@@ -1003,67 +1006,116 @@ export function PlanningDesk() {
                     </h3>
                     {bandCandidates.map((candidate) => {
                       const action = candidateActions[candidate.id];
+                      const isExpanded =
+                        expandedCandidateIds[candidate.id] ?? false;
 
                       return (
-                        <article className="candidate-item" key={candidate.id}>
-                          <div>
-                            <span className="candidate-band">
-                              分数 {candidate.score}
+                        <article
+                          className={
+                            isExpanded
+                              ? "candidate-item expanded"
+                              : "candidate-item"
+                          }
+                          key={candidate.id}
+                        >
+                          <button
+                            aria-expanded={isExpanded}
+                            className="candidate-summary-row"
+                            onClick={() =>
+                              setExpandedCandidateIds((current) => ({
+                                ...current,
+                                [candidate.id]: !isExpanded,
+                              }))
+                            }
+                            type="button"
+                          >
+                            <strong>{candidate.place.name}</strong>
+                            <span>关联 {candidate.score}</span>
+                            <span>
+                              距离 {formatCandidateDistance(candidate)}
                             </span>
-                            <h3>{candidate.place.name}</h3>
-                            <p>
-                              新增步行约 {candidate.detourMinutes} 分钟 · 停留{" "}
-                              {candidate.stayMinutes} 分钟 · 插入第{" "}
-                              {candidate.insertionIndex + 1} 段后
-                            </p>
-                          </div>
-                          <div className="candidate-tags">
-                            {candidate.themes.map((theme) => (
-                              <span key={theme}>{theme}</span>
-                            ))}
-                            <span>{candidate.placeType}</span>
-                            {candidate.risks.map((risk) => (
-                              <span key={risk}>{risk}</span>
-                            ))}
-                          </div>
-                          <ul>
-                            {candidate.reasons.slice(0, 3).map((reason) => (
-                              <li key={reason}>{reason}</li>
-                            ))}
-                          </ul>
-                          <div className="candidate-actions">
-                            <button
-                              className={action === "joined" ? "selected" : ""}
-                              onClick={() => toggleCandidateInRoute(candidate)}
-                              type="button"
-                            >
-                              {action === "joined" ? (
-                                <Check size={15} />
-                              ) : (
-                                <Plus size={15} />
-                              )}
-                              {action === "joined" ? "撤销加入" : "加入路线"}
-                            </button>
-                            <button
-                              className={action === "backup" ? "selected" : ""}
-                              onClick={() =>
-                                markCandidate(candidate.id, "backup")
-                              }
-                              type="button"
-                            >
-                              <Bookmark size={15} />
-                              设为备用
-                            </button>
-                            <button
-                              onClick={() =>
-                                markCandidate(candidate.id, "ignored")
-                              }
-                              type="button"
-                            >
-                              <EyeOff size={15} />
-                              忽略
-                            </button>
-                          </div>
+                            {isExpanded ? (
+                              <ChevronUp size={15} />
+                            ) : (
+                              <ChevronDown size={15} />
+                            )}
+                          </button>
+                          {isExpanded ? (
+                            <div className="candidate-detail">
+                              <div>
+                                <span className="candidate-band">
+                                  {candidate.placeType}
+                                </span>
+                                <h3>{candidate.place.name}</h3>
+                                <p>
+                                  {[candidate.place.district, candidate.place.address]
+                                    .filter(Boolean)
+                                    .join(" · ") || "地址待核验"}
+                                </p>
+                                <p>
+                                  新增步行约 {candidate.detourMinutes} 分钟 ·
+                                  停留 {candidate.stayMinutes} 分钟 · 插入第{" "}
+                                  {candidate.insertionIndex + 1} 段后
+                                </p>
+                              </div>
+                              <div className="candidate-tags">
+                                {candidate.themes.map((theme) => (
+                                  <span key={theme}>{theme}</span>
+                                ))}
+                                {candidate.risks.map((risk) => (
+                                  <span key={risk}>{risk}</span>
+                                ))}
+                              </div>
+                              <ul>
+                                {candidate.reasons
+                                  .slice(0, 3)
+                                  .map((reason) => (
+                                    <li key={reason}>{reason}</li>
+                                  ))}
+                              </ul>
+                              <div className="candidate-actions">
+                                <button
+                                  className={
+                                    action === "joined" ? "selected" : ""
+                                  }
+                                  onClick={() =>
+                                    toggleCandidateInRoute(candidate)
+                                  }
+                                  type="button"
+                                >
+                                  {action === "joined" ? (
+                                    <Check size={15} />
+                                  ) : (
+                                    <Plus size={15} />
+                                  )}
+                                  {action === "joined"
+                                    ? "撤销加入"
+                                    : "加入路线"}
+                                </button>
+                                <button
+                                  className={
+                                    action === "backup" ? "selected" : ""
+                                  }
+                                  onClick={() =>
+                                    markCandidate(candidate.id, "backup")
+                                  }
+                                  type="button"
+                                >
+                                  <Bookmark size={15} />
+                                  设为备用
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    markCandidate(candidate.id, "ignored")
+                                  }
+                                  type="button"
+                                >
+                                  <EyeOff size={15} />
+                                  忽略
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </article>
                       );
                     })}
@@ -1165,7 +1217,7 @@ export function PlanningDesk() {
           </div>
           <div>
             <dt>必去地点</dt>
-            <dd>{draft.mustVisits.join("、")}</dd>
+            <dd>{draft.mustVisits.length > 0 ? draft.mustVisits.join("、") : "未选择"}</dd>
           </div>
           <div>
             <dt>兴趣偏好</dt>
@@ -1310,4 +1362,8 @@ function getRouteEndTime(
   return lastArrivalMinutes === null
     ? "--:--"
     : formatTime(lastArrivalMinutes + lastStop.stayMinutes);
+}
+
+function formatCandidateDistance(candidate: RouteCandidate) {
+  return `${(candidate.detourMeters / 1000).toFixed(1)} km`;
 }

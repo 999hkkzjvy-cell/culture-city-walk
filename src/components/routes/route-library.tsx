@@ -8,8 +8,8 @@ import {
   createRouteRepository,
   type SavedRouteSummary,
 } from "@/lib/repositories/route-repository";
+import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import type { Theme } from "@/lib/route";
-import { readCandidateState, readRoutePlan } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
 
 type LoadState = "loading" | "ready" | "error";
@@ -55,10 +55,7 @@ export function RouteLibrary({
     const repository = createRouteRepository();
 
     try {
-      const route = readRoutePlan();
-      const saved = await repository.save(route);
-      const candidateState = readCandidateState(route.id);
-      await repository.saveCandidates(saved.id, candidateState);
+      const { saved } = await saveLocalRouteToCloud(repository);
       setRoutes((current) => [
         saved,
         ...current.filter((route) => route.id !== saved.id),
