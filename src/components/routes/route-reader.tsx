@@ -343,6 +343,21 @@ export function RouteReader() {
         </section>
       ) : null}
 
+      {route.validation && route.validation.issueCount > 0 ? (
+        <section className="route-kernel-alerts" aria-label="上次保存校验提示">
+          <p>
+            <FileText size={16} />
+            上次保存校验保留 {route.validation.issueCount} 项问题
+          </p>
+          {route.validation.issues.slice(0, 3).map((issue) => (
+            <p key={`${issue.code}-${issue.stopId ?? "route"}-${issue.message}`}>
+              <AlertTriangle size={16} />
+              {issue.message}
+            </p>
+          ))}
+        </section>
+      ) : null}
+
       <section className="reader-layout">
         <aside className="map-pane">
           <button className="map-toggle" type="button">

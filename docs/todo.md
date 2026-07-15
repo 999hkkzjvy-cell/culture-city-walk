@@ -28,10 +28,6 @@
   - `deepseek-proxy` 代码已基于 `AI_DAILY_USER_LIMIT` 和 `AI_PROJECT_COST_LIMIT_CNY` 增加每日用户限制和项目日成本限制。
   - 还需要部署新版 `deepseek-proxy`，在 Supabase Function secrets 中配置限额变量，并做线上超额/未登录/正常调用烟测。
 
-- `P1` 增加路线冲突持久化。
-  - 路线内核能检测缺失路段和固定时间冲突。
-  - 需要把冲突结果或派生校验状态保存到编辑流程，方便用户回看未解决问题。
-
 ## P1 地图与路线 Provider
 
 - `P1` 增强地图视野行为。

@@ -1,4 +1,8 @@
-import type { RoutePlan, RouteStop } from "@/lib/route";
+import type {
+  RoutePlan,
+  RouteStop,
+  RouteValidationSnapshot,
+} from "@/lib/route";
 
 export type RouteLegSource = "provider" | "estimated" | "missing";
 
@@ -52,6 +56,23 @@ export function calculateRouteKernel(route: RoutePlan): RouteKernelResult {
     ...totals,
     totalMinutes: totals.totalStayMinutes + totals.totalWalkingMinutes,
     legSource: getRouteLegSource(stops),
+    issues,
+  };
+}
+
+export function createRouteValidationSnapshot(
+  route: RoutePlan,
+): RouteValidationSnapshot {
+  const issues = calculateRouteKernel(route).issues.map((issue) => ({
+    code: issue.code,
+    severity: issue.severity,
+    stopId: issue.stopId,
+    message: issue.message,
+  }));
+
+  return {
+    checkedAt: new Date().toISOString(),
+    issueCount: issues.length,
     issues,
   };
 }

@@ -5,8 +5,10 @@ import {
   type RouteDraft,
   type RoutePlan,
   type RouteStop,
+  type RouteValidationSnapshot,
   type Theme,
 } from "@/lib/route";
+import { createRouteValidationSnapshot } from "@/lib/route-kernel";
 import {
   createRouteSnapshot,
   readCandidateState,
@@ -266,6 +268,7 @@ class SupabaseRouteRepository implements RouteRepository {
     }
 
     const preferences = route.preferences as Record<string, unknown>;
+    const validation = parseRouteValidation(preferences.validation);
 
     return {
       id: route.id,
@@ -286,6 +289,7 @@ class SupabaseRouteRepository implements RouteRepository {
       distanceKm: Number(preferences.distanceKm ?? 0),
       updatedAt: route.updated_at,
       stops: (stops ?? []).map(mapStopFromRow),
+      validation,
     };
   }
 
@@ -311,6 +315,7 @@ class SupabaseRouteRepository implements RouteRepository {
         mustVisits: route.mustVisits,
         pace: route.pace,
         distanceKm: route.distanceKm,
+        validation: createRouteValidationSnapshot(route) as unknown as Json,
       },
     };
 
@@ -966,6 +971,41 @@ function mapStopFromRow(row: {
   };
 }
 
+function parseRouteValidation(value: unknown): RouteValidationSnapshot | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const snapshot = value as Partial<RouteValidationSnapshot>;
+
+  if (!Array.isArray(snapshot.issues) || typeof snapshot.checkedAt !== "string") {
+    return undefined;
+  }
+
+  const issues = snapshot.issues
+    .filter(
+      (issue) =>
+        issue &&
+        typeof issue === "object" &&
+        typeof issue.code === "string" &&
+        typeof issue.message === "string" &&
+        (issue.severity === "warning" || issue.severity === "error"),
+    )
+    .map((issue) => ({
+      code: issue.code,
+      severity: issue.severity,
+      stopId: typeof issue.stopId === "string" ? issue.stopId : undefined,
+      message: issue.message,
+    }));
+
+  return {
+    checkedAt: snapshot.checkedAt,
+    issueCount:
+      typeof snapshot.issueCount === "number" ? snapshot.issueCount : issues.length,
+    issues,
+  };
+}
+
 function routeStopConstraintType(stop: RouteStop) {
   if (stop.routeRole === "start") {
     return "start";
@@ -1047,6 +1087,7 @@ function parseThemes(value: Json | null): Theme[] {
 
 export const routeRepositoryTestUtils = {
   mapStopFromRow,
+  parseRouteValidation,
   placeInsertFromStop,
   routeStopConstraintType,
 };

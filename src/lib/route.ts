@@ -64,6 +64,20 @@ export type RouteDraft = {
 export type RoutePlan = RouteDraft & {
   distanceKm: number;
   stops: RouteStop[];
+  validation?: RouteValidationSnapshot;
+};
+
+export type RouteValidationSnapshot = {
+  checkedAt: string;
+  issueCount: number;
+  issues: RouteValidationIssue[];
+};
+
+export type RouteValidationIssue = {
+  code: string;
+  severity: "warning" | "error";
+  stopId?: string;
+  message: string;
 };
 
 export const draftStorageKey = "cultural-citywalk:draft";

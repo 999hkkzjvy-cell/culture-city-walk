@@ -68,6 +68,45 @@ describe("local storage helpers", () => {
     );
   });
 
+  it("persists route validation issues with the saved route", () => {
+    saveRoutePlan({
+      ...demoRoute,
+      stops: [
+        {
+          ...demoRoute.stops[0],
+          id: "fixed-start",
+          time: "09:00",
+          stayMinutes: 60,
+          fixedTime: true,
+        },
+        {
+          ...demoRoute.stops[1],
+          id: "fixed-conflict",
+          time: "09:30",
+          fixedTime: true,
+          walkingFromPrevious: {
+            minutes: 20,
+            distanceMeters: 1200,
+            source: "estimated",
+            provider: "local",
+          },
+        },
+      ],
+    });
+
+    expect(readRoutePlan().validation).toEqual(
+      expect.objectContaining({
+        issueCount: 1,
+        issues: [
+          expect.objectContaining({
+            code: "fixed_time_conflict",
+            stopId: "fixed-conflict",
+          }),
+        ],
+      }),
+    );
+  });
+
   it("saves and reads candidate action state for a route", () => {
     const [candidate] = generateRouteCandidates(demoRoute, {
       themes: ["文学"],

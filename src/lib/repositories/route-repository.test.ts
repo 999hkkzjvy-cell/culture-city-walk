@@ -85,4 +85,31 @@ describe("route repository mapping", () => {
       }),
     );
   });
+
+  it("parses persisted route validation snapshots", () => {
+    expect(
+      routeRepositoryTestUtils.parseRouteValidation({
+        checkedAt: "2026-07-16T00:00:00.000Z",
+        issueCount: 1,
+        issues: [
+          {
+            code: "fixed_time_conflict",
+            severity: "error",
+            stopId: "stop-2",
+            message: "固定时间冲突",
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        issueCount: 1,
+        issues: [
+          expect.objectContaining({
+            code: "fixed_time_conflict",
+            stopId: "stop-2",
+          }),
+        ],
+      }),
+    );
+  });
 });

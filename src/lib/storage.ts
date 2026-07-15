@@ -6,7 +6,9 @@ import {
   draftStorageKey,
   type RouteDraft,
   type RoutePlan,
+  type RouteValidationSnapshot,
 } from "./route";
+import { createRouteValidationSnapshot } from "./route-kernel";
 import type { RouteCandidate } from "./route-candidates";
 
 export type StoredCandidateAction = "joined" | "backup" | "ignored";
@@ -122,11 +124,16 @@ export function readRoutePlan(): RoutePlan {
 export function saveRoutePlan(route: RoutePlan) {
   window.localStorage.setItem(
     routePlanStorageKey,
-    JSON.stringify({
+    JSON.stringify(withRouteValidation(route)),
+  );
+}
+
+function withRouteValidation(route: RoutePlan): RoutePlan {
+  return {
       ...route,
       updatedAt: new Date().toISOString(),
-    }),
-  );
+      validation: createRouteValidationSnapshot(route),
+  };
 }
 
 export function readCandidateState(
@@ -482,6 +489,42 @@ function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {
     startTime:
       typeof value.startTime === "string" ? value.startTime : demoRoute.startTime,
     stops: Array.isArray(value.stops) ? value.stops : demoRoute.stops,
+    validation: parseRouteValidation(value.validation),
+  };
+}
+
+function parseRouteValidation(value: unknown): RouteValidationSnapshot | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const snapshot = value as Partial<RouteValidationSnapshot>;
+
+  if (!Array.isArray(snapshot.issues) || typeof snapshot.checkedAt !== "string") {
+    return undefined;
+  }
+
+  const issues = snapshot.issues
+    .filter(
+      (issue) =>
+        issue &&
+        typeof issue === "object" &&
+        typeof issue.message === "string" &&
+        typeof issue.code === "string" &&
+        (issue.severity === "warning" || issue.severity === "error"),
+    )
+    .map((issue) => ({
+      code: issue.code,
+      severity: issue.severity,
+      stopId: typeof issue.stopId === "string" ? issue.stopId : undefined,
+      message: issue.message,
+    }));
+
+  return {
+    checkedAt: snapshot.checkedAt,
+    issueCount:
+      typeof snapshot.issueCount === "number" ? snapshot.issueCount : issues.length,
+    issues,
   };
 }
 
