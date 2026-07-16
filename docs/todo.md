@@ -16,18 +16,14 @@
 
 ## P1 规划与候选质量
 
-- `P1` 待授权执行 AI 用量限制的生产登录/超额烟测。
-  - `deepseek-proxy` 新版已部署，Supabase Function secrets 已配置 `AI_DAILY_USER_LIMIT=30` 和 `AI_PROJECT_COST_LIMIT_CNY=20`。
-  - 未登录诊断 smoke 已返回 `deepseek_auth_required`，高德 provider 诊断已返回 `OK`。
-  - 已新增 `npm run smoke:deepseek-limit`，默认 dry-run；用户明确授权后可运行 `npm run smoke:deepseek-limit -- --execute`，脚本会创建临时生产用户、验证登录 allowed、写入当日 `route_ai_runs` 触发用户日限额，再清理临时数据。
-  - 该操作会改写生产 Supabase 数据，仍需用户明确授权后执行。
+当前没有 P1 规划与候选质量待办。
 
 ## P1 认证、云端与数据可靠性
 
 - `P1` 线上验证头像上传与云端收藏迁移。
   - `20260716000200_profile_avatars_and_route_favorites.sql` 已由用户在 Supabase 执行，包含公开 `profile-avatars` bucket、头像 Storage policy、`route_favorites` 表和 owner-only RLS。
   - 本地代码已支持头像图片上传、本地收藏云端同步、登录后路线库合并云端收藏。
-  - 前端代码仍需提交、推送并等待 GitHub Pages 部署后，线上验证头像上传、收藏同步、跨设备收藏读取和未登录本地收藏 fallback。
+  - 前端代码已提交推送；仍需等待 GitHub Pages 部署后，线上验证头像上传最终展示、收藏同步、跨设备收藏读取和未登录本地收藏 fallback。
 
 - `P1` 如未来开启邮件确认或 magic link，执行线上邮件链接回跳 smoke。
   - 登录页已支持 Supabase `code` 回跳和 hash token 回跳，并会按安全站内 `redirect` 参数跳转。
