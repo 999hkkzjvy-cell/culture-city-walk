@@ -90,10 +90,12 @@ export async function parseIntentWithDeepSeek(
 export async function rankCandidatesWithDeepSeek(
   candidates: RouteCandidate[],
   intent: PlanningIntent,
+  routeGoal = "",
 ): Promise<CollaborationResult<RouteCandidate[]>> {
   const action = "rank-candidates";
   const payload = {
     intent,
+    routeGoal,
     candidates: candidates.map((candidate) => ({
       id: candidate.id,
       name: candidate.place.name,

@@ -22,6 +22,7 @@ type DeepSeekProxyRequest =
   | {
       action: "rank-candidates";
       intent: unknown;
+      routeGoal?: string;
       candidates: unknown[];
       schemaRepair?: SchemaRepairHint;
     }
@@ -308,7 +309,7 @@ async function handleParseIntent(
   const response = await callDeepSeek(apiKey, {
     maxTokens: 700,
     systemPrompt: withRepairInstruction(
-      "你是城市漫游规划助手。请把用户需求解析为严格 json 对象，不要输出 markdown。只允许输出这些字段：mode, city, date, mustVisitPlaceIds, themeFilters, pace, maxWalkingKm, mealRequirement。themeFilters 只能从 历史、文学、建筑、音乐、书店、美食 中选择。pace 只能是 轻松漫步、平衡、充实紧凑。缺失信息使用 draft 中的值。",
+      "你是城市漫游规划助手。请把用户需求解析为严格 json 对象，不要输出 markdown。只允许输出这些字段：mode, city, date, mustVisitPlaceIds, themeFilters, pace, maxWalkingKm, mealRequirement。themeFilters 只能从 历史、文学、建筑、音乐、书店、美食 中选择。pace 只能是 轻松漫步、平衡、充实紧凑。mealRequirement 可用 lunch、dinner 或 null，用户提到晚餐/晚饭/傍晚用 dinner，午餐/午饭/中午用 lunch。缺失信息使用 draft 中的值。",
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
@@ -407,7 +408,7 @@ async function handleRankCandidates(
   input: Extract<DeepSeekProxyRequest, { action: "rank-candidates" }>,
   apiKey: string,
 ) {
-  if (!Array.isArray(input.candidates) || input.candidates.length > 12) {
+  if (!Array.isArray(input.candidates) || input.candidates.length > 15) {
     return json({ error: "invalid_candidates" }, 400);
   }
 
@@ -415,11 +416,12 @@ async function handleRankCandidates(
   const response = await callDeepSeek(apiKey, {
     maxTokens: 1200,
     systemPrompt: withRepairInstruction(
-      "你是城市漫游候选点排序助手。请只基于用户意图和给定 candidates 排序，不要编造候选点、事实来源或不可验证故事。输出严格 json 对象，不要输出 markdown。格式为 {\"ranked\":[{\"id\":\"候选点id\",\"reasons\":[\"一句中文推荐理由\"]}],\"warnings\":[]}。ranked 只能使用输入里的 id。",
+      "你是城市漫游候选点排序助手。请只基于用户意图、routeGoal 和给定 candidates 排序，不要编造候选点、事实来源或不可验证故事。routeGoal 是用户的一句话补充目标，优先用于判断餐厅、晚餐、主题关键词和收官位置。输出严格 json 对象，不要输出 markdown。格式为 {\"ranked\":[{\"id\":\"候选点id\",\"reasons\":[\"一句中文推荐理由\"]}],\"warnings\":[]}。ranked 只能使用输入里的 id。",
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
       intent: input.intent,
+      routeGoal: input.routeGoal ?? "",
       candidates: input.candidates,
       schemaRepair: input.schemaRepair ?? null,
       exampleJson: {

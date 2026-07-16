@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { defaultDraft, demoRoute } from "@/lib/route";
-import { generateRouteCandidates } from "@/lib/route-candidates";
+import {
+  generateRouteCandidates,
+  generateRouteCandidatesFromPlaces,
+} from "@/lib/route-candidates";
 import {
   generateRouteSummaryWithFallback,
   generateStopThemeContentWithFallback,
@@ -64,6 +67,58 @@ describe("route collaboration fallback", () => {
     expect(ranked.data).toHaveLength(3);
     expect(ranked.data[0].reasons.at(-1)).toMatch(/文学|备选点/);
     expect(ranked.warnings[0]).toContain("待 DeepSeek 接入");
+  });
+
+  it("keeps dinner goals in fallback intent and candidate ranking", () => {
+    const intent = parseIntentWithFallback(
+      "南京，最后想在晚餐附近找一家南京菜餐厅",
+      defaultDraft,
+    ).data;
+    const candidates = generateRouteCandidatesFromPlaces(
+      demoRoute,
+      [
+        {
+          id: "amap:meal",
+          source: "amap",
+          sourcePlaceId: "meal",
+          name: "老城南京菜馆",
+          address: "终点附近",
+          city: "南京市",
+          district: "秦淮区",
+          adcode: "320104",
+          coordinate: { lng: 118.799, lat: 32.04, system: "gcj02" },
+          poiType: "餐饮服务;中餐厅;南京菜",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:gallery",
+          source: "amap",
+          sourcePlaceId: "gallery",
+          name: "城市展览馆",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.792, lat: 32.04, system: "gcj02" },
+          poiType: "科教文化服务;展览馆",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: intent.themeFilters,
+        acceptedTypes: ["餐厅", "博物馆"],
+        maxResults: 2,
+      },
+    );
+    const ranked = rankCandidatesWithFallback(
+      candidates,
+      intent,
+      "最后想在晚餐附近找一家南京菜餐厅",
+    );
+
+    expect(intent.mealRequirement).toBe("dinner");
+    expect(ranked.data[0].placeType).toBe("餐厅");
+    expect(ranked.data[0].reasons.at(-1)).toContain("晚餐候选");
   });
 
   it("generates route title and summary using a deterministic template", () => {

@@ -82,7 +82,7 @@ export function parseIntentWithFallback(
     themeFilters: themes,
     pace: draft.pace,
     maxWalkingKm,
-    mealRequirement: input.includes("午餐") ? "lunch" : null,
+    mealRequirement: inferMealRequirement(input),
   });
 
   return {
@@ -95,13 +95,16 @@ export function parseIntentWithFallback(
 export function rankCandidatesWithFallback(
   candidates: RouteCandidate[],
   intent: PlanningIntent,
+  routeGoal = "",
 ): CollaborationResult<RouteCandidate[]> {
   const startedAt = performanceNow();
   const ranked = [...candidates].sort((a, b) => {
     const aThemeBoost = countThemeMatches(a.themes, intent.themeFilters) * 8;
     const bThemeBoost = countThemeMatches(b.themes, intent.themeFilters) * 8;
+    const aGoalBoost = scoreCandidateAgainstGoal(a, routeGoal, intent);
+    const bGoalBoost = scoreCandidateAgainstGoal(b, routeGoal, intent);
 
-    return b.score + bThemeBoost - (a.score + aThemeBoost);
+    return b.score + bThemeBoost + bGoalBoost - (a.score + aThemeBoost + aGoalBoost);
   });
 
   return {
@@ -109,7 +112,7 @@ export function rankCandidatesWithFallback(
       ...candidate,
       reasons: [
         ...candidate.reasons,
-        templateAiReason(candidate, intent.themeFilters),
+        templateAiReason(candidate, intent.themeFilters, routeGoal, intent),
       ],
     })),
     usage: fallbackUsage(
@@ -245,20 +248,117 @@ function inferMaxWalkingKm(label: string) {
   return Number(match[2] ?? match[1]);
 }
 
+function inferMealRequirement(input: string) {
+  if (matchesAny(input, ["晚餐", "晚饭", "傍晚", "晚上吃", "收官餐"])) {
+    return "dinner";
+  }
+
+  if (matchesAny(input, ["午餐", "午饭", "中午吃"])) {
+    return "lunch";
+  }
+
+  return null;
+}
+
 function countThemeMatches(candidateThemes: Theme[], targetThemes: Theme[]) {
   return candidateThemes.filter((theme) => targetThemes.includes(theme)).length;
 }
 
-function templateAiReason(candidate: RouteCandidate, themes: Theme[]) {
+function templateAiReason(
+  candidate: RouteCandidate,
+  themes: Theme[],
+  routeGoal = "",
+  intent?: PlanningIntent,
+) {
   const matchedThemes = candidate.themes.filter((theme) =>
     themes.includes(theme),
   );
+
+  if (
+    candidate.placeType === "餐厅" &&
+    (routeGoal.includes("晚餐") || intent?.mealRequirement === "dinner")
+  ) {
+    return "它更适合作为晚餐候选，能把路线收束到用餐和休息节奏上。";
+  }
+
+  if (candidate.placeType === "餐厅" && routeGoal.includes("午餐")) {
+    return "它适合作为午餐候选，能在路线中段提供明确的用餐停顿。";
+  }
+
+  const goalKeywords = getGoalKeywords(routeGoal);
+  const matchedGoalKeywords = goalKeywords.filter((keyword) =>
+    [candidate.place.name, candidate.place.address ?? "", candidate.place.poiType ?? ""]
+      .join(" ")
+      .includes(keyword),
+  );
+
+  if (matchedGoalKeywords.length > 0) {
+    return `它呼应你补充的${matchedGoalKeywords.slice(0, 2).join("、")}目标，同时保持路线连续。`;
+  }
 
   if (matchedThemes.length === 0) {
     return "作为备选点，它主要补充路线节奏和空间连续性。";
   }
 
   return `它能加强${matchedThemes.join("、")}线索，同时不明显拉长步行时间。`;
+}
+
+function scoreCandidateAgainstGoal(
+  candidate: RouteCandidate,
+  routeGoal: string,
+  intent: PlanningIntent,
+) {
+  const text = [
+    candidate.place.name,
+    candidate.place.address ?? "",
+    candidate.place.poiType ?? "",
+    candidate.placeType,
+    candidate.themes.join(" "),
+  ].join(" ");
+  const keywordScore = getGoalKeywords(routeGoal).filter((keyword) =>
+    text.includes(keyword),
+  ).length;
+  const dinnerScore =
+    candidate.placeType === "餐厅" &&
+    (routeGoal.includes("晚餐") || intent.mealRequirement === "dinner")
+      ? 36
+      : 0;
+  const lunchScore =
+    candidate.placeType === "餐厅" &&
+    (routeGoal.includes("午餐") || intent.mealRequirement === "lunch")
+      ? 24
+      : 0;
+
+  return Math.min(16, keywordScore * 5) + dinnerScore + lunchScore;
+}
+
+function getGoalKeywords(routeGoal: string) {
+  return [
+    "民国",
+    "近代",
+    "老城",
+    "老街",
+    "书店",
+    "文学",
+    "建筑",
+    "历史",
+    "音乐",
+    "展览",
+    "博物馆",
+    "美术馆",
+    "小吃",
+    "淮扬",
+    "南京菜",
+    "本帮",
+    "日料",
+    "韩餐",
+    "火锅",
+    "烧烤",
+  ].filter((keyword) => routeGoal.includes(keyword));
+}
+
+function matchesAny(input: string, keywords: string[]) {
+  return keywords.some((keyword) => input.includes(keyword));
 }
 
 function fallbackUsage(

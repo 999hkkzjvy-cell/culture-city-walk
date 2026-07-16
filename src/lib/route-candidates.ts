@@ -30,6 +30,7 @@ export type CandidateSearchOptions = {
   themes: Theme[];
   acceptedTypes?: CandidatePlaceType[];
   restaurantPreferences?: RestaurantPreferences;
+  routeGoal?: string;
   maxResults?: number;
   now?: Date;
 };
@@ -37,6 +38,7 @@ export type CandidateSearchOptions = {
 export type RestaurantPreferences = {
   cuisines?: string[];
   budget?: string | null;
+  mealRequirement?: "lunch" | "dinner" | null;
 };
 
 type SeedCandidate = Omit<
@@ -168,6 +170,7 @@ export function generateRouteCandidates(
     .map((candidate) =>
       scoreCandidate(route, candidate, options.themes, undefined, {
         restaurantPreferences: options.restaurantPreferences,
+        routeGoal: options.routeGoal,
       }),
     )
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
@@ -193,6 +196,7 @@ export function generateRouteCandidatesFromPlaces(
     .map((candidate) =>
       scoreCandidate(route, candidate, options.themes, undefined, {
         restaurantPreferences: options.restaurantPreferences,
+        routeGoal: options.routeGoal,
       }),
     )
     .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
@@ -230,6 +234,7 @@ export async function refineCandidatesWithProviderDetours(
   calculateWalkingRoute: NonNullable<MapProvider["calculateWalkingRoute"]>,
   preferredThemes: Theme[],
   restaurantPreferences?: RestaurantPreferences,
+  routeGoal?: string,
 ): Promise<ProviderDetourResult> {
   if (route.stops.length < 2 || candidates.length === 0) {
     return {
@@ -258,6 +263,7 @@ export async function refineCandidatesWithProviderDetours(
     return scoreCandidate(route, candidate, preferredThemes, insertion, {
       providerVerified: (insertion.providerLegs ?? 0) > 0,
       restaurantPreferences,
+      routeGoal,
     });
   });
 
@@ -278,6 +284,7 @@ function scoreCandidate(
   scoringOptions: {
     providerVerified?: boolean;
     restaurantPreferences?: RestaurantPreferences;
+    routeGoal?: string;
   } = {},
 ): RouteCandidate {
   const insertion =
@@ -298,11 +305,13 @@ function scoreCandidate(
     route,
     insertion,
   );
+  const routeGoalMatch = getRouteGoalMatch(candidate, scoringOptions.routeGoal);
   const baseScore =
     58 +
     themeScore +
     diversityScore +
     providerQualityScore +
+    routeGoalMatch.score +
     restaurantPreference.score -
     detourPenalty;
   const score = clamp(Math.round(baseScore), 0, 100);
@@ -312,7 +321,7 @@ function scoreCandidate(
     matchedThemes,
     insertion.detourMinutes,
     scoringOptions.providerVerified,
-    restaurantPreference.reasons,
+    [...routeGoalMatch.reasons, ...restaurantPreference.reasons],
   );
   const risks = [
     ...buildRisks(candidate.place),
@@ -643,7 +652,10 @@ function getRestaurantPreferenceMatch(
   const expectedArrival = route && insertion
     ? getExpectedCandidateArrival(route, candidate.place, insertion)
     : null;
-  const mealTiming = getMealTimingMatch(expectedArrival);
+  const mealTiming = getMealTimingMatch(
+    expectedArrival,
+    preferences.mealRequirement,
+  );
   const openingStatus = getOpeningHoursStatus(
     candidate.place.openingHours,
     expectedArrival ?? undefined,
@@ -674,7 +686,10 @@ function getRestaurantPreferenceMatch(
     reasons.push(`人均约 ${budgetMatch.cost} 元，低于预算上限`);
   }
 
-  if (mealTiming.status === "meal_time") {
+  if (mealTiming.status === "target_meal_time") {
+    score += 12;
+    reasons.push(`${expectedArrival} 抵达接近${mealTiming.label}`);
+  } else if (mealTiming.status === "meal_time") {
     score += 6;
     reasons.push(`${expectedArrival} 抵达接近${mealTiming.label}`);
   } else if (mealTiming.status === "off_meal_time") {
@@ -699,6 +714,98 @@ function getRestaurantPreferenceMatch(
   }
 
   return { score, reasons, risks };
+}
+
+function getRouteGoalMatch(candidate: SeedCandidate, routeGoal?: string) {
+  const normalizedGoal = routeGoal?.trim();
+
+  if (!normalizedGoal) {
+    return { score: 0, reasons: [] as string[] };
+  }
+
+  const candidateText = [
+    candidate.place.name,
+    candidate.place.address ?? "",
+    candidate.place.poiType ?? "",
+    candidate.placeType,
+    candidate.themes.join(" "),
+  ].join(" ");
+  const keywords = getRouteGoalKeywords(normalizedGoal);
+  const matchedKeywords = keywords.filter((keyword) =>
+    candidateText.includes(keyword),
+  );
+  let score = Math.min(14, matchedKeywords.length * 5);
+  const reasons: string[] = [];
+
+  if (
+    candidate.placeType === "餐厅" &&
+    matchesAny(normalizedGoal, ["晚餐", "午餐", "吃饭", "餐厅", "美食", "小吃"])
+  ) {
+    score += normalizedGoal.includes("晚餐") ? 20 : 12;
+    reasons.push(
+      normalizedGoal.includes("晚餐")
+        ? "呼应晚餐安排目标"
+        : "呼应用餐安排目标",
+    );
+  }
+
+  if (matchedKeywords.length > 0) {
+    reasons.push(`呼应路线目标：${matchedKeywords.slice(0, 3).join("、")}`);
+  }
+
+  return {
+    score,
+    reasons,
+  };
+}
+
+function getRouteGoalKeywords(routeGoal: string) {
+  const directKeywords = [
+    "民国",
+    "近代",
+    "老城",
+    "老街",
+    "书店",
+    "文学",
+    "建筑",
+    "历史",
+    "音乐",
+    "展览",
+    "博物馆",
+    "美术馆",
+    "小吃",
+    "淮扬",
+    "南京菜",
+    "本帮",
+    "日料",
+    "韩餐",
+    "火锅",
+    "烧烤",
+    "晚餐",
+    "午餐",
+  ].filter((keyword) => routeGoal.includes(keyword));
+  const looseKeywords = routeGoal
+    .split(/[，。、“”\s,.;:：；/]+/)
+    .map((keyword) => keyword.trim())
+    .filter(
+      (keyword) =>
+        keyword.length >= 2 &&
+        ![
+          "附近",
+          "路线",
+          "目标",
+          "补充",
+          "安排",
+          "希望",
+          "想要",
+          "适合",
+          "一个",
+          "一些",
+          "这次",
+        ].includes(keyword),
+    );
+
+  return [...new Set([...directKeywords, ...looseKeywords])];
 }
 
 function getCuisineKeywords(cuisine: string) {
@@ -853,7 +960,10 @@ function getExpectedCandidateArrival(
   );
 }
 
-function getMealTimingMatch(arrivalTime: string | null) {
+function getMealTimingMatch(
+  arrivalTime: string | null,
+  mealRequirement?: RestaurantPreferences["mealRequirement"],
+) {
   const minutes = parseTime(arrivalTime);
 
   if (minutes === null) {
@@ -861,11 +971,23 @@ function getMealTimingMatch(arrivalTime: string | null) {
   }
 
   if (minutes >= 11 * 60 && minutes <= 14 * 60) {
-    return { status: "meal_time" as const, label: "午餐时段" };
+    return {
+      status:
+        mealRequirement === "lunch"
+          ? ("target_meal_time" as const)
+          : ("meal_time" as const),
+      label: "午餐时段",
+    };
   }
 
   if (minutes >= 17 * 60 && minutes <= 20 * 60 + 30) {
-    return { status: "meal_time" as const, label: "晚餐时段" };
+    return {
+      status:
+        mealRequirement === "dinner"
+          ? ("target_meal_time" as const)
+          : ("meal_time" as const),
+      label: "晚餐时段",
+    };
   }
 
   if (minutes >= 10 * 60 && minutes <= 21 * 60) {

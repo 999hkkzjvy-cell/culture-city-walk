@@ -55,6 +55,7 @@ import {
 import { logAiUsageRun, makeAiRunIdempotencyKey } from "@/lib/ai/usage-log";
 import {
   calculateRouteKernel,
+  calculateTimeline,
   formatTime,
   parseTime,
 } from "@/lib/route-kernel";
@@ -62,7 +63,7 @@ import {
   createAmapWebServiceProvider,
   isAmapWebProxyConfigured,
 } from "@/lib/maps/amap-web";
-import type { PlaceCandidate } from "@/lib/maps/types";
+import type { Coordinate, MapProvider, PlaceCandidate } from "@/lib/maps/types";
 import { getOpeningHoursWarning } from "@/lib/opening-hours";
 import {
   collectAmapPlacesAround,
@@ -560,8 +561,20 @@ export function PlanningDesk() {
         acceptedTypes: effectiveCandidateTypes,
         maxResults: includeMeals ? 15 : 12,
         restaurantPreferences: includeMeals
-          ? { cuisines: mealCuisines, budget: mealBudget }
+          ? {
+              cuisines: mealCuisines,
+              budget: mealBudget,
+              mealRequirement: normalizeMealRequirement(
+                intent.data.mealRequirement,
+                requestText,
+              ),
+            }
           : undefined,
+        routeGoal: requestText,
+        mealRequirement: normalizeMealRequirement(
+          intent.data.mealRequirement,
+          requestText,
+        ),
       });
       const ranked = await rankCandidateSuggestions(
         candidateResult.candidates,
@@ -641,6 +654,8 @@ export function PlanningDesk() {
       acceptedTypes: CandidatePlaceType[];
       maxResults: number;
       restaurantPreferences?: RestaurantPreferences;
+      routeGoal?: string;
+      mealRequirement?: RestaurantPreferences["mealRequirement"];
     },
   ) {
     const fallbackCandidates = () =>
@@ -649,6 +664,7 @@ export function PlanningDesk() {
         acceptedTypes: options.acceptedTypes,
         maxResults: options.maxResults,
         restaurantPreferences: options.restaurantPreferences,
+        routeGoal: options.routeGoal,
       });
     const fallbackResult = (
       message: string,
@@ -701,20 +717,27 @@ export function PlanningDesk() {
               `高德沿途候选部分采样点搜索失败（${failedCount}/${centers.length}），已使用成功返回的地点继续筛选。`,
             ]
           : [];
+      const mealSearchResult = await collectMealPlacesAroundRoute(route, {
+        ...options,
+        searchPlacesAround,
+      });
+      const allPlaces = dedupePlaces([...places, ...mealSearchResult.places]);
+      const providerWarnings = [...warnings, ...mealSearchResult.warnings];
 
       const providerCandidates = ensureMealCandidates(
         generateRouteCandidatesFromPlaces(
           route,
-          places,
+          allPlaces,
           {
             themes: options.themes,
             acceptedTypes: options.acceptedTypes,
             maxResults: options.maxResults,
             restaurantPreferences: options.restaurantPreferences,
+            routeGoal: options.routeGoal,
           },
         ),
         route,
-        places,
+        allPlaces,
         options,
       );
 
@@ -726,6 +749,7 @@ export function PlanningDesk() {
             provider.calculateWalkingRoute,
             options.themes,
             options.restaurantPreferences,
+            options.routeGoal,
           );
           const detourWarnings =
             detourResult.providerLegs > 0
@@ -743,11 +767,11 @@ export function PlanningDesk() {
 
           return {
             candidates: detourResult.candidates,
-            warnings: [...warnings, ...detourWarnings],
+            warnings: [...providerWarnings, ...detourWarnings],
           };
         }
 
-        return { candidates: providerCandidates, warnings };
+        return { candidates: providerCandidates, warnings: providerWarnings };
       }
 
       if (failedCount === centers.length) {
@@ -760,14 +784,14 @@ export function PlanningDesk() {
         );
       }
 
-      if (places.length > 0) {
+      if (allPlaces.length > 0) {
         return fallbackResult(
           "高德已返回地点，但当前筛选类型/路线约束下没有合适候选",
-          warnings,
+          providerWarnings,
         );
       }
 
-      return fallbackResult("高德没有返回沿途地点", warnings);
+      return fallbackResult("高德没有返回沿途地点", providerWarnings);
     } catch (error) {
       const failureDetail = getAmapFailureDetail(error);
 
@@ -806,13 +830,21 @@ export function PlanningDesk() {
     intent: ReturnType<typeof parseIntentWithFallback>["data"],
   ) {
     if (!isDeepSeekProxyConfigured()) {
-      return rankCandidatesWithFallback(localCandidates, intent);
+      return rankCandidatesWithFallback(localCandidates, intent, requestText);
     }
 
     try {
-      return await rankCandidatesWithDeepSeek(localCandidates, intent);
+      return await rankCandidatesWithDeepSeek(
+        localCandidates,
+        intent,
+        requestText,
+      );
     } catch {
-      const fallback = rankCandidatesWithFallback(localCandidates, intent);
+      const fallback = rankCandidatesWithFallback(
+        localCandidates,
+        intent,
+        requestText,
+      );
 
       return {
         ...fallback,
@@ -982,6 +1014,126 @@ export function PlanningDesk() {
     return [requestText.trim(), mealText].filter(Boolean).join("\n");
   }
 
+  function normalizeMealRequirement(
+    value: string | null,
+    routeGoal: string,
+  ): RestaurantPreferences["mealRequirement"] {
+    if (value === "lunch" || value === "dinner") {
+      return value;
+    }
+
+    if (matchesAny(routeGoal, ["晚餐", "晚饭", "傍晚", "晚上吃", "收官餐"])) {
+      return "dinner";
+    }
+
+    if (matchesAny(routeGoal, ["午餐", "午饭", "中午吃"])) {
+      return "lunch";
+    }
+
+    return null;
+  }
+
+  async function collectMealPlacesAroundRoute(
+    route: RoutePlan,
+    options: {
+      restaurantPreferences?: RestaurantPreferences;
+      mealRequirement?: RestaurantPreferences["mealRequirement"];
+      searchPlacesAround: NonNullable<MapProvider["searchPlacesAround"]>;
+    },
+  ) {
+    if (!includeMeals) {
+      return {
+        places: [] as PlaceCandidate[],
+        warnings: [] as string[],
+        searched: false,
+        label: "正餐时段",
+      };
+    }
+
+    const centers = collectMealSearchCenters(
+      route,
+      options.mealRequirement ?? options.restaurantPreferences?.mealRequirement,
+    );
+
+    if (centers.length === 0) {
+      return {
+        places: [] as PlaceCandidate[],
+        warnings: ["含餐已开启，但路线缺少可用于餐厅专项搜索的坐标。"],
+        searched: false,
+        label: "正餐时段",
+      };
+    }
+
+    const label =
+      (options.mealRequirement ?? options.restaurantPreferences?.mealRequirement) ===
+      "dinner"
+        ? "晚餐时段附近"
+        : (options.mealRequirement ??
+              options.restaurantPreferences?.mealRequirement) === "lunch"
+          ? "午餐时段附近"
+          : "正餐时段附近";
+    const result = await collectAmapPlacesAround({
+      centers,
+      city: route.city,
+      types: getAmapCandidateTypes(["餐厅"]),
+      radiusMeters: 1800,
+      limit: 15,
+      searchPlacesAround: options.searchPlacesAround,
+    });
+    const warnings =
+      result.failedCount > 0
+        ? [
+            `高德餐厅专项搜索部分采样点失败（${result.failedCount}/${centers.length}），已使用成功返回的餐厅继续筛选。`,
+          ]
+        : [];
+
+    return {
+      places: result.places,
+      warnings: result.places.length > 0 ? [`已围绕${label}补充餐厅专项搜索。`, ...warnings] : warnings,
+      searched: true,
+      label,
+    };
+  }
+
+  function collectMealSearchCenters(
+    route: RoutePlan,
+    mealRequirement?: RestaurantPreferences["mealRequirement"],
+  ): Coordinate[] {
+    const timeline = calculateTimeline(route.stops);
+    const targetMinutes =
+      mealRequirement === "lunch"
+        ? 12 * 60
+        : mealRequirement === "dinner"
+          ? 18 * 60 + 30
+          : 18 * 60;
+    const coordinatedStops = timeline.filter(
+      (stop) =>
+        stop.coordinate?.system === "gcj02" &&
+        Number.isFinite(stop.coordinate.lng) &&
+        Number.isFinite(stop.coordinate.lat),
+    );
+
+    return coordinatedStops
+      .sort((a, b) => {
+        const aMinutes = parseTime(a.calculatedTime) ?? targetMinutes;
+        const bMinutes = parseTime(b.calculatedTime) ?? targetMinutes;
+        const aDistance = Math.abs(aMinutes - targetMinutes);
+        const bDistance = Math.abs(bMinutes - targetMinutes);
+
+        if (aDistance !== bDistance) {
+          return aDistance - bDistance;
+        }
+
+        return mealRequirement === "dinner"
+          ? route.stops.findIndex((stop) => stop.id === b.id) -
+              route.stops.findIndex((stop) => stop.id === a.id)
+          : 0;
+      })
+      .map((stop) => stop.coordinate)
+      .filter((coordinate): coordinate is Coordinate => Boolean(coordinate))
+      .slice(0, 3);
+  }
+
   function ensureMealCandidates(
     currentCandidates: RouteCandidate[],
     route: RoutePlan,
@@ -991,17 +1143,10 @@ export function PlanningDesk() {
       acceptedTypes: CandidatePlaceType[];
       maxResults: number;
       restaurantPreferences?: RestaurantPreferences;
+      routeGoal?: string;
     },
   ) {
     if (!includeMeals) {
-      return currentCandidates;
-    }
-
-    const restaurantCount = currentCandidates.filter(
-      (candidate) => candidate.placeType === "餐厅",
-    ).length;
-
-    if (restaurantCount >= 3) {
       return currentCandidates;
     }
 
@@ -1010,11 +1155,12 @@ export function PlanningDesk() {
       acceptedTypes: ["餐厅"],
       maxResults: 5,
       restaurantPreferences: options.restaurantPreferences,
+      routeGoal: options.routeGoal,
     });
     const merged = [...currentCandidates, ...restaurants];
     const seen = new Set<string>();
 
-    return merged
+    const deduped = merged
       .filter((candidate) => {
         if (seen.has(candidate.id)) {
           return false;
@@ -1022,8 +1168,42 @@ export function PlanningDesk() {
         seen.add(candidate.id);
         return true;
       })
-      .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes)
-      .slice(0, options.maxResults);
+      .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes);
+    const top = deduped.slice(0, options.maxResults);
+    const targetRestaurantCount = Math.min(3, restaurants.length);
+    const topRestaurantCount = top.filter(
+      (candidate) => candidate.placeType === "餐厅",
+    ).length;
+
+    if (topRestaurantCount >= targetRestaurantCount) {
+      return top;
+    }
+
+    const restaurantsToKeep = restaurants
+      .filter((candidate) => !top.some((item) => item.id === candidate.id))
+      .slice(0, targetRestaurantCount - topRestaurantCount);
+
+    return [...top.slice(0, options.maxResults - restaurantsToKeep.length), ...restaurantsToKeep]
+      .sort((a, b) => b.score - a.score || a.detourMinutes - b.detourMinutes);
+  }
+
+  function dedupePlaces(places: PlaceCandidate[]) {
+    const seen = new Set<string>();
+
+    return places.filter((place) => {
+      const key = place.sourcePlaceId ?? place.id;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function matchesAny(input: string, keywords: string[]) {
+    return keywords.some((keyword) => input.includes(keyword));
   }
 
   function withGeneratedRouteTitle(route: RoutePlan, nextDraft = draft) {

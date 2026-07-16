@@ -496,4 +496,80 @@ describe("route candidates", () => {
     expect(candidates[1].risks.join(" ")).toContain("可能不在开放时间内");
     expect(candidates[1].risks.join(" ")).toContain("评分 3.6");
   });
+
+  it("uses the route goal and dinner requirement when scoring restaurant candidates", () => {
+    const dinnerRoute = {
+      ...demoRoute,
+      stops: [
+        {
+          ...demoRoute.stops[0],
+          id: "dinner-start",
+          name: "傍晚起点",
+          time: "17:40",
+          stayMinutes: 0,
+          routeRole: "start" as const,
+          coordinate: { lng: 118.79, lat: 32.04, system: "gcj02" as const },
+        },
+        {
+          ...demoRoute.stops[1],
+          id: "dinner-end",
+          name: "晚餐终点",
+          time: "19:00",
+          stayMinutes: 0,
+          routeRole: "end" as const,
+          coordinate: { lng: 118.8, lat: 32.04, system: "gcj02" as const },
+        },
+      ],
+    };
+    const candidates = generateRouteCandidatesFromPlaces(
+      dinnerRoute,
+      [
+        {
+          id: "amap:R030",
+          source: "amap",
+          sourcePlaceId: "R030",
+          name: "熙南里南京菜馆",
+          address: "终点附近",
+          city: "南京市",
+          district: "秦淮区",
+          adcode: "320104",
+          coordinate: { lng: 118.799, lat: 32.04, system: "gcj02" },
+          poiType: "餐饮服务;中餐厅;南京菜",
+          openingHours: "11:00-14:00, 17:00-21:30",
+          providerRating: "4.6",
+          providerCost: "92",
+          verificationStatus: "verified",
+        },
+        {
+          id: "amap:M030",
+          source: "amap",
+          sourcePlaceId: "M030",
+          name: "城市展览馆",
+          address: "长江路",
+          city: "南京市",
+          district: "玄武区",
+          adcode: "320102",
+          coordinate: { lng: 118.792, lat: 32.04, system: "gcj02" },
+          poiType: "科教文化服务;博物馆",
+          openingHours: "09:00-17:00",
+          verificationStatus: "verified",
+        },
+      ],
+      {
+        themes: ["历史"],
+        acceptedTypes: ["餐厅", "博物馆"],
+        maxResults: 2,
+        routeGoal: "希望最后在晚餐附近找一家南京菜餐厅",
+        restaurantPreferences: {
+          cuisines: ["地方小吃"],
+          budget: "50-100元",
+          mealRequirement: "dinner",
+        },
+      },
+    );
+
+    expect(candidates[0].place.name).toBe("熙南里南京菜馆");
+    expect(candidates[0].reasons.join(" ")).toContain("晚餐");
+    expect(candidates[0].reasons.join(" ")).toContain("路线目标");
+  });
 });
