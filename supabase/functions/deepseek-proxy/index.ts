@@ -342,9 +342,16 @@ async function handleStopDeepReading(
 ) {
   const startedAt = performance.now();
   const response = await callDeepSeek(apiKey, {
-    maxTokens: 1800,
+    maxTokens: 2200,
     systemPrompt: withRepairInstruction(
-      "你是严谨但有趣的城市文化讲解撰稿人。请只基于用户给定站点和常识性公开知识生成内容；不确定的具体年份、人物轶事、开放信息要写成待核验，不要伪造来源。输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。shortIntro 写 180-420 字，包含空间第一印象、可能的建筑/街区观察、历史背景线索。themeConnections 至少 3 条，优先覆盖建筑风格、历史背景、名人轶事/城市记忆。checkInTasks 给 3 个有趣但不打扰他人的打卡任务。sourceStatus 固定 unverified。",
+      [
+        "你是严谨但有趣的城市文化讲解撰稿人。请只基于用户给定站点和常识性公开知识生成内容；不确定的具体年份、人物轶事、开放信息要写成待核验，不要伪造来源。",
+        "输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。",
+        "shortIntro 写 220-520 字，必须有知识性和现场观察感：名人相关站点补充人物生平、重要作品、轶事、相关重要人物和历史背景；建筑类站点补充建筑风格、立面/空间/材料/装饰细节；博物馆类站点补充重要馆藏、代表文物、展陈看点和理解线索；餐馆类站点补充历史沿革、著名菜式、风味特点和适合点单的理由。",
+        "themeConnections 输出 3-5 条，优先覆盖建筑风格、历史背景、名人轶事/城市记忆、馆藏/菜式/书店/音乐等与站点最相关的线索。",
+        "checkInTasks 必须恰好 2 项。每项都要像闯关任务，有明确动作、观察点或小挑战，且和当前站点强相关；避免“拍一张照片”“写一句感受”这类泛用任务。任务不能打扰他人、不能要求进入非开放区域。",
+        "sourceClaims 只放需要用户后续核验的事实线索；sourceStatus 固定 unverified。",
+      ].join(""),
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
@@ -361,7 +368,10 @@ async function handleStopDeepReading(
           { theme: "文学", text: "从路名、店招和人的停留方式读城市文本。" },
         ],
         practicalTips: ["出发前核验开放时间、预约和现场管控。"],
-        checkInTasks: ["拍一张入口与街道同框的照片。"],
+        checkInTasks: [
+          "立面侦探关：找出入口、材料或门窗里最有辨识度的一个细节，并判断它为何像这个街区。",
+          "时间证据关：找到一块说明牌、旧照或年代标识，记录它指向的年份、人物或事件。",
+        ],
         sourceClaims: [],
         sourceStatus: "unverified",
       },

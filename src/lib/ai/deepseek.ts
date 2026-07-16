@@ -166,6 +166,8 @@ export async function generateStopThemeContentWithDeepSeek(
       themes: stop.themes,
       note: stop.note,
       stayMinutes: stop.stayMinutes,
+      openingHours: stop.openingHours,
+      providerCost: stop.providerCost,
       verificationStatus: stop.verificationStatus,
     },
   };

@@ -650,7 +650,7 @@ export function RouteJourneyMode() {
                 <section className="journey-task-block">
                 <div>
                   <p>打卡任务</p>
-                  <h3>把现场观察留下来</h3>
+                  <h3>二选一闯关打卡</h3>
                 </div>
                 <div className="journey-task-list">
                   {content.checkInTasks.map((task) => (

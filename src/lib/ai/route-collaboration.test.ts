@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultDraft, demoRoute } from "@/lib/route";
+import { defaultDraft, demoRoute, type RouteStop } from "@/lib/route";
 import {
   generateRouteCandidates,
   generateRouteCandidatesFromPlaces,
@@ -142,5 +142,55 @@ describe("route collaboration fallback", () => {
         shortIntro: expect.stringContaining("适合作为"),
       }),
     );
+  });
+
+  it("generates two site-specific challenge tasks for architecture stops", () => {
+    const content = generateStopThemeContentWithFallback({
+      ...demoRoute.stops[1],
+      name: "顺和路公馆区",
+      themes: ["建筑", "历史"],
+      note: "短备注",
+    });
+
+    expect(content.themeConnections).toHaveLength(3);
+    expect(content.shortIntro).toContain("建筑细节");
+    expect(content.checkInTasks).toHaveLength(2);
+    expect(content.checkInTasks[0]).toContain("立面侦探关");
+    expect(content.checkInTasks.join(" ")).toContain("顺和路公馆区");
+  });
+
+  it("generates museum deep reading with collection-oriented tasks", () => {
+    const museumStop: RouteStop = {
+      ...demoRoute.stops[2],
+      id: "museum",
+      sourcePlaceId: "museum",
+      name: "南京市博物馆",
+      themes: ["历史"],
+      note: "短备注",
+    };
+    const content = generateStopThemeContentWithFallback(museumStop);
+
+    expect(content.shortIntro).toContain("重要馆藏");
+    expect(content.checkInTasks).toHaveLength(2);
+    expect(content.checkInTasks[0]).toContain("镇馆线索关");
+    expect(content.checkInTasks[1]).toContain("展陈");
+  });
+
+  it("generates restaurant deep reading with dish and rhythm tasks", () => {
+    const restaurantStop: RouteStop = {
+      ...demoRoute.stops[2],
+      id: "restaurant",
+      sourcePlaceId: "restaurant",
+      name: "老城南京菜馆",
+      themes: ["美食"],
+      providerCost: "80",
+      note: "短备注",
+    };
+    const content = generateStopThemeContentWithFallback(restaurantStop);
+
+    expect(content.shortIntro).toContain("招牌菜");
+    expect(content.checkInTasks).toHaveLength(2);
+    expect(content.checkInTasks[0]).toContain("菜单侦探关");
+    expect(content.checkInTasks[1]).toContain("节奏观察关");
   });
 });

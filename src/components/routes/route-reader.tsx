@@ -531,7 +531,7 @@ export function RouteReader() {
                           {story.checkInTasks.map((task) => (
                             <p key={task}>
                               <Sparkles size={14} />
-                              打卡任务：{task}
+                              闯关打卡：{task}
                             </p>
                           ))}
                         </div>

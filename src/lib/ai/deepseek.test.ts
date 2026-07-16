@@ -213,7 +213,10 @@ describe("DeepSeek proxy client", () => {
             },
           ],
           practicalTips: ["出发前核验预约、门票和开放时间。"],
-          checkInTasks: ["拍一张门楼与街道同框的照片。"],
+          checkInTasks: [
+            "立面侦探关：找出门楼、材料或门窗里最有辨识度的一个细节。",
+            "时间证据关：找到一块说明牌或年代标识，记录它指向的年份。",
+          ],
           sourceClaims: [],
           sourceStatus: "unverified",
         },
@@ -234,7 +237,8 @@ describe("DeepSeek proxy client", () => {
       }),
     });
     expect(result.data.shortIntro).toContain("近代城市阅读");
-    expect(result.data.checkInTasks[0]).toContain("门楼");
+    expect(result.data.checkInTasks).toHaveLength(2);
+    expect(result.data.checkInTasks[0]).toContain("立面");
     expect(result.usage.provider).toBe("deepseek");
   });
 

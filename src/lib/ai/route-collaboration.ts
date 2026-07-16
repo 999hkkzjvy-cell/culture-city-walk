@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { RouteCandidate } from "@/lib/route-candidates";
 import type { RouteDraft, RoutePlan, RouteStop, Theme } from "@/lib/route";
 
-export const promptVersion = "route-collaboration-v0.1";
+export const promptVersion = "route-collaboration-v0.2";
 
 export const planningIntentSchema = z.object({
   mode: z.enum(["discover", "complete", "refine"]).default("complete"),
@@ -34,14 +34,17 @@ export const routeTitleSchema = z.object({
 export const stopThemeContentSchema = z.object({
   placeId: z.string().min(1),
   shortIntro: z.string().min(20).max(700),
-  themeConnections: z.array(
-    z.object({
-      theme: z.enum(["历史", "文学", "建筑", "音乐", "书店", "美食"]),
-      text: z.string().min(10).max(520),
-    }),
-  ),
+  themeConnections: z
+    .array(
+      z.object({
+        theme: z.enum(["历史", "文学", "建筑", "音乐", "书店", "美食"]),
+        text: z.string().min(10).max(520),
+      }),
+    )
+    .min(3)
+    .max(5),
   practicalTips: z.array(z.string()).default([]),
-  checkInTasks: z.array(z.string().min(4).max(160)).default([]),
+  checkInTasks: z.array(z.string().min(4).max(160)).length(2),
   sourceClaims: z.array(z.string()).default([]),
   sourceStatus: z.enum(["unverified", "verified"]).default("unverified"),
 });
@@ -169,38 +172,229 @@ export function generateRouteSummaryWithFallback(route: RoutePlan) {
 export function generateStopThemeContentWithFallback(
   stop: RouteStop,
 ): StopThemeContent {
-  const theme = stop.themes[0] ?? "历史";
+  const stopKind = inferStopDeepReadingKind(stop);
+  const theme = stop.themes[0] ?? primaryThemeForKind(stopKind);
   const stopArea = stop.area ? `${stop.area}片区` : "这片街区";
   const stopAddress = stop.address ? `地址线索是${stop.address}` : "";
-  const shortIntro =
-    stop.note.trim().length >= 20
-      ? stop.note.trim().slice(0, 170)
-      : `${stop.name} 适合作为这条路线中的${theme}观察点。到现场时，可以把门面、街道尺度、周边业态和人流节奏一起看，先形成自己的城市阅读，再补充史料核验。`;
-  const themeConnections = (stop.themes.length > 0 ? stop.themes : [theme])
-    .slice(0, 3)
-    .map((item) => ({
-      theme: item,
-      text: buildThemeConnection(stop, item, stopArea, stopAddress).slice(
-        0,
-        178,
-      ),
-    }));
+  const shortIntro = buildDeepReadingIntro(stop, stopKind, theme).slice(0, 700);
+  const themeConnections = buildThemeConnectionsForStop(
+    stop,
+    stopKind,
+    theme,
+    stopArea,
+    stopAddress,
+  );
 
   return stopThemeContentSchema.parse({
     placeId: stop.sourcePlaceId ?? stop.id,
     shortIntro,
     themeConnections,
     practicalTips: [
-      `建议停留 ${stop.stayMinutes} 分钟：前半段观察空间和人流，后半段记录与本路线主题相关的细节。`,
-      "开放时间、预约、门票和现场管控信息需要出发前再次核验。",
+      ...buildPracticalTips(stop, stopKind),
+      "开放时间、预约、门票、菜单和现场管控信息需要出发前再次核验。",
     ],
-    checkInTasks: [
-      `拍一张能同时看到${stop.name}入口和周边街道关系的照片。`,
-      "记录一个你认为最能代表这里气质的细节：门牌、树影、声音或人流。",
-    ],
+    checkInTasks: buildCheckInTasks(stop, stopKind),
     sourceClaims: [],
     sourceStatus: "unverified",
   });
+}
+
+type StopDeepReadingKind =
+  | "restaurant"
+  | "museum"
+  | "architecture"
+  | "literary"
+  | "history"
+  | "city";
+
+function inferStopDeepReadingKind(stop: RouteStop): StopDeepReadingKind {
+  const text = [
+    stop.name,
+    stop.area,
+    stop.address,
+    stop.note,
+    stop.themes.join(" "),
+    stop.providerCost ?? "",
+  ].join(" ");
+
+  if (
+    stop.themes.includes("美食") ||
+    Boolean(stop.providerCost) ||
+    matchesAny(text, ["餐厅", "菜馆", "酒楼", "饭店", "小吃", "面馆", "茶馆"])
+  ) {
+    return "restaurant";
+  }
+
+  if (
+    matchesAny(text, [
+      "博物馆",
+      "纪念馆",
+      "美术馆",
+      "展览馆",
+      "陈列馆",
+      "馆藏",
+      "展陈",
+    ])
+  ) {
+    return "museum";
+  }
+
+  if (
+    stop.themes.includes("建筑") ||
+    matchesAny(text, ["建筑", "公馆", "故居", "旧址", "街区", "院落", "门楼"])
+  ) {
+    return "architecture";
+  }
+
+  if (
+    stop.themes.includes("文学") ||
+    stop.themes.includes("书店") ||
+    matchesAny(text, ["书店", "图书馆", "作家", "诗人", "文学", "出版"])
+  ) {
+    return "literary";
+  }
+
+  if (stop.themes.includes("历史")) {
+    return "history";
+  }
+
+  return "city";
+}
+
+function primaryThemeForKind(kind: StopDeepReadingKind): Theme {
+  switch (kind) {
+    case "restaurant":
+      return "美食";
+    case "museum":
+    case "history":
+      return "历史";
+    case "architecture":
+      return "建筑";
+    case "literary":
+      return "文学";
+    case "city":
+      return "历史";
+  }
+}
+
+function buildDeepReadingIntro(
+  stop: RouteStop,
+  kind: StopDeepReadingKind,
+  theme: Theme,
+) {
+  const note = stop.note.trim();
+  const notePrefix = note.length >= 20 ? `${note} ` : "";
+
+  switch (kind) {
+    case "restaurant":
+      return `${notePrefix}${stop.name} 可以从“这座城市怎样把日常吃成记忆”读起。到现场先看店招、菜单结构、排队和出餐节奏，再找招牌菜、地方风味和街区客群之间的关系；如果它是老字号或区域名店，历史沿革、创始故事、代表菜式和口味变化都值得核验后补进路线。`;
+    case "museum":
+      return `${notePrefix}${stop.name} 不只是一处停留点，更像给这条路线加上一间资料室。进入后可以先找展陈主线、年代轴和重点展柜，再留意哪些文物、照片、地图或手稿反复出现；重要馆藏的来历、用途、发现过程和展览叙事，是理解这座城市历史背景的关键线索。`;
+    case "architecture":
+      return `${notePrefix}${stop.name} 适合把脚步放慢，用建筑细节读城市。先看立面比例、门窗尺度、材料颜色、屋顶或檐口，再观察入口、院墙、树影和街道宽度如何组织人的移动；如果现场能看到说明牌，可继续核验建筑年代、设计者、功能变迁和相关人物。`;
+    case "literary":
+      return `${notePrefix}${stop.name} 适合作为一处文学和人物线索的观察点。可以从书架、展牌、路名、橱窗或活动海报开始，追问这里关联过哪些作家、出版人或读者社群；如涉及名人，应补充其生平轮廓、重要作品、交游关系和轶事，但具体年份与传闻仍需可靠资料核验。`;
+    case "history":
+      return `${notePrefix}${stop.name} 可以作为一枚历史定位针：它把人物、制度、街区和日常生活压缩到一个可步行抵达的现场。建议先找时间标识、旧照片、门牌或展板，再把看到的人名、机构名和事件名串起来；名人轶事、相关重要人物和时代背景都应作为待核验线索继续深挖。`;
+    case "city":
+      return `${notePrefix}${stop.name} 适合作为这条路线中的${theme}观察点。到现场时，可以把门面、街道尺度、周边业态、人流节奏和声音层次一起看，先形成自己的城市阅读，再补充史料或官方信息核验。`;
+  }
+}
+
+function buildThemeConnectionsForStop(
+  stop: RouteStop,
+  kind: StopDeepReadingKind,
+  theme: Theme,
+  stopArea: string,
+  stopAddress: string,
+) {
+  const themes = uniqueThemes([
+    ...stop.themes,
+    theme,
+    primaryThemeForKind(kind),
+    kind === "restaurant" ? "美食" : "历史",
+    kind === "architecture" ? "建筑" : "文学",
+  ]).slice(0, 5);
+
+  return themes.slice(0, Math.max(3, Math.min(5, themes.length))).map((item) => ({
+    theme: item,
+    text: buildThemeConnection(stop, item, stopArea, stopAddress, kind).slice(
+      0,
+      300,
+    ),
+  }));
+}
+
+function uniqueThemes(themes: Theme[]): Theme[] {
+  const result: Theme[] = [];
+
+  for (const theme of themes) {
+    if (!result.includes(theme)) {
+      result.push(theme);
+    }
+  }
+
+  return result.length >= 3 ? result : uniqueThemes([...result, "历史", "建筑", "文学"]);
+}
+
+function buildPracticalTips(stop: RouteStop, kind: StopDeepReadingKind) {
+  const stayTip = `建议停留 ${stop.stayMinutes} 分钟：前半段完成现场观察，后半段挑一个线索拍照或记下关键词。`;
+
+  switch (kind) {
+    case "restaurant":
+      return [stayTip, "如需用餐，先确认排队时长、是否可预约、招牌菜是否售罄和人均预算。"];
+    case "museum":
+      return [stayTip, "进馆后先看导览图或展陈目录，优先选择 1-2 件重点展品深读。"];
+    case "architecture":
+      return [stayTip, "观察建筑细节时不要进入非开放区域，拍摄门楼和院墙需避让通行。"];
+    default:
+      return [stayTip, "涉及人物轶事、旧址沿革和年代判断时，优先以现场展陈或官方资料复核。"];
+  }
+}
+
+function buildCheckInTasks(stop: RouteStop, kind: StopDeepReadingKind) {
+  const stopName = compactStopName(stop.name);
+
+  switch (kind) {
+    case "restaurant":
+      return normalizeCheckInTasks([
+        `菜单侦探关：在${stopName}的菜单、招牌或推荐菜里找一道最能代表本地风味的菜，记下它和这片街区的关系。`,
+        "节奏观察关：观察排队、翻台或出餐窗口 3 分钟，判断它更像居民日常店、游客目的地还是路线休息点。",
+      ]);
+    case "museum":
+      return normalizeCheckInTasks([
+        `镇馆线索关：在${stopName}里找一件最想讲给朋友听的展品，记下它的年代、用途或发现故事。`,
+        "展陈破案关：找一张地图、年代轴或人物关系说明，把它和上一站或下一站连成一句线索。",
+      ]);
+    case "architecture":
+      return normalizeCheckInTasks([
+        `立面侦探关：找出${stopName}最有辨识度的一个建筑细节，比如门窗比例、材料、檐口、院墙或装饰。`,
+        "街角构图关：站在不影响通行的位置，找到一个能同时说明建筑和街道关系的观察角度。",
+      ]);
+    case "literary":
+      return normalizeCheckInTasks([
+        `书页线索关：在${stopName}找一个和作家、出版、阅读或城市记忆有关的名字、书脊、展牌或海报。`,
+        "现场旁白关：用现场看到的三个物件，给这一站写一句不超过 20 字的城市旁白。",
+      ]);
+    case "history":
+      return normalizeCheckInTasks([
+        `时间证据关：在${stopName}找一块说明牌、门牌、旧照或年代标识，记录它指向的年份或时期。`,
+        "人物关系关：找出一个人物、机构或事件名，判断它和这条路线的主题是因果、见证还是对照关系。",
+      ]);
+    case "city":
+      return normalizeCheckInTasks([
+        `街区线索关：在${stopName}周边找一个最能说明此地气质的细节，可以是门牌、树影、声音、橱窗或人流。`,
+        "路线连接关：说出这一站和上一站之间最大的变化，是尺度、年代、功能、气味还是人的节奏。",
+      ]);
+  }
+}
+
+function compactStopName(name: string) {
+  return name.length > 18 ? `${name.slice(0, 18)}...` : name;
+}
+
+function normalizeCheckInTasks(tasks: [string, string]) {
+  return tasks.map((task) => task.slice(0, 160));
 }
 
 function buildThemeConnection(
@@ -208,20 +402,30 @@ function buildThemeConnection(
   theme: Theme,
   stopArea: string,
   stopAddress: string,
+  kind: StopDeepReadingKind = "city",
 ) {
   switch (theme) {
     case "历史":
+      if (kind === "museum") {
+        return `${stop.name} 的历史线索应从展陈主线、重点展品和年代轴进入；人物、事件和文物来历要以现场说明或官方资料复核。`;
+      }
+      if (kind === "restaurant") {
+        return `${stop.name} 的历史不只在开店年份，也在菜式流行、街区客群和城市口味变化里；老字号传说需要继续核验。`;
+      }
       return `${stop.name} 可以从“城市记忆如何被保留”切入：看建筑边界、门牌、纪念性标识和周边街巷关系。${stopAddress}，适合作为后续查证地方志、展陈说明或官方介绍的索引。`;
     case "文学":
       return `把这里当作一段城市文本来读：记录店招、路名、橱窗、行人停留方式和声音层次，再和路线中的书店或文学站点互相对照。`;
     case "建筑":
+      if (kind === "architecture") {
+        return `重点看${stop.name}的立面比例、入口尺度、材料颜色、门窗和装饰细部，再判断它如何与${stopArea}的街道肌理相接。`;
+      }
       return `重点看立面比例、入口尺度、材料颜色和新旧建筑的连接方式。${stopArea}的街道肌理能帮助判断它在路线中的空间角色。`;
     case "音乐":
       return `适合用声音来观察：留意街面噪声、室内外声场变化、是否有演出或公共广播，让音乐主题落到真实步行体验。`;
     case "书店":
       return `如果这里与阅读或出版有关，可以看选书、陈列、活动海报和读者停留方式；如果不是书店，则把它作为前后阅读站点之间的城市语境。`;
     case "美食":
-      return `美食线索不只看吃什么，也看排队、出餐节奏、街角气味和午间人流。适合判断这段路线是否需要安排休息或用餐。`;
+      return `美食线索不只看吃什么，也看招牌菜、排队、出餐节奏、街角气味和午间人流。适合判断这段路线是否需要安排休息或用餐。`;
   }
 }
 
