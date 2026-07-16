@@ -16,29 +16,10 @@
 
 ## P1 规划与候选质量
 
-- `P1` 深化事实核验，不只依赖高德元数据。
-  - 当前路线详情和途中模式已展示 AI 深读的核验状态；AI claim 只作为待核验线索，不作为事实来源。
-  - 仍需增加官方开放公告、门票/预约状态、闭馆提醒、来源引用和最近核验时间。
-
-- `P1` 执行 AI 用量限制。
-  - `deepseek-proxy` 代码已基于 `AI_DAILY_USER_LIMIT` 和 `AI_PROJECT_COST_LIMIT_CNY` 增加每日用户限制和项目日成本限制。
-  - 还需要部署新版 `deepseek-proxy`，在 Supabase Function secrets 中配置限额变量，并做线上超额/未登录/正常调用烟测。
-
-## P1 地图与路线 Provider
-
-- `P1` 增强地图视野行为。
-  - 当前路线详情页会随路线变化重新 fit view，并支持时间线选中站点和到达该站路段高亮；规划页右侧地图已支持候选点插入位置预览。
-  - 还需要进一步打磨编辑过程中的地图视野保持策略，避免频繁编辑时视野跳动。
-
-- `P1` 增加移动端/全屏导航地图模式。
-  - 当前移动端路线阅读页能保持地图和时间线关联，但还不是现场导航优先的体验。
-
-- `P1` 决定是否需要 provider-backed 骑行。
-  - 步行、公交、驾车、打车已可在 provider 可用时通过高德代理计算。
-  - 骑行仍使用本地估算。
-
-- `P1` 增加实时 provider 状态诊断。
-  - 展示高德 JS、高德 Web Service、DeepSeek、Supabase Auth、Supabase DB 和 Storage 是否真实可达，而不仅是“已配置”。
+- `P1` 执行 AI 用量限制的生产登录/超额烟测。
+  - `deepseek-proxy` 新版已部署，Supabase Function secrets 已配置 `AI_DAILY_USER_LIMIT=30` 和 `AI_PROJECT_COST_LIMIT_CNY=20`。
+  - 未登录诊断 smoke 已返回 `deepseek_auth_required`，高德 provider 诊断已返回 `OK`。
+  - 仍需在用户明确授权后，创建临时生产用户并写入 `route_ai_runs` 超额记录，验证正常调用和超额拒绝分支；该操作会改写生产 Supabase 数据，本次因安全审查未执行。
 
 ## P1 认证、云端与数据可靠性
 

@@ -39,7 +39,7 @@ export type WalkingRouteLeg = {
   polyline?: Coordinate[];
 };
 
-export type ProviderRouteMode = "walking" | "transit" | "driving";
+export type ProviderRouteMode = "walking" | "cycling" | "transit" | "driving";
 
 export type ProviderRouteLeg = WalkingRouteLeg & {
   mode: ProviderRouteMode;

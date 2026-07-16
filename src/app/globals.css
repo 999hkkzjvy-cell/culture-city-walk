@@ -835,6 +835,12 @@ button {
   background: rgb(251 247 239 / 72%);
 }
 
+.dev-status-panel > div:first-child {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
 .dev-status-panel p,
 .dev-status-panel h2 {
   margin: 0;
@@ -887,6 +893,43 @@ button {
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.25;
+}
+
+.provider-diagnostics {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.provider-diagnostics article {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgb(142 118 87 / 28%);
+  border-radius: 6px;
+  background: rgb(255 251 244 / 76%);
+}
+
+.provider-diagnostics article.ready {
+  border-color: rgb(31 107 80 / 26%);
+  background: rgb(31 107 80 / 8%);
+}
+
+.provider-diagnostics article.error {
+  border-color: rgb(160 61 45 / 28%);
+  background: rgb(160 61 45 / 8%);
+}
+
+.provider-diagnostics strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.provider-diagnostics span {
+  color: #626b63;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .conversation {
@@ -2100,6 +2143,12 @@ button {
   font-weight: 700;
 }
 
+.secondary-button.compact {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
 .auth-form button {
   display: inline-flex;
   min-height: 42px;
@@ -2977,6 +3026,38 @@ button {
   display: none;
 }
 
+.map-pane.fullscreen {
+  position: fixed;
+  inset: 16px;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 24px 70px rgb(22 28 24 / 28%);
+}
+
+.map-pane.fullscreen .map-toggle {
+  display: block;
+}
+
+.map-pane.fullscreen .amap-route-map {
+  min-height: 0;
+  height: 100%;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.map-pane.fullscreen .map-source-note {
+  max-height: 34vh;
+  overflow: auto;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+}
+
 .paper-map {
   position: relative;
   min-height: 650px;
@@ -3447,6 +3528,11 @@ button {
   background: rgb(255 251 244 / 70%);
 }
 
+.fact-check-note.ready {
+  border-color: rgb(31 107 80 / 20%);
+  background: rgb(238 247 240 / 72%);
+}
+
 .fact-check-note p {
   display: flex;
   gap: 8px;
@@ -3461,6 +3547,32 @@ button {
   flex: 0 0 auto;
   margin-top: 2px;
   color: #8e7657;
+}
+
+.verification-profile {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(142 118 87 / 20%);
+}
+
+.verification-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.verification-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid rgb(31 107 80 / 18%);
+  border-radius: 999px;
+  background: rgb(31 107 80 / 7%);
+  color: var(--green-primary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .stop-story button {

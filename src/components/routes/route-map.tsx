@@ -37,6 +37,9 @@ export function RouteMap({
   compact?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<AmapMap | null>(null);
+  const overlaysRef = useRef<object[]>([]);
+  const lastFitKeyRef = useRef("");
   const geometry = useMemo(() => buildAmapRouteGeometry(route), [route]);
   const previewGeometry = useMemo(
     () => buildPreviewGeometry(route, previewCandidate),
@@ -55,7 +58,6 @@ export function RouteMap({
       return;
     }
 
-    let map: AmapMap | null = null;
     let cancelled = false;
 
     loadAmapJsApi()
@@ -64,14 +66,16 @@ export function RouteMap({
           return;
         }
 
-        const center = geometry.stopPoints[0].position;
-        map = new AMap.Map(containerRef.current, {
-          center,
-          mapStyle: "amap://styles/whitesmoke",
-          resizeEnable: true,
-          viewMode: "2D",
-          zoom: 14,
-        });
+        if (!mapRef.current) {
+          const center = geometry.stopPoints[0].position;
+          mapRef.current = new AMap.Map(containerRef.current, {
+            center,
+            mapStyle: "amap://styles/whitesmoke",
+            resizeEnable: true,
+            viewMode: "2D",
+            zoom: 14,
+          });
+        }
 
         const markers = geometry.stopPoints.map(
           (point, index) =>
@@ -138,9 +142,19 @@ export function RouteMap({
           ...(previewMarker ? [previewMarker] : []),
         ];
 
+        if (overlaysRef.current.length > 0) {
+          mapRef.current.remove(overlaysRef.current);
+        }
+
         if (overlays.length > 0) {
-          map.add(overlays);
-          map.setFitView(overlays, false, [36, 36, 36, 36]);
+          mapRef.current.add(overlays);
+          overlaysRef.current = overlays;
+
+          const fitKey = buildFitKey(geometry, previewGeometry);
+          if (lastFitKeyRef.current !== fitKey) {
+            mapRef.current.setFitView(overlays, false, [36, 36, 36, 36]);
+            lastFitKeyRef.current = fitKey;
+          }
         }
 
         setState("ready");
@@ -153,9 +167,16 @@ export function RouteMap({
 
     return () => {
       cancelled = true;
-      map?.destroy();
     };
   }, [geometry, hasAmapKey, previewGeometry, selectedStopId]);
+
+  useEffect(() => {
+    return () => {
+      overlaysRef.current = [];
+      mapRef.current?.destroy();
+      mapRef.current = null;
+    };
+  }, []);
 
   return (
     <div
@@ -189,6 +210,23 @@ export function RouteMap({
       </div>
     </div>
   );
+}
+
+function buildFitKey(
+  geometry: ReturnType<typeof buildAmapRouteGeometry>,
+  previewGeometry: ReturnType<typeof buildPreviewGeometry>,
+) {
+  return JSON.stringify({
+    stops: geometry.stopPoints.map((point) => point.position),
+    provider: geometry.providerLines.map((line) => line.path),
+    estimated: geometry.estimatedLines.map((line) => line.path),
+    preview: previewGeometry.point
+      ? {
+          point: previewGeometry.point,
+          lines: previewGeometry.lines,
+        }
+      : null,
+  });
 }
 
 function getEffectiveMapState(

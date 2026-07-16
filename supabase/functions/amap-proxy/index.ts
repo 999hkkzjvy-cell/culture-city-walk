@@ -10,6 +10,10 @@ const MAX_POI_LIMIT = 15;
 
 type AmapProxyRequest =
   | {
+      action: "diagnostic";
+      probe?: boolean;
+    }
+  | {
       action: "place-text";
       keyword: string;
       city?: string;
@@ -32,7 +36,7 @@ type AmapProxyRequest =
       action: "route";
       origin: AmapPointInput;
       destination: AmapPointInput;
-      mode: "walking" | "transit" | "driving";
+      mode: "walking" | "cycling" | "transit" | "driving";
       city?: string;
       departureTime?: string;
     };
@@ -76,6 +80,12 @@ type AmapWalkingPath = {
   steps?: AmapWalkingStep[];
 };
 
+type AmapCyclingPath = {
+  distance?: string;
+  duration?: string;
+  steps?: AmapWalkingStep[];
+};
+
 type AmapTransitSegment = {
   walking?: {
     distance?: string;
@@ -98,18 +108,22 @@ Deno.serve(async (request) => {
     return json({ error: "method_not_allowed" }, 405);
   }
 
-  const amapKey = Deno.env.get("AMAP_WEB_SERVICE_KEY");
-
-  if (!amapKey) {
-    return json({ error: "amap_not_configured" }, 500);
-  }
-
   let body: AmapProxyRequest;
 
   try {
     body = await request.json();
   } catch {
     return json({ error: "invalid_json" }, 400);
+  }
+
+  const amapKey = Deno.env.get("AMAP_WEB_SERVICE_KEY");
+
+  if (body.action === "diagnostic") {
+    return await handleDiagnostic(body, amapKey);
+  }
+
+  if (!amapKey) {
+    return json({ error: "amap_not_configured" }, 500);
   }
 
   try {
@@ -134,6 +148,55 @@ Deno.serve(async (request) => {
 
   return json({ error: "invalid_action" }, 400);
 });
+
+async function handleDiagnostic(
+  input: Extract<AmapProxyRequest, { action: "diagnostic" }>,
+  amapKey: string | undefined,
+) {
+  if (!amapKey) {
+    return json(
+      {
+        edgeFunctionReachable: true,
+        amapKeyConfigured: false,
+        providerReachable: false,
+      },
+      200,
+    );
+  }
+
+  if (!input.probe) {
+    return json(
+      {
+        edgeFunctionReachable: true,
+        amapKeyConfigured: true,
+        providerReachable: null,
+      },
+      200,
+    );
+  }
+
+  const params = new URLSearchParams({
+    key: amapKey,
+    keywords: "总统府",
+    city: "南京",
+    citylimit: "true",
+    output: "JSON",
+    offset: "1",
+    page: "1",
+  });
+  const response = await fetchAmap(`/v3/place/text?${params.toString()}`);
+
+  return json(
+    {
+      edgeFunctionReachable: true,
+      amapKeyConfigured: true,
+      providerReachable: response.status === "1",
+      info: response.info ?? null,
+      infocode: response.infocode ?? null,
+    },
+    response.status === "1" ? 200 : 502,
+  );
+}
 
 async function handlePlaceText(
   input: Extract<AmapProxyRequest, { action: "place-text" }>,
@@ -192,11 +255,22 @@ async function handleRoute(
   amapKey: string,
 ) {
   if (input.mode === "walking") {
-    return handleWalking({ action: "walking", origin: input.origin, destination: input.destination }, amapKey);
+    return handleWalking(
+      {
+        action: "walking",
+        origin: input.origin,
+        destination: input.destination,
+      },
+      amapKey,
+    );
   }
 
   if (input.mode === "transit") {
     return handleTransit(input, amapKey);
+  }
+
+  if (input.mode === "cycling") {
+    return handleCycling(input, amapKey);
   }
 
   return handleDriving(input, amapKey);
@@ -346,6 +420,50 @@ async function handleDriving(
   }
 
   const path = response.route?.paths?.[0] as AmapWalkingPath | undefined;
+
+  if (!path) {
+    return json({ error: "route_not_found" }, 404);
+  }
+
+  return json(
+    {
+      distanceMeters: toNumber(path.distance),
+      durationSeconds: toNumber(path.duration),
+      polyline: flattenPolyline(path.steps ?? []),
+      steps: [],
+    },
+    200,
+  );
+}
+
+async function handleCycling(
+  input: Extract<AmapProxyRequest, { action: "route" }>,
+  amapKey: string,
+) {
+  if (!isValidPoint(input.origin) || !isValidPoint(input.destination)) {
+    return json({ error: "invalid_coordinate" }, 400);
+  }
+
+  const params = new URLSearchParams({
+    key: amapKey,
+    origin: formatPoint(input.origin),
+    destination: formatPoint(input.destination),
+  });
+
+  const response = await fetchAmap(`/v4/direction/bicycling?${params.toString()}`);
+
+  if (response.errcode && response.errcode !== 0) {
+    return json(
+      {
+        error: "amap_provider_error",
+        info: response.errmsg ?? "UNKNOWN",
+        infocode: String(response.errcode),
+      },
+      502,
+    );
+  }
+
+  const path = response.data?.paths?.[0] as AmapCyclingPath | undefined;
 
   if (!path) {
     return json({ error: "route_not_found" }, 404);

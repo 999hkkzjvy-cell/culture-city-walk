@@ -85,6 +85,7 @@ export function RouteReader() {
   const [mapRecalculationState, setMapRecalculationState] =
     useState<MapRecalculationState>("idle");
   const [mapRecalculationMessage, setMapRecalculationMessage] = useState("");
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [selectedMapStopId, setSelectedMapStopId] = useState(
     route.stops[0]?.id ?? null,
   );
@@ -187,7 +188,9 @@ export function RouteReader() {
     }
 
     setMapRecalculationState("loading");
-      setMapRecalculationMessage("正在用高德复核步行、公交和驾车耗时...");
+    setMapRecalculationMessage(
+      "正在用高德复核步行、骑行、公交和驾车耗时...",
+    );
 
     try {
       const result = await recalculateRouteWithProvider(route, provider);
@@ -368,9 +371,13 @@ export function RouteReader() {
       ) : null}
 
       <section className="reader-layout">
-        <aside className="map-pane">
-          <button className="map-toggle" type="button">
-            查看地图
+        <aside className={isMapFullscreen ? "map-pane fullscreen" : "map-pane"}>
+          <button
+            className="map-toggle"
+            onClick={() => setIsMapFullscreen((current) => !current)}
+            type="button"
+          >
+            {isMapFullscreen ? "退出全屏地图" : "全屏导航地图"}
           </button>
           <RouteMap route={route} selectedStopId={effectiveSelectedMapStopId} />
           <div className="map-source-note">
@@ -378,7 +385,7 @@ export function RouteReader() {
             <p>
               当前地图只读取路线内的 GCJ-02 坐标和已保存 polyline，不会把 POI
               写入 places。可用高德 Web 服务复核步行段距离、耗时和
-              polyline；步行、公交、驾车/打车会优先使用高德复核，失败路段保留本地估算。
+              polyline；步行、骑行、公交、驾车/打车会优先使用高德复核，失败路段保留本地估算。
             </p>
             <div className="map-source-actions">
               <button
@@ -505,7 +512,13 @@ export function RouteReader() {
                               {tip}
                             </p>
                           ))}
-                          <FactCheckNote content={story} />
+                          <FactCheckNote
+                            city={route.city}
+                            content={story}
+                            dateLabel={route.dateLabel}
+                            stop={stop}
+                            time={stop.calculatedTime}
+                          />
                           {story.checkInTasks.map((task) => (
                             <p key={task}>
                               <Sparkles size={14} />

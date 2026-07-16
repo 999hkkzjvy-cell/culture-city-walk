@@ -140,7 +140,7 @@ export async function recalculateRouteWithProvider(
 }
 
 function toProviderMode(mode: RouteTravelMode) {
-  if (mode === "walking" || mode === "transit") {
+  if (mode === "walking" || mode === "cycling" || mode === "transit") {
     return mode;
   }
 

@@ -108,4 +108,71 @@ describe("amap web service provider", () => {
       }),
     );
   });
+
+  it("calculates cycling routes through the generic route proxy", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+    mocks.invoke.mockResolvedValueOnce({
+      data: {
+        distanceMeters: 1600,
+        durationSeconds: 420,
+        polyline: [
+          { lng: 118.77, lat: 32.05, system: "gcj02" },
+          { lng: 118.78, lat: 32.05, system: "gcj02" },
+        ],
+      },
+      error: null,
+    });
+
+    const provider = createAmapWebServiceProvider();
+    const leg = await provider?.calculateRoute?.({
+      origin: {
+        id: "from",
+        source: "amap",
+        sourcePlaceId: "from",
+        name: "起点",
+        address: null,
+        city: "南京",
+        district: null,
+        adcode: null,
+        coordinate: { lng: 118.77, lat: 32.05, system: "gcj02" },
+        poiType: null,
+        verificationStatus: "verified",
+      },
+      destination: {
+        id: "to",
+        source: "amap",
+        sourcePlaceId: "to",
+        name: "终点",
+        address: null,
+        city: "南京",
+        district: null,
+        adcode: null,
+        coordinate: { lng: 118.78, lat: 32.05, system: "gcj02" },
+        poiType: null,
+        verificationStatus: "verified",
+      },
+      mode: "cycling",
+      city: "南京",
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledWith("amap-proxy", {
+      body: {
+        action: "route",
+        origin: { id: "from", lng: 118.77, lat: 32.05 },
+        destination: { id: "to", lng: 118.78, lat: 32.05 },
+        mode: "cycling",
+        city: "南京",
+        departureTime: undefined,
+      },
+    });
+    expect(leg).toEqual(
+      expect.objectContaining({
+        mode: "cycling",
+        distanceMeters: 1600,
+        durationMinutes: 7,
+        source: "provider",
+      }),
+    );
+  });
 });

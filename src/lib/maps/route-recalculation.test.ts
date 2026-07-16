@@ -89,4 +89,46 @@ describe("route recalculation with map provider", () => {
     );
     expect(result.providerLegs).toBe(demoRoute.stops.length - 2);
   });
+
+  it("uses provider-backed cycling when the route provider supports it", async () => {
+    const mixedRoute = updateRouteLegTravelMode(demoRoute, "gym", "cycling");
+    const provider: MapProvider = {
+      async suggestPlaces() {
+        return [];
+      },
+      async calculateWalkingRoute({ origin, destination }) {
+        return {
+          fromPlaceId: origin.id,
+          toPlaceId: destination.id,
+          distanceMeters: 900,
+          durationMinutes: 12,
+          source: "provider",
+          provider: "amap",
+        };
+      },
+      async calculateRoute({ origin, destination, mode }) {
+        return {
+          fromPlaceId: origin.id,
+          toPlaceId: destination.id,
+          distanceMeters: mode === "cycling" ? 1600 : 900,
+          durationMinutes: mode === "cycling" ? 7 : 12,
+          source: "provider",
+          provider: "amap",
+          mode,
+        };
+      },
+    };
+
+    const result = await recalculateRouteWithProvider(mixedRoute, provider);
+
+    expect(result.route.stops[1].walkingFromPrevious).toEqual(
+      expect.objectContaining({
+        mode: "cycling",
+        source: "provider",
+        provider: "amap",
+        minutes: 7,
+      }),
+    );
+    expect(result.providerLegs).toBe(demoRoute.stops.length - 1);
+  });
 });

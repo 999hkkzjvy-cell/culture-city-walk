@@ -28,6 +28,7 @@ type AmapOverlay = object;
 
 export type AmapMap = {
   add(overlay: AmapOverlay | AmapOverlay[]): void;
+  remove(overlay: AmapOverlay | AmapOverlay[]): void;
   destroy(): void;
   setFitView(
     overlays?: AmapOverlay[],

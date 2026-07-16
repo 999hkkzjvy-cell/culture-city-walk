@@ -627,7 +627,13 @@ export function RouteJourneyMode() {
                     </section>
                   ))}
                 </div>
-                <FactCheckNote content={content} />
+                <FactCheckNote
+                  city={route.city}
+                  content={content}
+                  dateLabel={route.dateLabel}
+                  stop={selectedStop}
+                  time={selectedStop.calculatedTime}
+                />
                 </article>
               ) : (
                 <article className="journey-reading-block">

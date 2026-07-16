@@ -11,6 +11,9 @@ const MAX_REQUEST_BYTES = 32_000;
 
 type DeepSeekProxyRequest =
   | {
+      action: "diagnostic";
+    }
+  | {
       action: "parse-intent";
       input: string;
       draft: unknown;
@@ -60,12 +63,6 @@ Deno.serve(async (request) => {
     return json({ error: "method_not_allowed" }, 405);
   }
 
-  const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
-
-  if (!apiKey) {
-    return json({ error: "deepseek_not_configured" }, 500);
-  }
-
   const rawBody = await request.text();
 
   if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BYTES) {
@@ -78,6 +75,16 @@ Deno.serve(async (request) => {
     body = JSON.parse(rawBody);
   } catch {
     return json({ error: "invalid_json" }, 400);
+  }
+
+  const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
+
+  if (body.action === "diagnostic") {
+    return await handleDiagnostic(request, Boolean(apiKey));
+  }
+
+  if (!apiKey) {
+    return json({ error: "deepseek_not_configured" }, 500);
   }
 
   try {
@@ -109,6 +116,26 @@ Deno.serve(async (request) => {
 
   return json({ error: "invalid_action" }, 400);
 });
+
+async function handleDiagnostic(request: Request, hasApiKey: boolean) {
+  const dailyUserLimit = parsePositiveNumber(Deno.env.get("AI_DAILY_USER_LIMIT"));
+  const projectCostLimit = parsePositiveNumber(
+    Deno.env.get("AI_PROJECT_COST_LIMIT_CNY"),
+  );
+  const limitCheck = hasApiKey ? await checkAiUsageLimits(request) : null;
+
+  return json({
+    edgeFunctionReachable: true,
+    deepseekKeyConfigured: hasApiKey,
+    dailyUserLimit,
+    projectCostLimit,
+    limitStatus: limitCheck
+      ? limitCheck.allowed
+        ? "allowed"
+        : limitCheck.error
+      : "not_checked",
+  });
+}
 
 async function checkAiUsageLimits(request: Request) {
   const dailyUserLimit = parsePositiveNumber(Deno.env.get("AI_DAILY_USER_LIMIT"));

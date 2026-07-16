@@ -147,6 +147,10 @@ test("route reader supports direct refresh with query string", async ({
   await expect(
     page.getByText(/城市记忆如何被保留|建议停留/).first(),
   ).toBeVisible();
+  await expect(page.getByText("官方开放公告：").first()).toBeVisible();
+  await expect(page.getByLabel("核验来源入口").first()).toContainText(
+    "官方公告搜索",
+  );
 });
 
 test("route reader can edit stay time locally", async ({ page }) => {
@@ -167,6 +171,18 @@ test("route reader can edit stay time locally", async ({ page }) => {
   await expect(page.getByLabel("停留分钟").first()).toHaveValue("65");
   await expect(page.getByLabel("交通方式").first()).toHaveValue("cycling");
   await expect(page.getByLabel(/路途分钟/).first()).toHaveValue("18");
+});
+
+test("mobile route reader exposes fullscreen map mode", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/route/?id=demo");
+
+  const mapButton = page.getByRole("button", { name: "全屏导航地图" });
+  await expect(mapButton).toBeVisible();
+  await mapButton.click();
+  await expect(
+    page.getByRole("button", { name: "退出全屏地图" }),
+  ).toBeVisible();
 });
 
 test("route journey mode archives check-in photos", async ({ page }) => {
