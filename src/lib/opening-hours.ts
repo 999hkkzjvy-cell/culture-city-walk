@@ -11,8 +11,16 @@ type OpeningSchedule = {
   alwaysOpen: boolean;
   explicitlyClosed: boolean;
   needsVerification: boolean;
+  hasHolidayException: boolean;
+  specialClosedDates: MonthDay[];
+  specialOpenDates: MonthDay[];
   openWeekdays: number[] | null;
   closedWeekdays: number[];
+};
+
+type MonthDay = {
+  month: number;
+  day: number;
 };
 
 export type OpeningHoursStatus = {
@@ -51,12 +59,38 @@ export function getOpeningHoursStatus(
   const arrival = parseTime(arrivalTime);
   const arrivalLabel = arrivalTime ?? "预计时间";
   const weekday = getWeekdayFromDateLabel(dateLabel);
+  const monthDay = getMonthDayFromDateLabel(dateLabel);
+  const isSpecialOpenDate = Boolean(
+    monthDay &&
+      schedule.specialOpenDates.some((date) => isSameMonthDay(date, monthDay)),
+  );
 
   if (schedule.alwaysOpen) {
     return { status: "open", reason: "" };
   }
 
-  if (weekday !== null && schedule.closedWeekdays.includes(weekday)) {
+  if (
+    monthDay &&
+    schedule.specialClosedDates.some((date) => isSameMonthDay(date, monthDay))
+  ) {
+    return {
+      status: "closed",
+      reason: `预计 ${arrivalLabel} 到达，当天属于特殊闭馆日`,
+    };
+  }
+
+  if (!isSpecialOpenDate && schedule.hasHolidayException) {
+    return {
+      status: "unknown",
+      reason: "开放时间含节假日例外说明，请出发前再次核验",
+    };
+  }
+
+  if (
+    !isSpecialOpenDate &&
+    weekday !== null &&
+    schedule.closedWeekdays.includes(weekday)
+  ) {
     return {
       status: "closed",
       reason: `预计 ${arrivalLabel} 到达，当天可能闭馆`,
@@ -65,6 +99,7 @@ export function getOpeningHoursStatus(
 
   if (
     weekday !== null &&
+    !isSpecialOpenDate &&
     schedule.openWeekdays &&
     !schedule.openWeekdays.includes(weekday)
   ) {
@@ -81,7 +116,7 @@ export function getOpeningHoursStatus(
     };
   }
 
-  if (schedule.needsVerification) {
+  if (!isSpecialOpenDate && schedule.needsVerification) {
     return {
       status: "unknown",
       reason: "开放时间含预约、节假日或公告说明，请出发前再次核验",
@@ -111,6 +146,17 @@ function parseOpeningSchedule(value: string): OpeningSchedule {
     windows: parseOpeningWindows(normalized),
     alwaysOpen: /全天开放|24小时|24h|24H/.test(normalized),
     explicitlyClosed: /暂停开放|暂不开放|临时闭馆|停止开放/.test(normalized),
+    hasHolidayException: /节假日除外|法定假日除外|法定节假日除外/.test(
+      normalized,
+    ),
+    specialClosedDates: parseSpecialDates(
+      normalized,
+      /(?:闭馆|休息|不开放|暂停开放|特殊闭馆)/,
+    ),
+    specialOpenDates: parseSpecialDates(
+      normalized,
+      /(?:开放|营业|特殊开放)/,
+    ),
     needsVerification:
       /预约|需提前|节假日|法定假日|特殊开放|特殊闭馆|以公告为准|以景区公告|另行通知|闭馆日/.test(
         normalized,
@@ -122,6 +168,28 @@ function parseOpeningSchedule(value: string): OpeningSchedule {
 
 function normalizeOpeningHours(value: string) {
   return value.replace(/[：]/g, ":").replace(/\s+/g, " ").trim();
+}
+
+function parseSpecialDates(value: string, statusPattern: RegExp) {
+  const matches = value.matchAll(
+    /(?:(\d{4})[年/-])?(\d{1,2})[月/-](\d{1,2})日?[^，。,；;]*(闭馆|休息|不开放|暂停开放|特殊闭馆|开放|营业|特殊开放)/g,
+  );
+
+  return [...matches]
+    .filter((match) => statusPattern.test(match[4]))
+    .map((match) => ({
+      month: Number(match[2]),
+      day: Number(match[3]),
+    }))
+    .filter(
+      (date) =>
+        Number.isInteger(date.month) &&
+        Number.isInteger(date.day) &&
+        date.month >= 1 &&
+        date.month <= 12 &&
+        date.day >= 1 &&
+        date.day <= 31,
+    );
 }
 
 function parseOpeningWindows(value: string): OpeningWindow[] {
@@ -270,6 +338,41 @@ function getWeekdayFromDateLabel(dateLabel?: string) {
   }
 
   return null;
+}
+
+function getMonthDayFromDateLabel(dateLabel?: string): MonthDay | null {
+  if (!dateLabel) {
+    return null;
+  }
+
+  const absoluteDate = dateLabel.match(
+    /(?:(\d{4})[-/年])?(\d{1,2})[-/月](\d{1,2})/,
+  );
+
+  if (absoluteDate) {
+    return {
+      month: Number(absoluteDate[2]),
+      day: Number(absoluteDate[3]),
+    };
+  }
+
+  const relativeOffset = getRelativeDayOffset(dateLabel);
+
+  if (relativeOffset !== null) {
+    const date = new Date();
+    date.setDate(date.getDate() + relativeOffset);
+
+    return {
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+    };
+  }
+
+  return null;
+}
+
+function isSameMonthDay(a: MonthDay, b: MonthDay) {
+  return a.month === b.month && a.day === b.day;
 }
 
 function getRelativeDayOffset(dateLabel: string) {

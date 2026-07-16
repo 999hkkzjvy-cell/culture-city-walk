@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
+import { FactCheckNote } from "@/components/routes/fact-check-note";
 import { RouteJourneyPanel } from "@/components/routes/route-journey-panel";
 import { RouteMap } from "@/components/routes/route-map";
 import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
@@ -84,6 +85,14 @@ export function RouteReader() {
   const [mapRecalculationState, setMapRecalculationState] =
     useState<MapRecalculationState>("idle");
   const [mapRecalculationMessage, setMapRecalculationMessage] = useState("");
+  const [selectedMapStopId, setSelectedMapStopId] = useState(
+    route.stops[0]?.id ?? null,
+  );
+  const effectiveSelectedMapStopId = route.stops.some(
+    (stop) => stop.id === selectedMapStopId,
+  )
+    ? selectedMapStopId
+    : (route.stops[0]?.id ?? null);
   const routeKernel = calculateRouteKernel(route);
   const [isEditing, setIsEditing] = useState(false);
   const [expandedStories, setExpandedStories] = useState<
@@ -363,7 +372,7 @@ export function RouteReader() {
           <button className="map-toggle" type="button">
             查看地图
           </button>
-          <RouteMap route={route} />
+          <RouteMap route={route} selectedStopId={effectiveSelectedMapStopId} />
           <div className="map-source-note">
             <strong>地图内核</strong>
             <p>
@@ -424,7 +433,16 @@ export function RouteReader() {
                   });
 
             return (
-              <article className="stop-card" key={stop.id}>
+              <article
+                className={
+                  effectiveSelectedMapStopId === stop.id
+                    ? "stop-card selected"
+                    : "stop-card"
+                }
+                key={stop.id}
+                onFocus={() => setSelectedMapStopId(stop.id)}
+                onMouseEnter={() => setSelectedMapStopId(stop.id)}
+              >
                 <div className="stop-index">
                   {String(index + 1).padStart(2, "0")}
                 </div>
@@ -487,6 +505,7 @@ export function RouteReader() {
                               {tip}
                             </p>
                           ))}
+                          <FactCheckNote content={story} />
                           {story.checkInTasks.map((task) => (
                             <p key={task}>
                               <Sparkles size={14} />

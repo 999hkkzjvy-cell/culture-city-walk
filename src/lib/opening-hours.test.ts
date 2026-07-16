@@ -65,6 +65,46 @@ describe("opening hours", () => {
       ),
     ).toContain("请出发前再次核验");
   });
+
+  it("detects concrete special closed dates", () => {
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours("7月16日闭馆，周二至周日 09:00-17:00", "10:00"),
+        "10:00",
+        "2026-07-16",
+      ),
+    ).toContain("特殊闭馆日");
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours("7月16日闭馆，周二至周日 09:00-17:00", "10:00"),
+        "10:00",
+        "2026-07-17",
+      ),
+    ).toBe("");
+  });
+
+  it("does not overrule holiday exceptions with weekday closures", () => {
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours("周一闭馆，法定节假日除外", "10:00"),
+        "10:00",
+        "周一",
+      ),
+    ).toContain("节假日例外");
+  });
+
+  it("lets concrete special open dates override weekday closures", () => {
+    expect(
+      getOpeningHoursWarning(
+        stopWithOpeningHours(
+          "周一闭馆，7月13日特殊开放 09:00-17:00",
+          "10:00",
+        ),
+        "10:00",
+        "2026-07-13",
+      ),
+    ).toBe("");
+  });
 });
 
 function stopWithOpeningHours(

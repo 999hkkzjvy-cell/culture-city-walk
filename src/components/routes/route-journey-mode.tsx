@@ -20,6 +20,7 @@ import {
   generateStopThemeContentWithDeepSeek,
   isDeepSeekProxyConfigured,
 } from "@/lib/ai/deepseek";
+import { FactCheckNote } from "@/components/routes/fact-check-note";
 import {
   generateRouteSummaryWithFallback,
   generateStopThemeContentWithFallback,
@@ -621,6 +622,7 @@ export function RouteJourneyMode() {
                     </section>
                   ))}
                 </div>
+                <FactCheckNote content={content} />
                 </article>
               ) : (
                 <article className="journey-reading-block">

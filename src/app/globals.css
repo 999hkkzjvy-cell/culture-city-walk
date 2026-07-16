@@ -2972,6 +2972,14 @@ button {
   box-shadow: 0 7px 16px rgb(23 62 50 / 28%);
 }
 
+.amap-route-marker.selected {
+  width: 34px;
+  height: 34px;
+  border-color: #fff7e8;
+  background: #b45f2a;
+  box-shadow: 0 10px 22px rgb(180 95 42 / 34%);
+}
+
 .map-legend {
   position: absolute;
   right: 24px;
@@ -3079,6 +3087,12 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgb(251 247 239 / 78%);
+}
+
+.stop-card.selected .stop-body {
+  border-color: rgb(180 95 42 / 42%);
+  background: rgb(255 248 238 / 92%);
+  box-shadow: 0 12px 28px rgb(112 75 34 / 10%);
 }
 
 .stop-time {
@@ -3252,6 +3266,31 @@ button {
   flex: 0 0 auto;
   margin-top: 4px;
   color: var(--green-primary);
+}
+
+.fact-check-note {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgb(142 118 87 / 28%);
+  border-radius: 6px;
+  background: rgb(255 251 244 / 70%);
+}
+
+.fact-check-note p {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  color: #6d5839;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.fact-check-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #8e7657;
 }
 
 .stop-story button {

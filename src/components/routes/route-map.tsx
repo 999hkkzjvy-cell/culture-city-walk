@@ -13,7 +13,13 @@ import type { RoutePlan } from "@/lib/route";
 type MapState =
   "not-configured" | "no-geometry" | "loading" | "ready" | "error";
 
-export function RouteMap({ route }: { route: RoutePlan }) {
+export function RouteMap({
+  route,
+  selectedStopId,
+}: {
+  route: RoutePlan;
+  selectedStopId?: string | null;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const geometry = useMemo(() => buildAmapRouteGeometry(route), [route]);
   const [state, setState] = useState<MapState>("loading");
@@ -50,8 +56,12 @@ export function RouteMap({ route }: { route: RoutePlan }) {
         const markers = geometry.stopPoints.map(
           (point, index) =>
             new AMap.Marker({
-              content: markerContent(point.name, index + 1),
-              offset: new AMap.Pixel(-15, -36),
+              content: markerContent(
+                point.name,
+                index + 1,
+                point.id === selectedStopId,
+              ),
+              offset: new AMap.Pixel(-16, -38),
               position: point.position,
               title: point.name,
             }),
@@ -60,9 +70,11 @@ export function RouteMap({ route }: { route: RoutePlan }) {
           (line) =>
             new AMap.Polyline({
               path: line.path,
-              strokeColor: "#1f6b50",
+              strokeColor: isSelectedLeg(line.id, selectedStopId)
+                ? "#b45f2a"
+                : "#1f6b50",
               strokeOpacity: 0.95,
-              strokeWeight: 6,
+              strokeWeight: isSelectedLeg(line.id, selectedStopId) ? 8 : 6,
               lineJoin: "round",
             }),
         );
@@ -70,10 +82,12 @@ export function RouteMap({ route }: { route: RoutePlan }) {
           (line) =>
             new AMap.Polyline({
               path: line.path,
-              strokeColor: "#9b6f3f",
-              strokeOpacity: 0.72,
+              strokeColor: isSelectedLeg(line.id, selectedStopId)
+                ? "#b45f2a"
+                : "#9b6f3f",
+              strokeOpacity: isSelectedLeg(line.id, selectedStopId) ? 0.95 : 0.72,
               strokeStyle: "dashed",
-              strokeWeight: 4,
+              strokeWeight: isSelectedLeg(line.id, selectedStopId) ? 6 : 4,
               lineJoin: "round",
             }),
         );
@@ -96,7 +110,7 @@ export function RouteMap({ route }: { route: RoutePlan }) {
       cancelled = true;
       map?.destroy();
     };
-  }, [geometry, hasAmapKey]);
+  }, [geometry, hasAmapKey, selectedStopId]);
 
   return (
     <div className="amap-route-map" aria-label="高德路线地图">
@@ -164,8 +178,16 @@ const mapStateCopy: Record<MapState, string> = {
   error: "高德地图加载失败，暂时显示纸面路线示意图。",
 };
 
-function markerContent(name: string, index: number) {
-  return `<div class="amap-route-marker" title="${escapeHtml(name)}">${index}</div>`;
+function markerContent(name: string, index: number, selected: boolean) {
+  const className = selected
+    ? "amap-route-marker selected"
+    : "amap-route-marker";
+
+  return `<div class="${className}" title="${escapeHtml(name)}">${index}</div>`;
+}
+
+function isSelectedLeg(lineId: string, selectedStopId?: string | null) {
+  return Boolean(selectedStopId && lineId.includes(`:${selectedStopId}:`));
 }
 
 function escapeHtml(value: string) {
