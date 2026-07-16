@@ -11,6 +11,7 @@ import {
   ImagePlus,
   MapPin,
   Navigation,
+  NotebookTabs,
   RotateCcw,
   SkipForward,
   Sparkles,
@@ -55,7 +56,7 @@ import {
   type StoredJourneyState,
 } from "@/lib/storage";
 import { getRouteTravelModeLabel } from "@/lib/transport";
-import { readRouteId, routeUrl } from "@/lib/urls";
+import { journeyArchiveUrl, readRouteId, routeUrl } from "@/lib/urls";
 
 let cachedJourneyRoute:
   | {
@@ -437,7 +438,10 @@ export function RouteJourneyMode() {
               {latestArchive.photoCount} 张
             </strong>
           </div>
-          <span>{formatArchiveTime(latestArchive.completedAt)} 完成</span>
+          <Link className="secondary-link" href={journeyArchiveUrl()}>
+            <NotebookTabs size={15} />
+            {formatArchiveTime(latestArchive.completedAt)} 完成
+          </Link>
         </section>
       ) : null}
 
@@ -450,9 +454,10 @@ export function RouteJourneyMode() {
             {checkInPhotoCount} 张打卡图。
           </span>
           <strong>{buildPraiseCopy(journeyScore, route.city)}</strong>
-          <button onClick={() => setIsCompleted(false)} type="button">
+          <Link className="secondary-link" href={journeyArchiveUrl()}>
+            <NotebookTabs size={15} />
             继续查看行程存档
-          </button>
+          </Link>
         </section>
       ) : null}
 

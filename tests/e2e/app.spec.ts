@@ -196,6 +196,47 @@ test("route journey mode archives check-in photos", async ({ page }) => {
   await expect(page.getByText("还没有为这一站上传打卡图。")).toBeVisible();
 });
 
+test("journey archive page shows completed route records", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "cultural-citywalk:journey-archives",
+      JSON.stringify([
+        {
+          id: "journey-demo-2026-07-16",
+          routeId: "demo",
+          routeTitle: "书页与旧城之间",
+          city: "南京",
+          score: 88,
+          arrivedCount: 4,
+          skippedCount: 1,
+          photoCount: 2,
+          experienceStopCount: 5,
+          completedAt: "2026-07-16T09:30:00.000Z",
+        },
+      ]),
+    );
+  });
+
+  await page.goto("/journeys/");
+
+  await expect(page.getByRole("heading", { name: "行程存档" })).toBeVisible();
+  await expect(page.getByLabel("存档总览")).toContainText("1 次");
+  await expect(page.getByLabel("存档总览")).toContainText("4 个");
+  await expect(
+    page.getByRole("heading", { name: "书页与旧城之间" }),
+  ).toBeVisible();
+  await expect(page.getByText("到达 4/5")).toBeVisible();
+  await expect(page.getByRole("link", { name: "查看路线" })).toHaveAttribute(
+    "href",
+    "/route/?id=demo",
+  );
+
+  await page.getByLabel("行程存档筛选").getByLabel("城市").selectOption("南京");
+  await expect(
+    page.getByRole("heading", { name: "书页与旧城之间" }),
+  ).toBeVisible();
+});
+
 test("library page shows login gate when signed out", async ({ page }) => {
   await page.goto("/library/");
 

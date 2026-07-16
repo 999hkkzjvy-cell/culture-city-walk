@@ -8,6 +8,10 @@ export function journeyUrl(routeId: string) {
   return `/journey/?id=${encodeURIComponent(routeId)}`;
 }
 
+export function journeyArchiveUrl() {
+  return "/journeys/";
+}
+
 export function shareUrl(code: string) {
   return `/share/?code=${encodeURIComponent(code)}`;
 }
