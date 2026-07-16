@@ -1,7 +1,7 @@
 import type { Coordinate } from "@/lib/maps/types";
 import type { RoutePlan, RouteStop } from "@/lib/route";
 
-type AmapLngLat = [number, number];
+export type AmapLngLat = [number, number];
 
 export type AmapRouteStopPoint = {
   id: string;
@@ -176,7 +176,7 @@ export function buildAmapRouteGeometry(route: RoutePlan): AmapRouteGeometry {
   };
 }
 
-function coordinateToAmapPoint(
+export function coordinateToAmapPoint(
   coordinate?: Coordinate | null,
 ): AmapLngLat | null {
   if (

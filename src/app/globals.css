@@ -1270,6 +1270,11 @@ button {
   overflow: hidden;
 }
 
+.candidate-item.map-previewed {
+  border-color: rgb(180 95 42 / 48%);
+  box-shadow: 0 10px 24px rgb(180 95 42 / 10%);
+}
+
 .candidate-item h3,
 .candidate-item p,
 .candidate-item ul {
@@ -2638,6 +2643,10 @@ button {
   margin-top: 22px;
 }
 
+.planning-route-map {
+  margin-top: 18px;
+}
+
 .route-preview-stop {
   display: grid;
   gap: 10px;
@@ -2890,6 +2899,10 @@ button {
   background: #efe6d7;
 }
 
+.amap-route-map.compact {
+  min-height: 280px;
+}
+
 .amap-route-map-container {
   position: absolute;
   inset: 0;
@@ -2958,6 +2971,11 @@ button {
   border-top-style: dashed;
 }
 
+.amap-route-map-legend .candidate-line {
+  border-top-color: #d47b3c;
+  border-top-style: dashed;
+}
+
 .amap-route-marker {
   display: grid;
   width: 30px;
@@ -2978,6 +2996,19 @@ button {
   border-color: #fff7e8;
   background: #b45f2a;
   box-shadow: 0 10px 22px rgb(180 95 42 / 34%);
+}
+
+.amap-route-marker.candidate {
+  border-color: #fff7e8;
+  background: #d47b3c;
+  color: #fff7e8;
+  font-size: 18px;
+  box-shadow: 0 10px 22px rgb(212 123 60 / 34%);
+}
+
+.route-map-fallback li.candidate-preview span {
+  border-color: #fff7e8;
+  background: #d47b3c;
 }
 
 .map-legend {
@@ -3989,6 +4020,19 @@ button {
     border-top: 0;
     border-right: 0;
     border-bottom: 0;
+    border-radius: 0;
+  }
+
+  .planning-route-map .amap-route-map {
+    min-height: 300px;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .planning-route-map .amap-route-map .paper-map {
+    min-height: 100%;
+    border: 0;
     border-radius: 0;
   }
 

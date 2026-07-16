@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import {
+  RouteMap,
+  type RouteMapPreviewCandidate,
+} from "@/components/routes/route-map";
+import {
   ArrowRight,
   Bookmark,
   ChevronDown,
@@ -242,6 +246,9 @@ export function PlanningDesk() {
   const [expandedCandidateIds, setExpandedCandidateIds] = useState<
     Record<string, boolean>
   >({});
+  const [previewCandidateId, setPreviewCandidateId] = useState<string | null>(
+    null,
+  );
   const [planningImportSource, setPlanningImportSource] =
     useState<PlanningImportSource | null>(() =>
       typeof window === "undefined" ? null : readPlanningImportSource(),
@@ -286,6 +293,24 @@ export function PlanningDesk() {
       (candidate) => candidate.fitBand === band,
     ),
   }));
+  const mapPreviewCandidate = useMemo<RouteMapPreviewCandidate | null>(() => {
+    const candidate =
+      pendingCandidates.find((item) => item.id === previewCandidateId) ??
+      pendingCandidates.find((item) => expandedCandidateIds[item.id]);
+
+    if (!candidate) {
+      return null;
+    }
+
+    return {
+      id: candidate.id,
+      name: candidate.place.name,
+      insertionIndex: candidate.insertionIndex,
+      coordinate: candidate.place.coordinate,
+      placeType: candidate.placeType,
+      score: candidate.score,
+    };
+  }, [expandedCandidateIds, pendingCandidates, previewCandidateId]);
 
   function toggleTheme(theme: Theme) {
     setSaved(false);
@@ -1394,25 +1419,46 @@ export function PlanningDesk() {
                       const action = candidateActions[candidate.id];
                       const isExpanded =
                         expandedCandidateIds[candidate.id] ?? false;
+                      const isMapPreviewed =
+                        mapPreviewCandidate?.id === candidate.id;
 
                       return (
                         <article
-                          className={
-                            isExpanded
-                              ? "candidate-item expanded"
-                              : "candidate-item"
-                          }
+                          className={candidateItemClassName(
+                            isExpanded,
+                            isMapPreviewed,
+                          )}
                           key={candidate.id}
+                          onBlur={(event) => {
+                            if (
+                              !(event.relatedTarget instanceof Node) ||
+                              !event.currentTarget.contains(event.relatedTarget)
+                            ) {
+                              setPreviewCandidateId((current) =>
+                                current === candidate.id ? null : current,
+                              );
+                            }
+                          }}
+                          onFocus={() => setPreviewCandidateId(candidate.id)}
+                          onMouseEnter={() =>
+                            setPreviewCandidateId(candidate.id)
+                          }
+                          onMouseLeave={() =>
+                            setPreviewCandidateId((current) =>
+                              current === candidate.id ? null : current,
+                            )
+                          }
                         >
                           <button
                             aria-expanded={isExpanded}
                             className="candidate-summary-row"
-                            onClick={() =>
+                            onClick={() => {
+                              setPreviewCandidateId(candidate.id);
                               setExpandedCandidateIds((current) => ({
                                 ...current,
                                 [candidate.id]: !isExpanded,
-                              }))
-                            }
+                              }));
+                            }}
                             type="button"
                           >
                             <strong>{candidate.place.name}</strong>
@@ -1779,9 +1825,12 @@ export function PlanningDesk() {
           })}
         </div>
 
-        <div className="brief-sketch compact">
-          <MapPinned size={24} aria-hidden="true" />
-          <span>estimated preview</span>
+        <div className="planning-route-map">
+          <RouteMap
+            compact
+            previewCandidate={mapPreviewCandidate}
+            route={previewRoute}
+          />
         </div>
       </aside>
     </section>
@@ -1806,6 +1855,16 @@ function getRouteEndTime(
 
 function formatCandidateDistance(candidate: RouteCandidate) {
   return `${(candidate.detourMeters / 1000).toFixed(1)} km`;
+}
+
+function candidateItemClassName(isExpanded: boolean, isMapPreviewed: boolean) {
+  return [
+    "candidate-item",
+    isExpanded ? "expanded" : "",
+    isMapPreviewed ? "map-previewed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function generateRouteTitle(
