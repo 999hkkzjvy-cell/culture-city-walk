@@ -2,10 +2,9 @@
 
 import { LogIn, LogOut, Mail } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
+import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
-import {
-  hasSyncedRoutePlan,
-} from "@/lib/storage";
+import { hasSyncedRoutePlan } from "@/lib/storage";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -70,7 +69,7 @@ export function AuthPanel() {
     const { error } = await client.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.href,
+        emailRedirectTo: buildAuthRedirectUrl("/library/"),
       },
     });
 

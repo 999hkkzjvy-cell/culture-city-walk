@@ -1663,9 +1663,13 @@ button {
   display: grid;
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto 56px;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+
+.recommendation-layout > * {
+  min-width: 0;
 }
 
 .library-sidebar,
@@ -1688,6 +1692,7 @@ button {
   display: grid;
   gap: 18px;
   padding: 22px;
+  min-width: 0;
 }
 
 .library-sidebar p,
@@ -1744,6 +1749,7 @@ button {
 .recommendation-filter-group button,
 .filter-chip-row button {
   display: inline-flex;
+  min-width: 0;
   min-height: 36px;
   align-items: center;
   justify-content: center;
@@ -1788,10 +1794,12 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .filter-chip-row button {
   padding: 0 13px;
+  white-space: normal;
 }
 
 .recommendation-sidebar h2,
@@ -1804,13 +1812,17 @@ button {
 .recommendation-search {
   display: grid;
   gap: 8px;
+  min-width: 0;
   color: #37433b;
   font-size: 13px;
   font-weight: 700;
 }
 
 .recommendation-search input {
+  width: 100%;
+  min-width: 0;
   min-height: 40px;
+  box-sizing: border-box;
   padding: 0 12px;
   border: 1px solid rgb(142 118 87 / 30%);
   border-radius: 6px;
@@ -1831,6 +1843,7 @@ button {
 }
 
 .recommendation-results {
+  min-width: 0;
   padding: 24px;
 }
 
@@ -1850,6 +1863,7 @@ button {
 
 .recommendation-card {
   display: grid;
+  min-width: 0;
   min-height: 250px;
   align-content: space-between;
   gap: 18px;
@@ -1858,19 +1872,28 @@ button {
   text-decoration: none;
 }
 
+.recommendation-card > div {
+  min-width: 0;
+}
+
 .recommendation-card strong {
   display: block;
+  max-width: 100%;
   margin: 10px 0 8px;
   font-family: var(--serif);
   font-size: 23px;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recommendation-card p {
+  max-width: 100%;
   margin: 0;
   color: #5f675f;
   font-size: 14px;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .recommendation-preview,
@@ -1907,6 +1930,7 @@ button {
 
 .recommendation-card span,
 .recommendation-card em {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2292,6 +2316,41 @@ button {
   color: var(--text-primary);
 }
 
+.profile-upload-row {
+  position: relative;
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+}
+
+.profile-upload-row input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.profile-upload-row > span {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--green-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .profile-form textarea {
   min-height: 108px;
   padding: 12px;
@@ -2336,6 +2395,41 @@ button {
 .route-list {
   display: grid;
   gap: 12px;
+}
+
+.library-sync-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid rgb(31 107 80 / 22%);
+  border-radius: 8px;
+  background: rgb(31 107 80 / 7%);
+}
+
+.library-sync-card div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.library-sync-card strong {
+  color: var(--green-primary);
+  font-family: var(--serif);
+  font-size: 17px;
+}
+
+.library-sync-card span,
+.library-sync-card small {
+  color: #536057;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.library-sync-card small {
+  font-size: 12px;
 }
 
 .journey-archive-list {
@@ -4694,7 +4788,8 @@ button {
 
   .library-filter-bar,
   .recommendation-results-heading,
-  .route-poster-panel {
+  .route-poster-panel,
+  .library-sync-card {
     align-items: flex-start;
     flex-direction: column;
   }

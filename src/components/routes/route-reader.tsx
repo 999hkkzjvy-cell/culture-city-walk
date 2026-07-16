@@ -50,6 +50,7 @@ import {
   updateStopStayMinutes,
 } from "@/lib/route-editing";
 import { calculateRouteKernel } from "@/lib/route-kernel";
+import { persistFavoriteRouteToCloud } from "@/lib/repositories/favorite-route-repository";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
 import {
   readRoutePlan,
@@ -115,6 +116,12 @@ export function RouteReader() {
   useEffect(() => {
     queueMicrotask(() => setIsFavorited(isRouteFavorited(route.id)));
   }, [route.id]);
+
+  function toggleFavorite() {
+    const next = toggleFavoriteRoute(route);
+    setIsFavorited(next);
+    persistFavoriteRouteToCloud(route, next).catch(() => undefined);
+  }
 
   useEffect(() => {
     const routeId = readRouteId(new URLSearchParams(window.location.search));
@@ -322,7 +329,7 @@ export function RouteReader() {
           </button>
           <button
             className={isFavorited ? "selected" : ""}
-            onClick={() => setIsFavorited(toggleFavoriteRoute(route))}
+            onClick={toggleFavorite}
             type="button"
           >
             <Bookmark size={17} />

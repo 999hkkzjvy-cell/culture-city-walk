@@ -4,6 +4,10 @@ import Link from "next/link";
 import { Bookmark, Cloud, Edit3, FileText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouteShareManager } from "@/components/routes/route-share-manager";
+import {
+  listFavoriteRoutesWithCloud,
+  syncFavoriteRoutesToCloud,
+} from "@/lib/repositories/favorite-route-repository";
 import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import {
   createRouteRepository,
@@ -12,8 +16,10 @@ import {
 import { saveLocalRouteToCloud } from "@/lib/repositories/route-cloud-sync";
 import type { Theme } from "@/lib/route";
 import {
+  hasSyncedRoutePlan,
   importRouteForPlanning,
   readFavoriteRoutes,
+  readRoutePlan,
   saveRoutePlan,
 } from "@/lib/storage";
 import { routeUrl } from "@/lib/urls";
@@ -30,9 +36,15 @@ export function RouteLibrary({
   const [routes, setRoutes] = useState<SavedRouteSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [message, setMessage] = useState("");
-  const [favoriteRoutes] = useState(() =>
+  const [favoriteMessage, setFavoriteMessage] = useState("");
+  const [hasPendingLocalPreview, setHasPendingLocalPreview] = useState(false);
+  const [localPreview, setLocalPreview] = useState(() =>
+    typeof window === "undefined" ? null : readRoutePlan(),
+  );
+  const [favoriteRoutes, setFavoriteRoutes] = useState(() =>
     typeof window === "undefined" ? [] : readFavoriteRoutes(),
   );
+  const [favoriteCloudAvailable, setFavoriteCloudAvailable] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,6 +57,8 @@ export function RouteLibrary({
           return;
         }
         setRoutes(items);
+        setLocalPreview(readRoutePlan());
+        setHasPendingLocalPreview(!hasSyncedRoutePlan());
         setState("ready");
       })
       .catch((error) => {
@@ -60,6 +74,32 @@ export function RouteLibrary({
     };
   }, []);
 
+  useEffect(() => {
+    if (view !== "favorites") {
+      return;
+    }
+
+    let isMounted = true;
+
+    listFavoriteRoutesWithCloud().then((result) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setFavoriteRoutes(result.routes);
+      setFavoriteCloudAvailable(result.cloudAvailable);
+      setFavoriteMessage(
+        result.cloudAvailable && result.cloudCount > 0
+          ? `已合并 ${result.cloudCount} 条云端收藏。`
+          : "",
+      );
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [view]);
+
   async function saveCurrentRoute() {
     setMessage("");
     const repository = createRouteRepository();
@@ -70,7 +110,13 @@ export function RouteLibrary({
         saved,
         ...current.filter((route) => route.id !== saved.id),
       ]);
-      setMessage("当前本地预案已保存。");
+      setLocalPreview(readRoutePlan());
+      setHasPendingLocalPreview(false);
+      setMessage(
+        saved.version > 1
+          ? `当前本地预案已同步，并更新云端路线：${saved.title}。`
+          : `当前本地预案已保存为云端路线：${saved.title}。`,
+      );
     } catch (error) {
       setMessage(mapCloudError(error, "save"));
     }
@@ -83,6 +129,20 @@ export function RouteLibrary({
       setRoutes((current) => current.filter((route) => route.id !== routeId));
     } catch (error) {
       setMessage(mapCloudError(error, "route_delete"));
+    }
+  }
+
+  async function syncFavorites() {
+    setFavoriteMessage("");
+
+    try {
+      await syncFavoriteRoutesToCloud(readFavoriteRoutes());
+      const result = await listFavoriteRoutesWithCloud();
+      setFavoriteRoutes(result.routes);
+      setFavoriteCloudAvailable(result.cloudAvailable);
+      setFavoriteMessage("本地收藏已同步到云端。");
+    } catch (error) {
+      setFavoriteMessage(mapCloudError(error, "favorite"));
     }
   }
 
@@ -103,6 +163,13 @@ export function RouteLibrary({
       selectedThemes.length === 0 ||
       selectedThemes.every((theme) => route.themes.includes(theme)),
   );
+  const localConflict =
+    localPreview &&
+    routes.find(
+      (route) =>
+        route.id === localPreview.id ||
+        (route.title === localPreview.title && route.city === localPreview.city),
+    );
 
   if (view === "favorites") {
     const filteredFavorites = favoriteRoutes.filter(
@@ -115,7 +182,20 @@ export function RouteLibrary({
       <section className="library-panel">
         <div className="section-heading">
           <h2>我的收藏</h2>
+          <button
+            className="secondary-button"
+            onClick={syncFavorites}
+            type="button"
+          >
+            <Cloud size={17} />
+            同步收藏
+          </button>
         </div>
+        {favoriteMessage ? (
+          <p className="auth-message">{favoriteMessage}</p>
+        ) : favoriteCloudAvailable ? (
+          <p className="auth-note">云端收藏已接入，可跨设备合并查看。</p>
+        ) : null}
         <div className="route-list">
           {filteredFavorites.length > 0 ? (
             filteredFavorites.map((route) => (
@@ -178,6 +258,32 @@ export function RouteLibrary({
           保存当前预案
         </button>
       </div>
+      {hasPendingLocalPreview && localPreview ? (
+        <div className="library-sync-card">
+          <div>
+            <strong>发现未同步的本地预案</strong>
+            <span>
+              {localPreview.title} · {localPreview.city} ·{" "}
+              {localPreview.stops.length} 个站点
+            </span>
+            <small>
+              {localConflict?.id === localPreview.id
+                ? "同步会更新同一条云端路线。"
+                : localConflict
+                  ? `云端已有同名路线“${localConflict.title}”，同步会保存为独立副本。`
+                  : "同步后可在云端路线库跨设备查看。"}
+            </small>
+          </div>
+          <button
+            className="secondary-button"
+            onClick={saveCurrentRoute}
+            type="button"
+          >
+            <Cloud size={17} />
+            同步本地预案
+          </button>
+        </div>
+      ) : null}
       {message ? <p className="auth-message">{message}</p> : null}
       <div className="route-list">
         {filteredRoutes.length > 0 ? (
@@ -218,8 +324,10 @@ export function RouteLibrary({
             <FileText size={24} />
             <span>
               {routes.length > 0
-                ? "当前主题筛选下没有路线。"
-                : "还没有云端路线。先保存当前预案，之后可以跨设备查看。"}
+                ? "当前主题筛选下没有路线，取消部分主题即可查看其他云端路线。"
+                : hasPendingLocalPreview
+                  ? "云端暂时没有路线；上方可以先把本地预案同步到云端。"
+                  : "还没有云端路线。先在规划页生成路线，再保存到云端跨设备查看。"}
             </span>
           </div>
         )}

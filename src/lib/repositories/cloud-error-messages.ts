@@ -4,6 +4,7 @@ export type CloudAction =
   | "snapshot"
   | "route_list"
   | "route_delete"
+  | "favorite"
   | "photo_upload";
 
 const actionLabels: Record<CloudAction, string> = {
@@ -12,6 +13,7 @@ const actionLabels: Record<CloudAction, string> = {
   snapshot: "快照",
   route_list: "路线读取",
   route_delete: "路线删除",
+  favorite: "收藏同步",
   photo_upload: "打卡图同步",
 };
 
@@ -49,17 +51,19 @@ export function mapCloudError(error: unknown, action: CloudAction) {
   if (
     matchesAny(normalized, [
       "route-media",
+      "profile-avatars",
       "bucket",
       "storage",
       "object not found",
     ])
   ) {
-    return "云端 Storage 尚不可用：请确认 `route-media` bucket 和相关 RLS 策略已完成迁移。";
+    return "云端 Storage 尚不可用：请确认 `route-media` / `profile-avatars` bucket 和相关 RLS 策略已完成迁移。";
   }
 
   if (
     matchesAny(normalized, [
       "route_checkin_photos",
+      "route_favorites",
       "relation does not exist",
       "schema cache",
       "column",

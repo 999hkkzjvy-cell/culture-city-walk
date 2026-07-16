@@ -320,6 +320,28 @@ export type Database = {
         >;
         Relationships: [];
       };
+      route_favorites: {
+        Row: {
+          id: string;
+          owner_id: string;
+          source_route_id: string;
+          route_snapshot: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          source_route_id: string;
+          route_snapshot: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["route_favorites"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

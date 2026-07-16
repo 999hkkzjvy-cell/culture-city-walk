@@ -15,6 +15,10 @@ export type UserProfile = {
 
 export type UserProfileInput = Omit<UserProfile, "id" | "email">;
 
+const profileAvatarBucket = "profile-avatars";
+const maxAvatarBytes = 2 * 1024 * 1024;
+const allowedAvatarMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+
 export function createProfileRepository(client = createBrowserSupabaseClient()) {
   if (!client) {
     throw new Error("supabase_not_configured");
@@ -83,6 +87,40 @@ export class ProfileRepository {
     } satisfies UserProfile;
   }
 
+  async uploadAvatar(file: File) {
+    if (!allowedAvatarMimeTypes.includes(file.type)) {
+      throw new Error("avatar_invalid_type");
+    }
+
+    if (file.size > maxAvatarBytes) {
+      throw new Error("avatar_too_large");
+    }
+
+    const user = await this.requireUser();
+    const extension = extensionForMime(file.type);
+    const storagePath = `${user.id}/avatar.${extension}`;
+    const { error: uploadError } = await this.client.storage
+      .from(profileAvatarBucket)
+      .upload(storagePath, file, {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = this.client.storage
+      .from(profileAvatarBucket)
+      .getPublicUrl(storagePath);
+
+    if (!data.publicUrl) {
+      throw new Error("avatar_public_url_failed");
+    }
+
+    return data.publicUrl;
+  }
+
   private async ensureProfile(userId: string, email: string | null) {
     const { data: existing, error: readError } = await this.client
       .from("profiles")
@@ -129,4 +167,16 @@ export class ProfileRepository {
 function normalize(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function extensionForMime(mimeType: string) {
+  switch (mimeType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/jpeg":
+    default:
+      return "jpg";
+  }
 }

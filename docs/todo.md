@@ -1,6 +1,6 @@
 # 待办清单
 
-最后更新：2026-07-16
+最后更新：2026-07-17
 
 本文件只记录尚未完成、尚未验证或尚未部署确认的事项。已完成的开发项不再保留在本文中；历史完成情况请查看 `ignore-files/项目提交日志.md` 和阶段状态文档。
 
@@ -16,39 +16,30 @@
 
 ## P1 规划与候选质量
 
-- `P1` 执行 AI 用量限制的生产登录/超额烟测。
+- `P1` 待授权执行 AI 用量限制的生产登录/超额烟测。
   - `deepseek-proxy` 新版已部署，Supabase Function secrets 已配置 `AI_DAILY_USER_LIMIT=30` 和 `AI_PROJECT_COST_LIMIT_CNY=20`。
   - 未登录诊断 smoke 已返回 `deepseek_auth_required`，高德 provider 诊断已返回 `OK`。
-  - 仍需在用户明确授权后，创建临时生产用户并写入 `route_ai_runs` 超额记录，验证正常调用和超额拒绝分支；该操作会改写生产 Supabase 数据，本次因安全审查未执行。
+  - 已新增 `npm run smoke:deepseek-limit`，默认 dry-run；用户明确授权后可运行 `npm run smoke:deepseek-limit -- --execute`，脚本会创建临时生产用户、验证登录 allowed、写入当日 `route_ai_runs` 触发用户日限额，再清理临时数据。
+  - 该操作会改写生产 Supabase 数据，仍需用户明确授权后执行。
 
 ## P1 认证、云端与数据可靠性
 
-- `P1` 如未来开启邮件确认或 magic link，补充邮件链接回跳验证。
-  - 2026-07-16 线上邮箱密码注册登录已通过，可直接进入 `/profile/`。
-  - 由于当前生产注册没有强制邮件确认，本次线上烟测没有触发邮件确认链接。
+- `P1` 线上验证头像上传与云端收藏迁移。
+  - `20260716000200_profile_avatars_and_route_favorites.sql` 已由用户在 Supabase 执行，包含公开 `profile-avatars` bucket、头像 Storage policy、`route_favorites` 表和 owner-only RLS。
+  - 本地代码已支持头像图片上传、本地收藏云端同步、登录后路线库合并云端收藏。
+  - 前端代码仍需提交、推送并等待 GitHub Pages 部署后，线上验证头像上传、收藏同步、跨设备收藏读取和未登录本地收藏 fallback。
+
+- `P1` 如未来开启邮件确认或 magic link，执行线上邮件链接回跳 smoke。
+  - 登录页已支持 Supabase `code` 回跳和 hash token 回跳，并会按安全站内 `redirect` 参数跳转。
+  - 2026-07-16 线上邮箱密码注册登录已通过，可直接进入 `/profile/`；当前生产注册没有强制邮件确认，本次线上烟测没有触发邮件确认链接。
   - 若后续启用邮件确认或恢复 magic-link 主流程，需要单独验证 GitHub Pages 回跳：
     - Site URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/`
     - Redirect URL：`https://999hkkzjvy-cell.github.io/culture-city-walk/**`
     - 本地 Redirect URL：`http://localhost:3000/**`
 
-- `P1` 改进登录后的本地草稿迁移。
-  - 当前同步是 best effort。
-  - 需要更明确的“保存本地草稿到云端”流程，并处理云端已有路线时的冲突。
-
-- `P1` 增加头像上传。
-  - 当前 profile 只支持头像 URL。
-  - 需要决定头像 Storage 的私有/公开策略，并增加图片上传 UI。
-
-- `P1` 改进路线归档空态与错误态。
-  - 区分“没有路线”、“未登录”、“云端不可用”和“主题筛选为空”。
-
-- `P1` 增加 Supabase 路线/候选/快照完整性测试。
-  - 本地 repository 和纯函数已有测试。
-  - 需要补云端保存、路线重新读取、候选重新读取、快照创建/读取、分享创建/删除和 Storage 上传的集成检查。
-
-- `P1` 评估登录用户收藏云端同步。
-  - 当前 P0 决策是收藏保留在本地浏览器存储，保证未登录也能收藏和修改。
-  - 如需要跨设备收藏，应新增 schema/RLS、repository 方法和迁移，并明确与本地收藏的合并策略。
+- `P1` 线上执行 Supabase 路线/候选/快照完整性检查。
+  - 已新增 `runRouteCloudIntegrityCheck` 和 Vitest contract，覆盖云端保存、路线重新读取、候选重新读取、快照创建/读取、分享创建/撤销。
+  - 仍需在真实 Supabase 登录态下运行一次线上集成 smoke；Storage 上传已由打卡图线上冒烟覆盖，头像 Storage 需在新 migration 后补测。
 
 ## P2 UI 与内容打磨
 

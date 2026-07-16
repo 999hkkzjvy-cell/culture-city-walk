@@ -9,6 +9,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
 import { generateStopThemeContentWithFallback } from "@/lib/ai/route-collaboration";
+import { persistFavoriteRouteToCloud } from "@/lib/repositories/favorite-route-repository";
 import { defaultDraft, type RoutePlan, type RouteStop } from "@/lib/route";
 import { importRouteForPlanning, toggleFavoriteRoute } from "@/lib/storage";
 import { readShareCode } from "@/lib/urls";
@@ -158,6 +159,9 @@ export function SharedRouteReader() {
           className="secondary-link"
           onClick={() => {
             const favorited = toggleFavoriteRoute(sharedRoute);
+            persistFavoriteRouteToCloud(sharedRoute, favorited).catch(
+              () => undefined,
+            );
             setFavoriteMessage(favorited ? "已收藏路线。" : "已取消收藏。");
           }}
           type="button"

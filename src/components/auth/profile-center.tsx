@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Save, UserRound } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { ImageUp, LogOut, Save, UserRound } from "lucide-react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import {
   createProfileRepository,
   type UserProfileInput,
@@ -30,6 +30,7 @@ export function ProfileCenter() {
   const [profile, setProfile] = useState<UserProfileInput>(emptyProfile);
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   useEffect(() => {
     const client = createBrowserSupabaseClient();
@@ -133,6 +134,45 @@ export function ProfileCenter() {
     setState("signed-out");
   }
 
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setMessage("");
+    setIsUploadingAvatar(true);
+
+    try {
+      const repository = createProfileRepository();
+      const avatarUrl = await repository.uploadAvatar(file);
+      const saved = await repository.updateCurrent({
+        ...profile,
+        avatarUrl,
+      });
+      setProfile({
+        displayName: saved.displayName,
+        avatarUrl: saved.avatarUrl,
+        location: saved.location,
+        wechatId: saved.wechatId,
+        bio: saved.bio,
+      });
+      setMessage("头像已上传并保存。");
+    } catch (error) {
+      const reason =
+        error instanceof Error && error.message === "avatar_too_large"
+          ? "图片不能超过 2MB。"
+          : error instanceof Error && error.message === "avatar_invalid_type"
+            ? "请上传 JPG、PNG 或 WebP 图片。"
+            : "头像上传失败，请稍后重试。";
+      setMessage(reason);
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
+
   if (state === "loading") {
     return <p className="auth-note">正在读取个人中心...</p>;
   }
@@ -213,10 +253,26 @@ export function ProfileCenter() {
           />
         </label>
         <label>
+          头像
+          <span className="profile-upload-row">
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="上传头像图片"
+              disabled={isUploadingAvatar}
+              onChange={uploadAvatar}
+              type="file"
+            />
+            <span>
+              <ImageUp size={16} />
+              {isUploadingAvatar ? "上传中..." : "上传图片"}
+            </span>
+          </span>
+        </label>
+        <label>
           头像图片 URL
           <input
             onChange={(event) => updateField("avatarUrl", event.target.value)}
-            placeholder="https://..."
+            placeholder="可手动粘贴图片地址，或使用上方上传"
             type="url"
             value={profile.avatarUrl}
           />

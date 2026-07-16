@@ -4,7 +4,11 @@ import Link from "next/link";
 import { LogIn, Mail, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
-import { basePath } from "@/lib/site";
+import {
+  buildAuthRedirectUrl,
+  completeAuthRedirect,
+  readAuthRedirectTarget,
+} from "@/lib/auth-redirect";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -18,6 +22,11 @@ export function LoginForm({
   redirectTo?: string;
 }) {
   const router = useRouter();
+  const [resolvedRedirectTo] = useState(() =>
+    typeof window === "undefined"
+      ? redirectTo
+      : readAuthRedirectTarget(redirectTo),
+  );
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,12 +42,24 @@ export function LoginForm({
       return;
     }
 
-    client.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        router.replace(redirectTo);
+    completeAuthRedirect(client, redirectTo).then((result) => {
+      if (result.handled) {
+        if (result.ok) {
+          router.replace(result.redirectTo);
+          return;
+        }
+
+        setMessage(result.message);
+        return;
       }
+
+      client.auth.getSession().then(({ data }) => {
+        if (data.session?.user) {
+          router.replace(resolvedRedirectTo);
+        }
+      });
     });
-  }, [redirectTo, router]);
+  }, [redirectTo, resolvedRedirectTo, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,7 +86,7 @@ export function LoginForm({
           return;
         }
 
-        router.push(redirectTo);
+        router.push(resolvedRedirectTo);
         return;
       }
 
@@ -76,7 +97,7 @@ export function LoginForm({
           data: {
             display_name: displayName.trim() || email.split("@")[0],
           },
-          emailRedirectTo: `${window.location.origin}${basePath}${redirectTo}`,
+          emailRedirectTo: buildAuthRedirectUrl(resolvedRedirectTo),
         },
       });
 
@@ -93,11 +114,11 @@ export function LoginForm({
       }
 
       if (data.session) {
-        router.push(redirectTo);
+        router.push(resolvedRedirectTo);
         return;
       }
 
-      setMessage("注册邮件已发送，请先到邮箱完成确认。");
+      setMessage("注册邮件已发送，请从邮件链接回到登录页完成确认。");
     } finally {
       setIsSubmitting(false);
     }

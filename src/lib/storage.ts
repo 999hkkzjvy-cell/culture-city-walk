@@ -478,7 +478,7 @@ function readAllCheckInPhotos(): StoredCheckInPhoto[] {
   }
 }
 
-function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {
+export function normalizeRoutePlan(value: Partial<RoutePlan>): RoutePlan {
   return {
     ...demoRoute,
     ...value,
