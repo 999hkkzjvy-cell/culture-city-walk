@@ -98,7 +98,7 @@ export class ProfileRepository {
 
     const user = await this.requireUser();
     const extension = extensionForMime(file.type);
-    const storagePath = `${user.id}/avatar.${extension}`;
+    const storagePath = `${user.id}/avatar-${Date.now()}.${extension}`;
     const bucket = this.client.storage.from(profileAvatarBucket);
     const { error: uploadError } = await bucket.upload(storagePath, file, {
       contentType: file.type,
@@ -128,7 +128,7 @@ export class ProfileRepository {
       throw new Error("avatar_public_url_failed");
     }
 
-    return data.publicUrl;
+    return `${data.publicUrl}?v=${Date.now()}`;
   }
 
   private async ensureProfile(userId: string, email: string | null) {

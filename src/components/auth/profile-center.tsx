@@ -148,18 +148,31 @@ export function ProfileCenter() {
     try {
       const repository = createProfileRepository();
       const avatarUrl = await repository.uploadAvatar(file);
-      const saved = await repository.updateCurrent({
+      const optimisticProfile = {
         ...profile,
         avatarUrl,
-      });
-      setProfile({
-        displayName: saved.displayName,
-        avatarUrl: saved.avatarUrl,
-        location: saved.location,
-        wechatId: saved.wechatId,
-        bio: saved.bio,
-      });
-      setMessage("头像已上传并保存。");
+      };
+
+      setProfile(optimisticProfile);
+
+      try {
+        const saved = await repository.updateCurrent(optimisticProfile);
+        setProfile({
+          displayName: saved.displayName,
+          avatarUrl: saved.avatarUrl,
+          location: saved.location,
+          wechatId: saved.wechatId,
+          bio: saved.bio,
+        });
+        setMessage("头像已上传并保存。");
+      } catch (profileError) {
+        setMessage(
+          `头像已上传，但资料保存失败。头像地址已填入表单，可稍后点击“保存资料”重试。${mapCloudError(
+            profileError,
+            "avatar_upload",
+          )}`,
+        );
+      }
     } catch (error) {
       const reason =
         error instanceof Error && error.message === "avatar_too_large"
