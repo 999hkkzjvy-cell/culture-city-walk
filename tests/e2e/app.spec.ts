@@ -142,6 +142,7 @@ test("route reader supports direct refresh with query string", async ({
   await expect(
     page.getByRole("link", { name: "在高德查看地点" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "海报" })).toBeVisible();
   await expect(page.getByText("模板讲解 · 来源待核验").first()).toBeVisible();
   await page.getByRole("button", { name: "展开深读" }).first().click();
   await expect(
@@ -282,6 +283,12 @@ test("recommended routes can be filtered", async ({ page }) => {
   await expect(page.getByText("武康路文学漫游")).toBeVisible();
   await page.getByRole("button", { name: "紧凑" }).click();
   await expect(page.getByText("没有符合当前筛选的推荐路线。")).toBeVisible();
+
+  await page.getByRole("button", { name: "紧凑" }).click();
+  await page.getByRole("button", { name: "书店" }).click();
+  await page.getByPlaceholder("输入城市名").fill("成都");
+  await expect(page.getByText("茶馆、街巷与晚餐")).toBeVisible();
+  await expect(page.getByText(/人民公园 → 宽窄巷子边线/)).toBeVisible();
 });
 
 test("login and profile pages expose account flows", async ({ page }) => {

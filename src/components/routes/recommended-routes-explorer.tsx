@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, MapPin, Search } from "lucide-react";
+import { ArrowRight, MapPin, Quote, Route, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { Theme } from "@/lib/route";
@@ -133,6 +133,14 @@ export function RecommendedRoutesExplorer() {
                   </span>
                   <strong>{route.title}</strong>
                   <p>{route.summary}</p>
+                  <div className="recommendation-preview">
+                    <Route size={15} />
+                    <span>{route.previewStops.join(" → ")}</span>
+                  </div>
+                </div>
+                <div className="recommendation-share-copy">
+                  <Quote size={15} />
+                  <span>{route.shareCopy}</span>
                 </div>
                 <div className="recommendation-tags">
                   {route.themes.map((theme) => (
@@ -140,6 +148,7 @@ export function RecommendedRoutesExplorer() {
                   ))}
                   <span>{route.pace}</span>
                   <span>{route.duration}</span>
+                  <span>{route.bestFor}</span>
                 </div>
                 <em>
                   查看路线

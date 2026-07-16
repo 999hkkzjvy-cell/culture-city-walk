@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { ArrowRight, BookOpen, Compass, MapPin } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { assetPath } from "@/lib/site";
 import { routeUrl, shareUrl } from "@/lib/urls";
@@ -10,19 +10,19 @@ const modes = [
     title: "AI 帮我发现",
     text: "我只有时间和兴趣，剩下交给 AI。",
     href: "/plan/",
-    icon: Compass,
+    artifact: "compass",
   },
   {
     title: "我已有几个目标",
     text: "告诉 AI 必去的地方，补全顺路路线。",
     href: "/plan/",
-    icon: MapPin,
+    artifact: "pins",
   },
   {
     title: "我已有路线",
     text: "导入或粘贴路线，帮我优化体验。",
     href: routeUrl("demo"),
-    icon: BookOpen,
+    artifact: "notebook",
   },
 ];
 
@@ -75,19 +75,23 @@ export default function Home() {
       </section>
 
       <section aria-label="规划模式" className="mode-panel">
-        {modes.map((mode) => {
-          const Icon = mode.icon;
-          return (
-            <Link className="mode-card" href={mode.href} key={mode.title}>
-              <Icon aria-hidden="true" size={42} strokeWidth={1.5} />
-              <span>
-                <strong>{mode.title}</strong>
-                <small>{mode.text}</small>
-              </span>
-              <ArrowRight aria-hidden="true" size={22} />
-            </Link>
-          );
-        })}
+        {modes.map((mode) => (
+          <Link className="mode-card" href={mode.href} key={mode.title}>
+            <span
+              aria-hidden="true"
+              className={`mode-art mode-art-${mode.artifact}`}
+            >
+              <i />
+              <b />
+              <em />
+            </span>
+            <span>
+              <strong>{mode.title}</strong>
+              <small>{mode.text}</small>
+            </span>
+            <ArrowRight aria-hidden="true" size={22} />
+          </Link>
+        ))}
       </section>
 
       <section className="section">

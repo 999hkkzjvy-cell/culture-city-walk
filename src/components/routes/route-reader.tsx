@@ -21,6 +21,7 @@ import { RouteCloudActions } from "@/components/routes/route-cloud-actions";
 import { FactCheckNote } from "@/components/routes/fact-check-note";
 import { RouteJourneyPanel } from "@/components/routes/route-journey-panel";
 import { RouteMap } from "@/components/routes/route-map";
+import { RoutePosterExport } from "@/components/routes/route-poster-export";
 import { RouteSnapshotPanel } from "@/components/routes/route-snapshot-panel";
 import { amapPlaceSearchUrl, amapWalkingNavigationUrl } from "@/lib/maps/amap";
 import { createAmapWebServiceProvider } from "@/lib/maps/amap-web";
@@ -327,6 +328,7 @@ export function RouteReader() {
             <Bookmark size={17} />
             {isFavorited ? "已收藏" : "收藏"}
           </button>
+          <RoutePosterExport route={route} />
         </div>
         <div className="postmark" aria-hidden="true">
           NANJING

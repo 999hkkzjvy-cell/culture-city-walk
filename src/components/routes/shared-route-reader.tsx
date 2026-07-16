@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BookOpen, Bookmark, Clock, Edit3 } from "lucide-react";
+import { RoutePosterExport } from "@/components/routes/route-poster-export";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -179,6 +180,7 @@ export function SharedRouteReader() {
         </Link>
       </div>
       {favoriteMessage ? <p className="auth-note">{favoriteMessage}</p> : null}
+      <RoutePosterExport route={sharedRoute} variant="panel" />
       <div className="shared-source-note">
         <strong>只读分享</strong>
         <p>
