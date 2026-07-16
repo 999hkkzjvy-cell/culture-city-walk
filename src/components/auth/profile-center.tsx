@@ -7,6 +7,7 @@ import {
   createProfileRepository,
   type UserProfileInput,
 } from "@/lib/repositories/profile-repository";
+import { mapCloudError } from "@/lib/repositories/cloud-error-messages";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -165,7 +166,7 @@ export function ProfileCenter() {
           ? "图片不能超过 2MB。"
           : error instanceof Error && error.message === "avatar_invalid_type"
             ? "请上传 JPG、PNG 或 WebP 图片。"
-            : "头像上传失败，请稍后重试。";
+            : mapCloudError(error, "avatar_upload");
       setMessage(reason);
     } finally {
       setIsUploadingAvatar(false);

@@ -99,20 +99,30 @@ export class ProfileRepository {
     const user = await this.requireUser();
     const extension = extensionForMime(file.type);
     const storagePath = `${user.id}/avatar.${extension}`;
-    const { error: uploadError } = await this.client.storage
-      .from(profileAvatarBucket)
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: true,
-      });
+    const bucket = this.client.storage.from(profileAvatarBucket);
+    const { error: uploadError } = await bucket.upload(storagePath, file, {
+      contentType: file.type,
+      upsert: true,
+    });
 
     if (uploadError) {
-      throw uploadError;
+      const message = uploadError.message.toLowerCase();
+
+      if (message.includes("already exists")) {
+        const { error: updateError } = await bucket.update(storagePath, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        throw uploadError;
+      }
     }
 
-    const { data } = this.client.storage
-      .from(profileAvatarBucket)
-      .getPublicUrl(storagePath);
+    const { data } = bucket.getPublicUrl(storagePath);
 
     if (!data.publicUrl) {
       throw new Error("avatar_public_url_failed");

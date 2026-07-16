@@ -5,6 +5,7 @@ export type CloudAction =
   | "route_list"
   | "route_delete"
   | "favorite"
+  | "avatar_upload"
   | "photo_upload";
 
 const actionLabels: Record<CloudAction, string> = {
@@ -14,6 +15,7 @@ const actionLabels: Record<CloudAction, string> = {
   route_list: "路线读取",
   route_delete: "路线删除",
   favorite: "收藏同步",
+  avatar_upload: "头像上传",
   photo_upload: "打卡图同步",
 };
 
