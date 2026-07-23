@@ -146,8 +146,9 @@ test("route reader supports direct refresh with query string", async ({
   await expect(page.getByText("模板讲解 · 来源待核验").first()).toBeVisible();
   await page.getByRole("button", { name: "展开深读" }).first().click();
   await expect(
-    page.getByText(/城市记忆如何被保留|建议停留/).first(),
+    page.getByRole("button", { name: "收起深读" }).first(),
   ).toBeVisible();
+  await expect(page.locator(".stop-story-more p").first()).toBeVisible();
   await expect(page.getByText("官方开放公告：").first()).toBeVisible();
   await expect(page.getByLabel("核验来源入口").first()).toContainText(
     "官方公告搜索",
