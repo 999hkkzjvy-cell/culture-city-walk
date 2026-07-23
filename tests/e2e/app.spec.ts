@@ -71,10 +71,10 @@ test("planning page can add a candidate to the editable route preview", async ({
 }) => {
   await page.goto("/plan/");
 
-  await page.getByRole("button", { name: /生成沿途候选/ }).click();
+  await page.getByRole("button", { name: /生成完整建议路线/ }).click();
   await page.locator(".candidate-summary-row").first().click();
   const joinButton = page
-    .getByLabel("沿途可选点")
+    .getByRole("region", { name: "路线替换与休息点" })
     .getByRole("button", { name: "加入路线" })
     .first();
 
@@ -102,10 +102,10 @@ test("planning page can add a candidate to the editable route preview", async ({
 test("saved planning preview appears in the route reader", async ({ page }) => {
   await page.goto("/plan/");
 
-  await page.getByRole("button", { name: /生成沿途候选/ }).click();
+  await page.getByRole("button", { name: /生成完整建议路线/ }).click();
   await page.locator(".candidate-summary-row").first().click();
   const candidateName = await page
-    .getByLabel("沿途可选点")
+    .getByRole("region", { name: "路线替换与休息点" })
     .locator(".candidate-summary-row strong")
     .first()
     .innerText();
