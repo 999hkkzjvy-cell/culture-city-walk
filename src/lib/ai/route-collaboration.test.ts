@@ -139,7 +139,7 @@ describe("route collaboration fallback", () => {
     ).toEqual(
       expect.objectContaining({
         sourceStatus: "unverified",
-        shortIntro: expect.stringContaining("适合作为"),
+        shortIntro: expect.stringContaining("最适合慢一点读"),
       }),
     );
   });
@@ -153,9 +153,9 @@ describe("route collaboration fallback", () => {
     });
 
     expect(content.themeConnections).toHaveLength(3);
-    expect(content.shortIntro).toContain("建筑细节");
+    expect(content.shortIntro).toContain("门、墙、屋檐和树影");
     expect(content.checkInTasks).toHaveLength(2);
-    expect(content.checkInTasks[0]).toContain("立面侦探关");
+    expect(content.checkInTasks[0]).toContain("找一处最像");
     expect(content.checkInTasks.join(" ")).toContain("顺和路公馆区");
   });
 
@@ -170,10 +170,10 @@ describe("route collaboration fallback", () => {
     };
     const content = generateStopThemeContentWithFallback(museumStop);
 
-    expect(content.shortIntro).toContain("重要馆藏");
+    expect(content.shortIntro).toContain("一件让你愿意靠近的展品");
     expect(content.checkInTasks).toHaveLength(2);
-    expect(content.checkInTasks[0]).toContain("镇馆线索关");
-    expect(content.checkInTasks[1]).toContain("展陈");
+    expect(content.checkInTasks[0]).toContain("最想讲给朋友听的展品");
+    expect(content.checkInTasks[1]).toContain("地图、旧照片或时间表");
   });
 
   it("generates restaurant deep reading with dish and rhythm tasks", () => {
@@ -188,9 +188,29 @@ describe("route collaboration fallback", () => {
     };
     const content = generateStopThemeContentWithFallback(restaurantStop);
 
-    expect(content.shortIntro).toContain("招牌菜");
+    expect(content.shortIntro).toContain("菜单、店招和出餐的节奏");
     expect(content.checkInTasks).toHaveLength(2);
-    expect(content.checkInTasks[0]).toContain("菜单侦探关");
-    expect(content.checkInTasks[1]).toContain("节奏观察关");
+    expect(content.checkInTasks[0]).toContain("菜单或招牌");
+    expect(content.checkInTasks[1]).toContain("点单前坐三分钟");
+  });
+
+  it("uses a relaxed, non-reporting voice for fallback deep reading", () => {
+    const content = generateStopThemeContentWithFallback({
+      ...demoRoute.stops[1],
+      name: "顺和路公馆区",
+      themes: ["建筑", "历史"],
+      note: "短备注",
+    });
+    const readerFacingCopy = [
+      content.shortIntro,
+      ...content.themeConnections.map((connection) => connection.text),
+      ...content.practicalTips,
+      ...content.checkInTasks,
+    ].join(" ");
+
+    expect(readerFacingCopy).not.toMatch(
+      /线索|核验|观察点|建议|适合作为|追问|展陈主线|立面比例|门窗尺度|侦探关/,
+    );
+    expect(content.checkInTasks).toHaveLength(2);
   });
 });

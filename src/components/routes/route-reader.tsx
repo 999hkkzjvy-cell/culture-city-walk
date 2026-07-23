@@ -196,9 +196,7 @@ export function RouteReader() {
     }
 
     setMapRecalculationState("loading");
-    setMapRecalculationMessage(
-      "正在用高德复核步行、骑行、公交和驾车耗时...",
-    );
+    setMapRecalculationMessage("正在用高德复核步行、骑行、公交和驾车耗时...");
 
     try {
       const result = await recalculateRouteWithProvider(route, provider);
@@ -239,7 +237,7 @@ export function RouteReader() {
       ...current,
       [stop.id]: {
         status: "loading",
-        message: "正在生成 DeepSeek 深读...",
+        message: "正在检索资料并生成 DeepSeek 深读...",
       },
     }));
 
@@ -253,12 +251,15 @@ export function RouteReader() {
           content: result.data,
         },
       }));
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
       setDeepReadings((current) => ({
         ...current,
         [stop.id]: {
           status: "error",
-          message: "DeepSeek 深读暂时失败，已保留本地模板讲解。",
+          message: message.includes("source_research")
+            ? "未找到可用的核验资料，已保留不含事实断言的本地模板讲解。"
+            : "DeepSeek 深读暂时失败，已保留本地模板讲解。",
         },
       }));
     }
@@ -371,7 +372,9 @@ export function RouteReader() {
             上次保存校验保留 {route.validation.issueCount} 项问题
           </p>
           {route.validation.issues.slice(0, 3).map((issue) => (
-            <p key={`${issue.code}-${issue.stopId ?? "route"}-${issue.message}`}>
+            <p
+              key={`${issue.code}-${issue.stopId ?? "route"}-${issue.message}`}
+            >
               <AlertTriangle size={16} />
               {issue.message}
             </p>
@@ -496,7 +499,11 @@ export function RouteReader() {
                       <div>
                         <span>
                           {deepReading?.content
-                            ? "DeepSeek 深读 · 来源待核验"
+                            ? deepReading.content.sourceStatus === "verified"
+                              ? "DeepSeek 深读 · 已核验资料"
+                              : deepReading.content.sourceStatus === "partial"
+                                ? "DeepSeek 深读 · 部分核验"
+                                : "DeepSeek 深读 · 来源待核验"
                             : "模板讲解 · 来源待核验"}
                         </span>
                         <strong>{story.shortIntro}</strong>

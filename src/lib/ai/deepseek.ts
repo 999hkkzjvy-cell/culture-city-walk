@@ -119,7 +119,9 @@ export async function rankCandidatesWithDeepSeek(
     rankedCandidateSchema,
   );
   const ranked = parsed.data;
-  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const candidateById = new Map(
+    candidates.map((candidate) => [candidate.id, candidate]),
+  );
   const seen = new Set<string>();
   const ordered = ranked.ranked
     .map((item) => {
@@ -230,6 +232,24 @@ async function invokeDeepSeekProxy(action: string, payload: object) {
   });
 
   if (error) {
+    const context = (error as { context?: unknown }).context;
+
+    if (context instanceof Response) {
+      const body = await context
+        .clone()
+        .json()
+        .catch(() => null);
+
+      if (
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof body.error === "string"
+      ) {
+        throw new Error(body.error);
+      }
+    }
+
     throw new Error(error.message);
   }
 
@@ -278,7 +298,10 @@ function formatZodIssue(issue: z.ZodIssue) {
   return `${path}: ${issue.message}`;
 }
 
-function mergeUsage(first: DeepSeekUsage, second: DeepSeekUsage): DeepSeekUsage {
+function mergeUsage(
+  first: DeepSeekUsage,
+  second: DeepSeekUsage,
+): DeepSeekUsage {
   return {
     provider: "deepseek",
     model: second.model || first.model,

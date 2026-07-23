@@ -318,7 +318,7 @@ export function RouteJourneyMode() {
       ...current,
       [stop.id]: {
         status: "loading",
-        message: "正在生成 DeepSeek 深读...",
+        message: "正在检索资料并生成 DeepSeek 深读...",
       },
     }));
 
@@ -332,12 +332,15 @@ export function RouteJourneyMode() {
           content: result.data,
         },
       }));
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
       setDeepReadings((current) => ({
         ...current,
         [stop.id]: {
           status: "error",
-          message: "DeepSeek 深读暂时失败，已保留本地模板讲解。",
+          message: message.includes("source_research")
+            ? "未找到可用的核验资料，已保留不含事实断言的本地模板讲解。"
+            : "DeepSeek 深读暂时失败，已保留本地模板讲解。",
         },
       }));
     }
@@ -593,47 +596,53 @@ export function RouteJourneyMode() {
 
               {isExperienceStop(selectedStop) ? (
                 <article className="journey-reading-block">
-                <div className="journey-reading-title">
-                  <span>
-                    {deepReadings[selectedStop.id]?.content
-                      ? "DeepSeek 深读 · 来源待核验"
-                      : "模板深读 · 来源待核验"}
-                  </span>
-                  <button
-                    disabled={
-                      deepReadings[selectedStop.id]?.status === "loading"
-                    }
-                    onClick={() => requestDeepReading(selectedStop)}
-                    type="button"
-                  >
-                    <Sparkles size={14} />
-                    {isDeepSeekProxyConfigured() ? "生成深读" : "刷新模板"}
-                  </button>
-                </div>
-                {deepReadings[selectedStop.id]?.message ? (
-                  <p className="journey-reading-message">
-                    {deepReadings[selectedStop.id]?.message}
-                  </p>
-                ) : null}
-                <p>{content.shortIntro}</p>
-                <div className="journey-reading-grid">
-                  {content.themeConnections.map((connection) => (
-                    <section key={connection.theme}>
-                      <h3>
-                        <FileText size={15} />
-                        {connection.theme}
-                      </h3>
-                      <p>{connection.text}</p>
-                    </section>
-                  ))}
-                </div>
-                <FactCheckNote
-                  city={route.city}
-                  content={content}
-                  dateLabel={route.dateLabel}
-                  stop={selectedStop}
-                  time={selectedStop.calculatedTime}
-                />
+                  <div className="journey-reading-title">
+                    <span>
+                      {deepReadings[selectedStop.id]?.content
+                        ? deepReadings[selectedStop.id]?.content
+                            ?.sourceStatus === "verified"
+                          ? "DeepSeek 深读 · 已核验资料"
+                          : deepReadings[selectedStop.id]?.content
+                                ?.sourceStatus === "partial"
+                            ? "DeepSeek 深读 · 部分核验"
+                            : "DeepSeek 深读 · 来源待核验"
+                        : "模板深读 · 来源待核验"}
+                    </span>
+                    <button
+                      disabled={
+                        deepReadings[selectedStop.id]?.status === "loading"
+                      }
+                      onClick={() => requestDeepReading(selectedStop)}
+                      type="button"
+                    >
+                      <Sparkles size={14} />
+                      {isDeepSeekProxyConfigured() ? "生成深读" : "刷新模板"}
+                    </button>
+                  </div>
+                  {deepReadings[selectedStop.id]?.message ? (
+                    <p className="journey-reading-message">
+                      {deepReadings[selectedStop.id]?.message}
+                    </p>
+                  ) : null}
+                  <p>{content.shortIntro}</p>
+                  <div className="journey-reading-grid">
+                    {content.themeConnections.map((connection) => (
+                      <section key={connection.theme}>
+                        <h3>
+                          <FileText size={15} />
+                          {connection.theme}
+                        </h3>
+                        <p>{connection.text}</p>
+                      </section>
+                    ))}
+                  </div>
+                  <FactCheckNote
+                    city={route.city}
+                    content={content}
+                    dateLabel={route.dateLabel}
+                    stop={selectedStop}
+                    time={selectedStop.calculatedTime}
+                  />
                 </article>
               ) : (
                 <article className="journey-reading-block">
@@ -648,82 +657,82 @@ export function RouteJourneyMode() {
 
               {isExperienceStop(selectedStop) ? (
                 <section className="journey-task-block">
-                <div>
-                  <p>打卡任务</p>
-                  <h3>二选一闯关打卡</h3>
-                </div>
-                <div className="journey-task-list">
-                  {content.checkInTasks.map((task) => (
-                    <label key={task}>
-                      <input type="checkbox" />
-                      <span>{task}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="journey-tip-list">
-                  {content.practicalTips.map((tip) => (
-                    <p key={tip}>{tip}</p>
-                  ))}
-                </div>
+                  <div>
+                    <p>打卡任务</p>
+                    <h3>二选一闯关打卡</h3>
+                  </div>
+                  <div className="journey-task-list">
+                    {content.checkInTasks.map((task) => (
+                      <label key={task}>
+                        <input type="checkbox" />
+                        <span>{task}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="journey-tip-list">
+                    {content.practicalTips.map((tip) => (
+                      <p key={tip}>{tip}</p>
+                    ))}
+                  </div>
                 </section>
               ) : null}
 
               {isExperienceStop(selectedStop) ? (
                 <section className="journey-photo-archive">
-                <div className="journey-photo-heading">
-                  <div>
-                    <p>打卡图存档</p>
-                    <h3>{selectedPhotos.length} 张照片</h3>
+                  <div className="journey-photo-heading">
+                    <div>
+                      <p>打卡图存档</p>
+                      <h3>{selectedPhotos.length} 张照片</h3>
+                    </div>
+                    <label className="journey-upload-button">
+                      <ImagePlus size={15} />
+                      上传打卡图
+                      <input
+                        accept="image/*"
+                        aria-label="上传打卡图"
+                        onChange={(event) => {
+                          void handlePhotoInput(event.target.files);
+                          event.currentTarget.value = "";
+                        }}
+                        type="file"
+                      />
+                    </label>
                   </div>
-                  <label className="journey-upload-button">
-                    <ImagePlus size={15} />
-                    上传打卡图
-                    <input
-                      accept="image/*"
-                      aria-label="上传打卡图"
-                      onChange={(event) => {
-                        void handlePhotoInput(event.target.files);
-                        event.currentTarget.value = "";
-                      }}
-                      type="file"
-                    />
-                  </label>
-                </div>
-                {uploadMessage ? (
-                  <p className={`journey-upload-status ${uploadState}`}>
-                    {uploadMessage}
-                  </p>
-                ) : null}
-                {selectedPhotos.length > 0 ? (
-                  <div className="journey-photo-grid">
-                    {selectedPhotos.map((photo) => (
-                      <figure key={photo.id}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          alt={`${selectedStop.name} 打卡图`}
-                          src={photo.dataUrl}
-                        />
-                        <figcaption>
-                          <span>{formatArchiveTime(photo.createdAt)}</span>
-                          <button
-                            aria-label={`删除打卡图 ${photo.fileName}`}
-                            onClick={() => {
-                              void deletePhoto(photo);
-                            }}
-                            type="button"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="journey-photo-empty">
-                    <Camera size={18} />
-                    <span>还没有为这一站上传打卡图。</span>
-                  </div>
-                )}
+                  {uploadMessage ? (
+                    <p className={`journey-upload-status ${uploadState}`}>
+                      {uploadMessage}
+                    </p>
+                  ) : null}
+                  {selectedPhotos.length > 0 ? (
+                    <div className="journey-photo-grid">
+                      {selectedPhotos.map((photo) => (
+                        <figure key={photo.id}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt={`${selectedStop.name} 打卡图`}
+                            src={photo.dataUrl}
+                          />
+                          <figcaption>
+                            <span>{formatArchiveTime(photo.createdAt)}</span>
+                            <button
+                              aria-label={`删除打卡图 ${photo.fileName}`}
+                              onClick={() => {
+                                void deletePhoto(photo);
+                              }}
+                              type="button"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="journey-photo-empty">
+                      <Camera size={18} />
+                      <span>还没有为这一站上传打卡图。</span>
+                    </div>
+                  )}
                 </section>
               ) : null}
               {selectedStop.routeRole === "end" ? (

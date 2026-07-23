@@ -8,6 +8,9 @@ const corsHeaders = {
 const DEEPSEEK_API_BASE = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-v4-flash";
 const MAX_REQUEST_BYTES = 32_000;
+const BAIDU_AI_SEARCH_URL =
+  "https://qianfan.baidubce.com/v2/ai_search/web_search";
+const MAX_RESEARCH_SOURCES = 6;
 
 type DeepSeekProxyRequest =
   | {
@@ -49,6 +52,30 @@ type DeepSeekUsage = {
   completion_tokens?: number;
   prompt_cache_hit_tokens?: number;
   prompt_cache_miss_tokens?: number;
+};
+
+type ResearchSourceKind = "official" | "authority" | "academic" | "map";
+
+type ResearchSource = {
+  id: string;
+  label: string;
+  href: string;
+  kind: ResearchSourceKind;
+  excerpt: string;
+};
+
+type StopResearch = {
+  checkedAt: string;
+  status: "verified" | "partial";
+  sources: ResearchSource[];
+};
+
+type BaiduSearchReference = {
+  title?: unknown;
+  url?: unknown;
+  snippet?: unknown;
+  content?: unknown;
+  type?: unknown;
 };
 
 type AuthenticatedUser = {
@@ -119,7 +146,9 @@ Deno.serve(async (request) => {
 });
 
 async function handleDiagnostic(request: Request, hasApiKey: boolean) {
-  const dailyUserLimit = parsePositiveNumber(Deno.env.get("AI_DAILY_USER_LIMIT"));
+  const dailyUserLimit = parsePositiveNumber(
+    Deno.env.get("AI_DAILY_USER_LIMIT"),
+  );
   const projectCostLimit = parsePositiveNumber(
     Deno.env.get("AI_PROJECT_COST_LIMIT_CNY"),
   );
@@ -128,6 +157,7 @@ async function handleDiagnostic(request: Request, hasApiKey: boolean) {
   return json({
     edgeFunctionReachable: true,
     deepseekKeyConfigured: hasApiKey,
+    sourceResearchConfigured: Boolean(Deno.env.get("BAIDU_AI_SEARCH_API_KEY")),
     dailyUserLimit,
     projectCostLimit,
     limitStatus: limitCheck
@@ -139,7 +169,9 @@ async function handleDiagnostic(request: Request, hasApiKey: boolean) {
 }
 
 async function checkAiUsageLimits(request: Request) {
-  const dailyUserLimit = parsePositiveNumber(Deno.env.get("AI_DAILY_USER_LIMIT"));
+  const dailyUserLimit = parsePositiveNumber(
+    Deno.env.get("AI_DAILY_USER_LIMIT"),
+  );
   const projectCostLimit = parsePositiveNumber(
     Deno.env.get("AI_PROJECT_COST_LIMIT_CNY"),
   );
@@ -341,45 +373,63 @@ async function handleStopDeepReading(
   apiKey: string,
 ) {
   const startedAt = performance.now();
+  const research = await researchStopSources(input);
   const response = await callDeepSeek(apiKey, {
     maxTokens: 2200,
     systemPrompt: withRepairInstruction(
       [
-        "你是严谨但有趣的城市文化讲解撰稿人。请只基于用户给定站点和常识性公开知识生成内容；不确定的具体年份、人物轶事、开放信息要写成待核验，不要伪造来源。",
+        "你叫小城，在这座城市住了很多年，喜欢读本地历史、建筑随笔和作家的城市笔记。现在正带着一位朋友散步：像突然想起一件有意思的事那样分享，不像导游背书，也不必面面俱到。",
+        "开场总从可感知的细节进入：光线、声音、气味、门的样子、树影或脚步的节奏，而不是定义、年代或地位。知识要包在一个小场景里，先说“你注意到没有”“有意思的是”“看看这里”，让读者在现场多停一会儿。每站只挑 1-2 个最值得讲的点；同一路线的不同站点必须使用不同的开场角度和内容结构，不能只替换地名。",
+        "可以使用“我总觉得”“每次路过我都会留意”这类仅表达当下感受的朋友口吻；绝不能虚构亲身经历、人物轶事或来访记录。不要写营销软文、学术腔、说明书式罗列，也不要复制任何参考路线的句子或段落。",
+        "userPrompt.verifiedSources 是唯一可写成事实的证据包。只可把其中支持的内容写成具体年份、人物关系、建筑年代、文保级别、地址、开放时间、票价、预约方式和现场细节；证据不足就删去该事实，不用常识、记忆或推测补足。禁止编造名人到访、轶事、引语、销量、称号、获奖，以及“最、唯一、第一”等绝对结论。",
+        "餐饮店的营业时间、价格、菜单和预约信息都容易变化：只有证据包明确提供时才可写入 practicalTips，并写明 userPrompt.verifiedAt；不得把它们写进没有日期的历史叙述。",
+        "在面向读者的 shortIntro、themeConnections、practicalTips 和 checkInTasks 中，不要使用“线索、核验、观察点、建议、适合作为、追问、展陈主线、立面比例、门窗尺度、待确认、待验证”等词。不要把不确定性写成扫兴的免责声明；没有证据便不写。",
         "输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。",
-        "shortIntro 写 220-520 字，必须有知识性和现场观察感：名人相关站点补充人物生平、重要作品、轶事、相关重要人物和历史背景；建筑类站点补充建筑风格、立面/空间/材料/装饰细节；博物馆类站点补充重要馆藏、代表文物、展陈看点和理解线索；餐馆类站点补充历史沿革、著名菜式、风味特点和适合点单的理由。",
-        "themeConnections 输出 3-5 条，优先覆盖建筑风格、历史背景、名人轶事/城市记忆、馆藏/菜式/书店/音乐等与站点最相关的线索。",
-        "checkInTasks 必须恰好 2 项。每项都要像闯关任务，有明确动作、观察点或小挑战，且和当前站点强相关；避免“拍一张照片”“写一句感受”这类泛用任务。任务不能打扰他人、不能要求进入非开放区域。",
-        "sourceClaims 只放需要用户后续核验的事实线索；sourceStatus 固定 unverified。",
+        "shortIntro 写 2-4 句自然短句：从感官细节切入，写这地方给人的感觉，再放进一个证据支持的有意思事实。让人读完想停下来多看两眼。",
+        "themeConnections 输出 3-4 条。每条用 2-4 句讲一个与站点有关的小故事或现场片段，不要按“历史/建筑/文学”做填表式罗列；最后一句最好落回现场，可以邀请朋友看看、找找或留意。历史事实只可来自证据包，其他内容写为当下可做的感受或观察。",
+        "checkInTasks 必须恰好 2 项，语气像朋友发起一个不难但有意思的小游戏，不要添加“XX关”标签。第一项通常是找一个具体视觉目标并在允许拍摄处拍照；第二项是稍有挑战的观察、对比、寻找或互动。任务必须和当前站点的内容呼应，目标明确，不打扰他人、不要求进入非开放区域，也不用“核验、确认、验证”等报告式词语。",
+        "sourceClaims 列出 1-5 条你实际使用的关键事实，每条以对应资料编号开头，例如“S1：……”。没有充分证据时可为空。sourceStatus 必须使用 userPrompt.researchStatus 的值。",
       ].join(""),
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
       route: input.route,
       stop: input.stop,
+      verifiedAt: research.checkedAt,
+      researchStatus: research.status,
+      verifiedSources: research.sources,
       schemaRepair: input.schemaRepair ?? null,
       exampleJson: {
         placeId: "poi-id",
         shortIntro:
-          "这是一段较长的城市阅读讲解，提醒用户哪些内容需要现场或资料核验。",
+          "拐进这条街时，先看看墙面上被树影切开的明暗。资料里提到，这处地方曾见证过一段城市变迁；站在这里，你会发现宏大的故事其实离脚步很近。",
         themeConnections: [
-          { theme: "建筑", text: "观察建筑立面、材料和街道尺度。" },
-          { theme: "历史", text: "梳理它与城市变迁的关系，具体事实待核验。" },
-          { theme: "文学", text: "从路名、店招和人的停留方式读城市文本。" },
+          {
+            theme: "建筑",
+            text: "你注意到没有，入口和街道之间总会留下一个让人放慢脚步的过渡。走近一点看看材料、光线和人的动线，它们比一串术语更会讲故事。",
+          },
+          {
+            theme: "历史",
+            text: "资料里保存下来的那件往事，不必急着背下来。先在现场找找它留下的空间感，想想当时的人会从哪里进来、又会在哪里停下。",
+          },
+          {
+            theme: "文学",
+            text: "这儿很适合把城市当作一本摊开的书。看看路名、店招和路过的人，哪一个细节最像这一页的句子。",
+          },
         ],
-        practicalTips: ["出发前核验开放时间、预约和现场管控。"],
+        practicalTips: ["出门前看一眼当天的开放、预约和现场安排，免得扑空。"],
         checkInTasks: [
-          "立面侦探关：找出入口、材料或门窗里最有辨识度的一个细节，并判断它为何像这个街区。",
-          "时间证据关：找到一块说明牌、旧照或年代标识，记录它指向的年份、人物或事件。",
+          "找一处最有辨识度的入口、材料或墙面细节，在允许拍摄处拍下来；试着把它和街道一起放进画面。",
+          "找一块说明牌、旧照片或年代标识，看看它让你想起了什么；再和同行的人交换一下答案。",
         ],
         sourceClaims: [],
-        sourceStatus: "unverified",
+        sourceStatus: "verified",
       },
     }),
   });
 
   return json({
-    result: response.result,
+    result: attachStopResearch(response.result, research),
     usage: usageFromDeepSeek(response.usage, response.model, startedAt),
     warnings: [],
   });
@@ -393,7 +443,7 @@ async function handleRouteTitle(
   const response = await callDeepSeek(apiKey, {
     maxTokens: 260,
     systemPrompt: withRepairInstruction(
-      "你是城市漫游路线命名助手。请基于城市、主题、站点和用户目标，输出一个短而具体的中文路线标题。标题 8-18 个中文字符优先，不要营销口号，不要使用引号，不要超过 32 个字符。输出严格 json：{\"title\":\"路线标题\",\"warnings\":[]}。",
+      '你是城市漫游路线命名助手。请基于城市、主题、站点和用户目标，输出一个短而具体的中文路线标题。标题 8-18 个中文字符优先，不要营销口号，不要使用引号，不要超过 32 个字符。输出严格 json：{"title":"路线标题","warnings":[]}。',
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
@@ -426,7 +476,7 @@ async function handleRankCandidates(
   const response = await callDeepSeek(apiKey, {
     maxTokens: 1200,
     systemPrompt: withRepairInstruction(
-      "你是城市漫游候选点排序助手。请只基于用户意图、routeGoal 和给定 candidates 排序，不要编造候选点、事实来源或不可验证故事。routeGoal 是用户的一句话补充目标，优先用于判断餐厅、晚餐、主题关键词和收官位置。输出严格 json 对象，不要输出 markdown。格式为 {\"ranked\":[{\"id\":\"候选点id\",\"reasons\":[\"一句中文推荐理由\"]}],\"warnings\":[]}。ranked 只能使用输入里的 id。",
+      '你是城市漫游候选点排序助手。请只基于用户意图、routeGoal 和给定 candidates 排序，不要编造候选点、事实来源或不可验证故事。routeGoal 是用户的一句话补充目标，优先用于判断餐厅、晚餐、主题关键词和收官位置。输出严格 json 对象，不要输出 markdown。格式为 {"ranked":[{"id":"候选点id","reasons":["一句中文推荐理由"]}],"warnings":[]}。ranked 只能使用输入里的 id。',
       input.schemaRepair,
     ),
     userPrompt: JSON.stringify({
@@ -453,12 +503,242 @@ async function handleRankCandidates(
   });
 }
 
-function withRepairInstruction(prompt: string, schemaRepair?: SchemaRepairHint) {
+function withRepairInstruction(
+  prompt: string,
+  schemaRepair?: SchemaRepairHint,
+) {
   if (!schemaRepair) {
     return prompt;
   }
 
   return `${prompt}\n这是一次 schema 修复重试。请根据 schemaRepair.issues 修正 schemaRepair.previousResult 的 JSON 结构和值类型，只输出修复后的严格 json，不要添加 markdown、解释或不在字段范围内的内容。`;
+}
+
+async function researchStopSources(
+  input: Extract<DeepSeekProxyRequest, { action: "stop-deep-reading" }>,
+): Promise<StopResearch> {
+  const checkedAt = new Date().toISOString();
+  const stop = readStopResearchFields(input.stop);
+  const mapSource = buildMapResearchSource(stop, checkedAt);
+  const baiduApiKey = Deno.env.get("BAIDU_AI_SEARCH_API_KEY");
+
+  if (!baiduApiKey && !mapSource) {
+    throw new Error("source_research_not_configured");
+  }
+
+  const authoritativeSources = baiduApiKey
+    ? await searchBaiduSources({
+        apiKey: baiduApiKey,
+        city: readRouteCity(input.route),
+        stop,
+      })
+    : [];
+  const sources = [
+    ...authoritativeSources,
+    ...(mapSource ? [mapSource] : []),
+  ].slice(0, MAX_RESEARCH_SOURCES);
+
+  if (sources.length === 0) {
+    throw new Error("source_research_no_authoritative_sources");
+  }
+
+  return {
+    checkedAt,
+    status: authoritativeSources.length > 0 ? "verified" : "partial",
+    sources: sources.map((source, index) => ({
+      ...source,
+      id: `S${index + 1}`,
+    })),
+  };
+}
+
+async function searchBaiduSources({
+  apiKey,
+  city,
+  stop,
+}: {
+  apiKey: string;
+  city: string;
+  stop: ReturnType<typeof readStopResearchFields>;
+}) {
+  const query = [city, stop.name, stop.address, "官网 开放时间 历史 建筑"]
+    .filter(Boolean)
+    .join(" ");
+  const response = await fetch(BAIDU_AI_SEARCH_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: query.slice(0, 36),
+        },
+      ],
+      search_source: "baidu_search_v2",
+      resource_type_filter: [{ type: "web", top_k: 20 }],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("source_research_failed");
+  }
+
+  const data = await response.json();
+  const references =
+    isRecord(data) && Array.isArray(data.references)
+      ? (data.references as BaiduSearchReference[])
+      : [];
+  const seen = new Set<string>();
+  const sources: ResearchSource[] = [];
+
+  for (const reference of references) {
+    if (reference.type !== "web") {
+      continue;
+    }
+
+    const href = typeof reference.url === "string" ? reference.url : "";
+    const kind = classifyResearchSource(href);
+    const excerpt =
+      typeof reference.content === "string"
+        ? compactExcerpt(reference.content)
+        : typeof reference.snippet === "string"
+          ? compactExcerpt(reference.snippet)
+          : "";
+
+    if (!href || !kind || !excerpt || seen.has(href)) {
+      continue;
+    }
+
+    seen.add(href);
+    sources.push({
+      id: "",
+      label:
+        typeof reference.title === "string" && reference.title.trim()
+          ? reference.title.trim().slice(0, 160)
+          : new URL(href).hostname,
+      href,
+      kind,
+      excerpt,
+    });
+
+    if (sources.length >= MAX_RESEARCH_SOURCES) {
+      break;
+    }
+  }
+
+  return sources;
+}
+
+function readStopResearchFields(stop: unknown) {
+  const value = isRecord(stop) ? stop : {};
+
+  return {
+    name: readString(value.name),
+    address: readString(value.address),
+    openingHours: readString(value.openingHours),
+    providerCost: readString(value.providerCost),
+  };
+}
+
+function readRouteCity(route: unknown) {
+  return isRecord(route) ? readString(route.city) : "";
+}
+
+function buildMapResearchSource(
+  stop: ReturnType<typeof readStopResearchFields>,
+  checkedAt: string,
+): ResearchSource | null {
+  const details = [
+    stop.address ? `地址：${stop.address}` : "",
+    stop.openingHours ? `高德开放时间：${stop.openingHours}` : "",
+    stop.providerCost ? `高德人均/票价线索：${stop.providerCost}` : "",
+  ].filter(Boolean);
+
+  if (!stop.name || details.length === 0) {
+    return null;
+  }
+
+  return {
+    id: "",
+    label: `高德地点资料（检索于 ${formatResearchDate(checkedAt)}）`,
+    href: `https://www.amap.com/search?query=${encodeURIComponent(
+      [stop.name, stop.address].filter(Boolean).join(" "),
+    )}`,
+    kind: "map",
+    excerpt: details.join("；"),
+  };
+}
+
+function classifyResearchSource(href: string): ResearchSourceKind | null {
+  try {
+    const hostname = new URL(href).hostname.toLowerCase();
+
+    if (
+      hostname.endsWith(".gov.cn") ||
+      hostname === "gov.cn" ||
+      hostname.endsWith(".museum.org.cn")
+    ) {
+      return "official";
+    }
+
+    if (
+      hostname.endsWith(".edu.cn") ||
+      hostname === "cnki.net" ||
+      hostname.endsWith(".cnki.net") ||
+      hostname.endsWith(".cssn.cn")
+    ) {
+      return "academic";
+    }
+
+    if (
+      ["people.com.cn", "xinhuanet.com", "cctv.com", "chinanews.com.cn"].some(
+        (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+      )
+    ) {
+      return "authority";
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function attachStopResearch(result: unknown, research: StopResearch) {
+  if (!isRecord(result)) {
+    return result;
+  }
+
+  return {
+    ...result,
+    sourceStatus: research.status,
+    sourceReferences: research.sources.map(({ id, label, href, kind }) => ({
+      id,
+      label,
+      href,
+      kind,
+    })),
+    verifiedAt: research.checkedAt,
+  };
+}
+
+function compactExcerpt(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 1_200);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function formatResearchDate(value: string) {
+  return value.slice(0, 10);
 }
 
 async function callDeepSeek(
@@ -557,7 +837,8 @@ function estimateCostCny(
   const usdCny = Number(Deno.env.get("AI_USD_CNY_RATE") || "7.2");
   const cacheHitTokens = usage?.prompt_cache_hit_tokens ?? 0;
   const cacheMissTokens =
-    usage?.prompt_cache_miss_tokens ?? Math.max(inputTokens - cacheHitTokens, 0);
+    usage?.prompt_cache_miss_tokens ??
+    Math.max(inputTokens - cacheHitTokens, 0);
   const hitUsdPerMillion = isPro ? 0.003625 : 0.0028;
   const missUsdPerMillion = isPro ? 0.435 : 0.14;
   const outputUsdPerMillion = isPro ? 0.87 : 0.28;

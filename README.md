@@ -51,12 +51,13 @@ npm run e2e
 - `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED`（公开开关，设为 `true` 后前端调用 DeepSeek 代理）
 - `DEEPSEEK_API_KEY`（仅 `deepseek-proxy` Edge Function 使用）
 - `DEEPSEEK_MODEL`（默认 `deepseek-v4-flash`）
+- `BAIDU_AI_SEARCH_API_KEY`（仅 Edge Function 使用；用于在站点深读前检索政府、场馆、档案/学术与权威媒体资料）
 
 已实现的 Edge Functions：
 
 - `share-route`：读取只读分享路线。
 - `amap-proxy`：代理高德 Web 服务，支持 POI 关键字/周边搜索、步行、公交和驾车路线规划。
-- `deepseek-proxy`：代理 DeepSeek JSON 输出，用于规划意图解析和候选点排序。
+- `deepseek-proxy`：代理 DeepSeek JSON 输出，用于规划意图、候选点排序、路线命名和“资料检索后”的站点深读。站点深读先以百度 AI 搜索检索并筛选政府、场馆、档案/学术与权威媒体来源，再将来源摘要、链接和检索时间交给 DeepSeek；仅有高德地点资料时标为“部分核验”。
 
 部署高德代理时，先在 Supabase Secrets 中设置：
 
@@ -73,7 +74,7 @@ supabase functions deploy amap-proxy
 部署 DeepSeek 代理时，先在 Supabase Secrets 中设置：
 
 ```bash
-supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-v4-flash
+supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-v4-flash BAIDU_AI_SEARCH_API_KEY=你的百度AI搜索Key
 ```
 
 然后部署函数，并在 GitHub Pages 环境变量中把

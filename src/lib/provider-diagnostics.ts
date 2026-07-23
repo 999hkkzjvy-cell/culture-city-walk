@@ -86,7 +86,11 @@ async function checkAmapWebService(): Promise<ProviderDiagnostic> {
   };
 
   if (!diagnostic.amapKeyConfigured) {
-    return warning("amap-web", "高德 Web Service", "Edge Function 缺少高德 Key。");
+    return warning(
+      "amap-web",
+      "高德 Web Service",
+      "Edge Function 缺少高德 Key。",
+    );
   }
 
   return diagnostic.providerReachable
@@ -117,6 +121,7 @@ async function checkDeepSeek(): Promise<ProviderDiagnostic> {
 
   const diagnostic = data as {
     deepseekKeyConfigured?: boolean;
+    sourceResearchConfigured?: boolean;
     dailyUserLimit?: number | null;
     projectCostLimit?: number | null;
     limitStatus?: string;
@@ -124,6 +129,14 @@ async function checkDeepSeek(): Promise<ProviderDiagnostic> {
 
   if (!diagnostic.deepseekKeyConfigured) {
     return warning("deepseek", "DeepSeek", "Edge Function 缺少 DeepSeek Key。");
+  }
+
+  if (!diagnostic.sourceResearchConfigured) {
+    return warning(
+      "deepseek",
+      "DeepSeek",
+      "DeepSeek 可用，但缺少百度 AI 搜索 Key；站点深读只能使用高德的部分地点资料，无法完成可靠资料核验。",
+    );
   }
 
   const limits = [
@@ -213,7 +226,11 @@ function ready(id: string, label: string, detail: string): ProviderDiagnostic {
   return { id, label, status: "ready", detail };
 }
 
-function warning(id: string, label: string, detail: string): ProviderDiagnostic {
+function warning(
+  id: string,
+  label: string,
+  detail: string,
+): ProviderDiagnostic {
   return { id, label, status: "warning", detail };
 }
 

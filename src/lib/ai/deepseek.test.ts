@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: () =>
     Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     ),
 }));
 
@@ -85,7 +85,10 @@ describe("DeepSeek proxy client", () => {
       error: null,
     });
 
-    const result = await parseIntentWithDeepSeek("苏州，想看园林建筑", defaultDraft);
+    const result = await parseIntentWithDeepSeek(
+      "苏州，想看园林建筑",
+      defaultDraft,
+    );
 
     expect(result.data.city).toBe("苏州");
     expect(result.data.themeFilters).toEqual(["历史", "建筑"]);
@@ -217,8 +220,17 @@ describe("DeepSeek proxy client", () => {
             "立面侦探关：找出门楼、材料或门窗里最有辨识度的一个细节。",
             "时间证据关：找到一块说明牌或年代标识，记录它指向的年份。",
           ],
-          sourceClaims: [],
-          sourceStatus: "unverified",
+          sourceClaims: ["S1：站点开放时间以官方公告为准。"],
+          sourceStatus: "verified",
+          sourceReferences: [
+            {
+              id: "S1",
+              label: "南京市文化和旅游局公告",
+              href: "https://wlj.nanjing.gov.cn/example",
+              kind: "official",
+            },
+          ],
+          verifiedAt: "2026-07-23T08:00:00.000Z",
         },
         usage: deepSeekUsage,
         warnings: [],
@@ -239,6 +251,9 @@ describe("DeepSeek proxy client", () => {
     expect(result.data.shortIntro).toContain("近代城市阅读");
     expect(result.data.checkInTasks).toHaveLength(2);
     expect(result.data.checkInTasks[0]).toContain("立面");
+    expect(result.data.sourceStatus).toBe("verified");
+    expect(result.data.sourceReferences[0]?.kind).toBe("official");
+    expect(result.data.verifiedAt).toBe("2026-07-23T08:00:00.000Z");
     expect(result.usage.provider).toBe("deepseek");
   });
 

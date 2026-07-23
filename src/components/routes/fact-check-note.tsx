@@ -27,6 +27,9 @@ export function FactCheckNote({
     city && dateLabel && stop && time
       ? buildPlaceVerificationProfile({ city, dateLabel, stop, time })
       : null;
+  const sources = content.sourceReferences.slice(0, 6);
+  const hasVerifiedResearch =
+    content.sourceStatus === "verified" || content.sourceStatus === "partial";
 
   return (
     <div
@@ -39,14 +42,25 @@ export function FactCheckNote({
       <p>
         <AlertTriangle size={14} />
         {content.sourceStatus === "verified"
-          ? "内容带有核验标记；出发前仍请以官方公告、预约页面或现场信息为准。"
-          : "内容未接入官方核验，仅作为现场观察线索，不应当作事实来源。"}
+          ? "文案仅据已检索的可靠资料和站点信息写成；出发前仍请以官方公告、预约页面或现场信息为准。"
+          : content.sourceStatus === "partial"
+            ? "文案只接入了部分地点资料；历史与人物信息仍需以官方或学术来源复核。"
+            : "内容未接入可靠资料核验，仅作为现场观察线索，不应当作事实来源。"}
       </p>
+      {hasVerifiedResearch && content.verifiedAt ? (
+        <p>
+          <Clock size={14} />
+          资料检索时间：{formatCheckedAt(content.verifiedAt)}
+        </p>
+      ) : null}
       {claims.length > 0 ? (
         claims.map((claim) => (
           <p key={claim}>
             <FileText size={14} />
-            待核验线索：{claim}
+            {content.sourceStatus === "unverified"
+              ? "待核验线索："
+              : "本次使用的事实线索："}
+            {claim}
           </p>
         ))
       ) : (
@@ -55,6 +69,21 @@ export function FactCheckNote({
           暂无官方来源引用；开放时间、门票、预约和闭馆信息需要再次确认。
         </p>
       )}
+      {sources.length > 0 ? (
+        <div className="verification-links" aria-label="本次深读使用的资料来源">
+          {sources.map((source) => (
+            <a
+              href={source.href}
+              key={source.id}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <ExternalLink size={13} />
+              {source.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
       {profile ? <VerificationProfileView profile={profile} /> : null}
     </div>
   );
@@ -67,10 +96,6 @@ function VerificationProfileView({
 }) {
   return (
     <div className="verification-profile">
-      <p>
-        <Clock size={14} />
-        最近核验：{formatCheckedAt(profile.checkedAt)}
-      </p>
       <p>
         <FileText size={14} />
         官方开放公告：{profile.openingNotice}
@@ -89,7 +114,12 @@ function VerificationProfileView({
       </p>
       <div className="verification-links" aria-label="核验来源入口">
         {profile.sourceReferences.map((reference) => (
-          <a href={reference.href} key={reference.label} rel="noreferrer" target="_blank">
+          <a
+            href={reference.href}
+            key={reference.label}
+            rel="noreferrer"
+            target="_blank"
+          >
             <ExternalLink size={13} />
             {reference.label}
           </a>
