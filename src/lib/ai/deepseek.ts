@@ -48,6 +48,33 @@ type DeepSeekUsage = z.infer<typeof deepSeekUsageSchema>;
 
 type ProxyResponse = z.infer<typeof proxyResponseSchema>;
 
+export const stopQuestionAnswerSchema = z.object({
+  answer: z.string().min(1).max(900),
+  sourceIds: z.array(z.string()).default([]),
+  sourceStatus: z.enum(["unverified", "partial", "verified"]),
+  sourceReferences: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      href: z.string().url(),
+      kind: z.enum(["official", "authority", "academic", "cultural", "map"]),
+    }),
+  ),
+  verifiedAt: z.string().datetime().nullable(),
+  researchMeta: z.object({
+    provider: z.enum(["baidu_ai_search", "map", "none"]),
+    attemptedQueries: z.number().int().min(0),
+    successfulQueries: z.number().int().min(0),
+    returnedReferences: z.number().int().min(0),
+    acceptedSources: z.number().int().min(0),
+    usedSourceIds: z.array(z.string()),
+    mapIncluded: z.boolean(),
+    checkedAt: z.string().datetime(),
+  }),
+});
+
+export type StopQuestionAnswer = z.infer<typeof stopQuestionAnswerSchema>;
+
 export function isDeepSeekProxyConfigured() {
   return (
     isSupabaseConfigured() &&
@@ -185,6 +212,40 @@ export async function generateStopThemeContentWithDeepSeek(
     data: parsed.data,
     usage: toUsageRecord(parsed.usage),
     warnings: parsed.warnings,
+  };
+}
+
+export async function askStopQuestionWithDeepSeek(
+  stop: RouteStop,
+  route: RoutePlan,
+  question: string,
+  recentMessages: Array<{ role: "user" | "assistant"; content: string }> = [],
+): Promise<CollaborationResult<StopQuestionAnswer>> {
+  const response = await invokeDeepSeekProxy("stop-question", {
+    route: {
+      city: route.city,
+      title: route.title,
+      themes: route.themes,
+      stopNames: route.stops.map((item) => item.name),
+    },
+    stop: {
+      id: stop.sourcePlaceId ?? stop.id,
+      name: stop.name,
+      area: stop.area,
+      address: stop.address,
+      themes: stop.themes,
+      note: stop.note,
+      openingHours: stop.openingHours,
+      providerCost: stop.providerCost,
+    },
+    question,
+    recentMessages,
+  });
+
+  return {
+    data: stopQuestionAnswerSchema.parse(response.result),
+    usage: toUsageRecord(response.usage),
+    warnings: response.warnings,
   };
 }
 

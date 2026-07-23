@@ -18,6 +18,116 @@
     serif;
 }
 
+.research-meta {
+  margin: 10px 0;
+  color: var(--green-muted);
+  font-size: 13px;
+}
+
+.research-meta summary {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.stop-question-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.stop-question-heading,
+.stop-question-heading span,
+.stop-question-suggestions,
+.stop-question-panel form,
+.stop-question-sources {
+  display: flex;
+  align-items: center;
+}
+
+.stop-question-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stop-question-heading span {
+  gap: 7px;
+  font-weight: 700;
+}
+
+.stop-question-heading small,
+.stop-question-panel > p,
+.stop-question-notice {
+  color: var(--green-muted);
+  font-size: 13px;
+}
+
+.stop-question-panel > p {
+  margin: -6px 0 0;
+}
+
+.stop-question-suggestions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stop-question-suggestions button,
+.stop-question-sources a {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.stop-question-message {
+  padding: 12px 14px;
+  border-left: 3px solid var(--green-muted);
+  background: color-mix(in srgb, var(--paper) 84%, var(--surface-soft) 16%);
+}
+
+.stop-question-message.user {
+  border-left-color: var(--archive-brown);
+}
+
+.stop-question-message p {
+  margin: 6px 0 0;
+  line-height: 1.75;
+}
+
+.stop-question-sources {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.stop-question-panel form {
+  align-items: stretch;
+  gap: 8px;
+}
+
+.stop-question-panel textarea {
+  min-height: 72px;
+  flex: 1;
+  resize: vertical;
+}
+
+.stop-question-panel form button {
+  align-self: flex-end;
+}
+
+@media (max-width: 680px) {
+  .stop-question-panel form {
+    display: grid;
+  }
+
+  .stop-question-panel form button {
+    justify-self: start;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -4948,26 +5058,21 @@ button {
     display: grid;
     width: 100%;
     margin: 0 0 56px;
-    grid-template-columns: minmax(320px, 84vw) minmax(320px, 88vw);
-    gap: 0;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    -webkit-overflow-scrolling: touch;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    overflow: visible;
+    border: 0;
   }
 
   .journey-route-overview,
   .journey-stop-detail {
     border-radius: 0;
-    scroll-snap-align: start;
+    scroll-snap-align: none;
   }
 
   .journey-route-overview {
-    min-height: 100%;
-    border-top: 0;
-    border-bottom: 0;
-    border-left: 0;
+    min-height: auto;
+    border: 1px solid var(--border);
   }
 
   .journey-stop-detail {

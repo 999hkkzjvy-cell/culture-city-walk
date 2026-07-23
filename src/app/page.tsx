@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
+import { recommendedRoutes } from "@/lib/recommended-routes";
 import { assetPath } from "@/lib/site";
-import { routeUrl, shareUrl } from "@/lib/urls";
+import { routeUrl } from "@/lib/urls";
 
 const modes = [
   {
@@ -23,33 +24,6 @@ const modes = [
     text: "导入或粘贴路线，帮我优化体验。",
     href: routeUrl("demo"),
     artifact: "notebook",
-  },
-];
-
-const themes = [
-  {
-    city: "上海 1935",
-    title: "时间切片漫游",
-    tags: "历史 · 建筑",
-    href: routeUrl("demo"),
-  },
-  {
-    city: "武康路",
-    title: "文学漫游",
-    tags: "文学 · 建筑",
-    href: routeUrl("demo"),
-  },
-  {
-    city: "南京",
-    title: "金陵城南 · 民国记忆",
-    tags: "历史 · 建筑 · 美食",
-    href: shareUrl("nanjing-minguo"),
-  },
-  {
-    city: "上海",
-    title: "书店巡礼",
-    tags: "书店 · 生活",
-    href: routeUrl("demo"),
   },
 ];
 
@@ -96,15 +70,15 @@ export default function Home() {
 
       <section className="section">
         <div className="section-heading">
-          <h2>精选主题</h2>
-          <Link href={routeUrl("demo")}>
+          <h2>南京城市伴游</h2>
+          <Link href="/recommendations/">
             查看全部
             <ArrowRight size={16} />
           </Link>
         </div>
 
         <div className="theme-grid">
-          {themes.map((theme, index) => (
+          {recommendedRoutes.map((theme, index) => (
             <Link className="theme-card" href={theme.href} key={theme.title}>
               <div
                 className={`theme-image theme-image-${index + 1}`}
@@ -114,7 +88,7 @@ export default function Home() {
               />
               <p>{theme.city}</p>
               <h3>{theme.title}</h3>
-              <span>{theme.tags}</span>
+              <span>{theme.centralQuestion}</span>
             </Link>
           ))}
         </div>

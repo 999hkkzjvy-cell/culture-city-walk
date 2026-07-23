@@ -22,6 +22,7 @@ import {
   isDeepSeekProxyConfigured,
 } from "@/lib/ai/deepseek";
 import { FactCheckNote } from "@/components/routes/fact-check-note";
+import { StopQuestionPanel } from "@/components/routes/stop-question-panel";
 import {
   generateRouteSummaryWithFallback,
   generateStopThemeContentWithFallback,
@@ -44,10 +45,12 @@ import {
 import {
   readJourneyState,
   readJourneyArchives,
+  readDeepReadings,
   readRoutePlan,
   routePlanStorageKey,
   saveCandidateState,
   saveJourneyArchive,
+  saveDeepReading,
   saveJourneyState,
   saveRoutePlan,
   type StoredCandidateAction,
@@ -154,6 +157,15 @@ export function RouteJourneyMode() {
       );
       setJourney(readJourneyState(route.id));
       setArchives(readJourneyArchives(route.id));
+      const cachedReadings = readDeepReadings(route.id).readings;
+      setDeepReadings(
+        Object.fromEntries(
+          Object.entries(cachedReadings).map(([stopId, content]) => [
+            stopId,
+            { status: "ready" as const, content },
+          ]),
+        ),
+      );
       void listCheckInPhotos(route.id).then((nextPhotos) => {
         if (isMounted) {
           setPhotos(nextPhotos);
@@ -299,14 +311,16 @@ export function RouteJourneyMode() {
 
   function requestDeepReading(stop: RouteStop) {
     if (!isDeepSeekProxyConfigured()) {
+      const content = generateStopThemeContentWithFallback(stop);
       setDeepReadings((current) => ({
         ...current,
         [stop.id]: {
           status: "ready",
-          content: generateStopThemeContentWithFallback(stop),
+          content,
           message: "DeepSeek 未启用，当前显示本地模板深读。",
         },
       }));
+      saveDeepReading(route.id, stop.id, content);
       return;
     }
 
@@ -318,7 +332,7 @@ export function RouteJourneyMode() {
       ...current,
       [stop.id]: {
         status: "loading",
-        message: "正在检索资料并生成 DeepSeek 深读...",
+        message: "正在检索资料并生成城市导览...",
       },
     }));
 
@@ -332,6 +346,7 @@ export function RouteJourneyMode() {
           content: result.data,
         },
       }));
+      saveDeepReading(route.id, stop.id, result.data);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       setDeepReadings((current) => ({
@@ -340,7 +355,7 @@ export function RouteJourneyMode() {
           status: "error",
           message: message.includes("source_research")
             ? "未找到可用的核验资料，已保留不含事实断言的本地模板讲解。"
-            : "DeepSeek 深读暂时失败，已保留本地模板讲解。",
+            : "城市导览暂时失败，已保留本地模板讲解。",
         },
       }));
     }
@@ -436,8 +451,8 @@ export function RouteJourneyMode() {
           <div>
             <p>最近行程存档</p>
             <strong>
-              {latestArchive.score} 分 · 到达 {latestArchive.arrivedCount}/
-              {latestArchive.experienceStopCount} · 打卡图{" "}
+              到达 {latestArchive.arrivedCount}/
+              {latestArchive.experienceStopCount} · 记录照片{" "}
               {latestArchive.photoCount} 张
             </strong>
           </div>
@@ -451,7 +466,7 @@ export function RouteJourneyMode() {
       {isCompleted ? (
         <section className="journey-completion">
           <p>路线完成</p>
-          <h2>{journeyScore} 分</h2>
+          <h2>你走到了 {completedCount} 个站点</h2>
           <span>
             完成 {completedCount}/{experienceStops.length} 个体验站点，上传{" "}
             {checkInPhotoCount} 张打卡图。
@@ -601,12 +616,12 @@ export function RouteJourneyMode() {
                       {deepReadings[selectedStop.id]?.content
                         ? deepReadings[selectedStop.id]?.content
                             ?.sourceStatus === "verified"
-                          ? "DeepSeek 深读 · 已核验资料"
+                          ? "城市导览 · 已检索资料"
                           : deepReadings[selectedStop.id]?.content
                                 ?.sourceStatus === "partial"
-                            ? "DeepSeek 深读 · 部分核验"
-                            : "DeepSeek 深读 · 来源待核验"
-                        : "模板深读 · 来源待核验"}
+                            ? "城市导览 · 资料有限"
+                            : "城市导览 · 资料待补充"
+                        : "现场导览 · 资料待补充"}
                     </span>
                     <button
                       disabled={
@@ -616,7 +631,7 @@ export function RouteJourneyMode() {
                       type="button"
                     >
                       <Sparkles size={14} />
-                      {isDeepSeekProxyConfigured() ? "生成深读" : "刷新模板"}
+                      {isDeepSeekProxyConfigured() ? "开始听这里的故事" : "刷新导览"}
                     </button>
                   </div>
                   {deepReadings[selectedStop.id]?.message ? (
@@ -627,10 +642,10 @@ export function RouteJourneyMode() {
                   <p>{content.shortIntro}</p>
                   <div className="journey-reading-grid">
                     {content.themeConnections.map((connection) => (
-                      <section key={connection.theme}>
+                      <section key={connection.title ?? connection.theme}>
                         <h3>
                           <FileText size={15} />
-                          {connection.theme}
+                          {connection.title ?? connection.theme}
                         </h3>
                         <p>{connection.text}</p>
                       </section>
@@ -642,6 +657,11 @@ export function RouteJourneyMode() {
                     dateLabel={route.dateLabel}
                     stop={selectedStop}
                     time={selectedStop.calculatedTime}
+                  />
+                  <StopQuestionPanel
+                    key={selectedStop.id}
+                    route={route}
+                    stop={selectedStop}
                   />
                 </article>
               ) : (
@@ -659,7 +679,7 @@ export function RouteJourneyMode() {
                 <section className="journey-task-block">
                   <div>
                     <p>打卡任务</p>
-                    <h3>二选一闯关打卡</h3>
+                    <h3>两项现场任务</h3>
                   </div>
                   <div className="journey-task-list">
                     {content.checkInTasks.map((task) => (

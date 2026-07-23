@@ -11,26 +11,17 @@ test("home page exposes the three planning modes", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /我已有路线/ })).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /南京 金陵城南 · 民国记忆/ }),
-  ).toHaveAttribute("href", /\/share\/\?code=nanjing-minguo/);
+    page.getByRole("link", { name: /南京 近代南京的几次转身/ }),
+  ).toHaveAttribute("href", /\/route\/\?id=demo/);
   await expect(
-    mainNav.getByRole("link", { name: "首页", exact: true }),
-  ).toHaveAttribute("href", "/");
+    mainNav.getByRole("link", { name: "探索路线", exact: true }),
+  ).toHaveAttribute("href", "/recommendations/");
   await expect(
-    mainNav.getByRole("link", { name: "开始规划", exact: true }),
+    mainNav.getByRole("link", { name: "规划路线", exact: true }),
   ).toHaveAttribute("href", "/plan/");
   await expect(
     mainNav.getByRole("link", { name: "我的路线", exact: true }),
   ).toHaveAttribute("href", "/library/");
-  await expect(
-    mainNav.getByRole("link", { name: "推荐路线", exact: true }),
-  ).toHaveAttribute("href", "/recommendations/");
-  await expect(
-    mainNav.getByRole("link", { name: "关于我们", exact: true }),
-  ).toHaveAttribute("href", "/about/");
-  await expect(
-    mainNav.getByRole("link", { name: "如何使用", exact: true }),
-  ).toHaveAttribute("href", "/guide/");
   await expect(
     page.getByRole("link", { name: "登录" }).first(),
   ).toHaveAttribute("href", "/login/");
@@ -143,7 +134,7 @@ test("route reader supports direct refresh with query string", async ({
     page.getByRole("link", { name: "在高德查看地点" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "海报" })).toBeVisible();
-  await expect(page.getByText("模板讲解 · 来源待核验").first()).toBeVisible();
+  await expect(page.getByText("现场导览 · 资料待补充").first()).toBeVisible();
   await page.getByRole("button", { name: "展开深读" }).first().click();
   await expect(
     page.getByRole("button", { name: "收起深读" }).first(),
@@ -274,22 +265,21 @@ test("recommended routes can be filtered", async ({ page }) => {
   await expect(
     page.getByRole("heading", { level: 1, name: "推荐路线" }),
   ).toBeVisible();
-  await expect(page.getByText("金陵城南 · 民国记忆")).toBeVisible();
+  await expect(page.getByText("近代南京的几次转身")).toBeVisible();
 
   await page.getByPlaceholder("输入城市名").fill("上海");
-  await expect(page.getByText("武康路文学漫游")).toBeVisible();
-  await expect(page.getByText("金陵城南 · 民国记忆")).toHaveCount(0);
+  await expect(page.getByText("没有符合当前筛选的推荐路线。")).toBeVisible();
 
+  await page.getByPlaceholder("输入城市名").fill("南京");
   await page.getByRole("button", { name: "书店" }).click();
-  await expect(page.getByText("武康路文学漫游")).toBeVisible();
+  await expect(page.getByText("书页里的南京")).toBeVisible();
   await page.getByRole("button", { name: "紧凑" }).click();
   await expect(page.getByText("没有符合当前筛选的推荐路线。")).toBeVisible();
 
   await page.getByRole("button", { name: "紧凑" }).click();
   await page.getByRole("button", { name: "书店" }).click();
-  await page.getByPlaceholder("输入城市名").fill("成都");
-  await expect(page.getByText("茶馆、街巷与晚餐")).toBeVisible();
-  await expect(page.getByText(/人民公园 → 宽窄巷子边线/)).toBeVisible();
+  await expect(page.getByText("民国建筑与城市生活")).toBeVisible();
+  await expect(page.getByText(/颐和路公馆区 → 拉贝故居/)).toBeVisible();
 });
 
 test("login and profile pages expose account flows", async ({ page }) => {

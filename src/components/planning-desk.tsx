@@ -559,7 +559,7 @@ export function PlanningDesk() {
       const candidateResult = await getRouteAwareCandidates(previewRoute, {
         themes: intent.data.themeFilters,
         acceptedTypes: effectiveCandidateTypes,
-        maxResults: includeMeals ? 15 : 12,
+        maxResults: includeMeals ? 6 : 5,
         restaurantPreferences: includeMeals
           ? {
               cuisines: mealCuisines,
@@ -1536,7 +1536,7 @@ export function PlanningDesk() {
                 onClick={generateSuggestions}
                 type="button"
               >
-                {isGeneratingCandidates ? "生成中..." : "生成沿途候选"}
+                {isGeneratingCandidates ? "生成中..." : "生成完整建议路线"}
                 <Sparkles size={17} />
               </button>
               <span>
@@ -1548,11 +1548,11 @@ export function PlanningDesk() {
           </div>
         </div>
 
-        <section className="candidate-panel" aria-label="沿途可选点">
+        <section className="candidate-panel" aria-label="路线替换与休息点">
           <div className="candidate-panel-heading">
             <div>
-              <p>沿途可选点</p>
-              <h2>Complete 模式预案</h2>
+              <p>微调路线</p>
+              <h2>替换站点与可选休息点</h2>
             </div>
             {aiUsage ? (
               <span>
@@ -1687,8 +1687,10 @@ export function PlanningDesk() {
                                 ) : null}
                                 {candidate.place.providerRating ? (
                                   <span>
-                                    高德评分 {candidate.place.providerRating}
-                                  </span>
+                                  高德评分 {candidate.place.providerRating}
+                                </span>
+                                ) : candidate.placeType === "餐厅" ? (
+                                  <span>暂无平台评分</span>
                                 ) : null}
                                 {candidate.place.providerCost ? (
                                   <span>

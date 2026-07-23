@@ -11,6 +11,23 @@ export type PlanningMode = "discover" | "complete" | "refine";
 export type RouteTravelMode =
   "walking" | "cycling" | "transit" | "driving" | "taxi";
 
+export type JourneyRole =
+  | "anchor"
+  | "support"
+  | "bridge"
+  | "ending"
+  | "rest"
+  | "user_anchor";
+
+export type ThemeRoutePack = {
+  id: string;
+  centralQuestion: string;
+  narrativeArc: [string, string, string, string];
+  anchorPlaceIds: string[];
+  allowedPlaceIds: string[];
+  status: "review" | "published";
+};
+
 export type Place = {
   id: string;
   name: string;
@@ -29,6 +46,7 @@ export type Place = {
   telephone?: string | null;
   providerRating?: string | null;
   providerCost?: string | null;
+  journeyRole?: JourneyRole;
 };
 
 export type RouteStop = Place & {
@@ -64,6 +82,7 @@ export type RouteDraft = {
 export type RoutePlan = RouteDraft & {
   distanceKm: number;
   stops: RouteStop[];
+  themePack?: ThemeRoutePack;
   validation?: RouteValidationSnapshot;
 };
 

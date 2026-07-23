@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { RouteCandidate } from "@/lib/route-candidates";
 import type { RouteDraft, RoutePlan, RouteStop, Theme } from "@/lib/route";
 
-export const promptVersion = "route-collaboration-v0.5";
+export const promptVersion = "route-collaboration-v0.6";
 
 export const planningIntentSchema = z.object({
   mode: z.enum(["discover", "complete", "refine"]).default("complete"),
@@ -31,36 +31,72 @@ export const routeTitleSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+const sourceClaimSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const sourceIds = [...value.matchAll(/S\d+/g)].map((match) => match[0]);
+
+    return {
+      text: value.replace(/^S\d+[：:]\s*/, "").trim(),
+      sourceIds,
+      kind: value.includes("相传") || value.includes("一种说法") ? "legend" : "fact",
+    };
+  },
+  z.object({
+    text: z.string().min(1).max(260),
+    sourceIds: z.array(z.string().regex(/^S\d+$/)).min(1).max(3),
+    kind: z.enum(["fact", "legend"]),
+  }),
+);
+
 export const stopThemeContentSchema = z.object({
   placeId: z.string().min(1),
-  shortIntro: z.string().min(20).max(700),
+  shortIntro: z.string().min(20).max(260),
   themeConnections: z
     .array(
       z.object({
         theme: z.enum(["历史", "文学", "建筑", "音乐", "书店", "美食"]),
-        text: z.string().min(10).max(520),
+        title: z.string().min(2).max(24).optional(),
+        text: z.string().min(10).max(620),
       }),
     )
-    .min(3)
-    .max(5),
+    .min(2)
+    .max(4),
   practicalTips: z.array(z.string()).default([]),
   checkInTasks: z.array(z.string().min(4).max(160)).length(2),
-  sourceClaims: z.array(z.string()).default([]),
+  sourceClaims: z.array(sourceClaimSchema).default([]),
   sourceStatus: z
     .enum(["unverified", "partial", "verified"])
     .default("unverified"),
+  contentDepth: z.enum(["full", "limited", "template"]).default("limited"),
   sourceReferences: z
     .array(
       z.object({
         id: z.string().min(1),
         label: z.string().min(1).max(160),
         href: z.string().url(),
-        kind: z.enum(["official", "authority", "academic", "map"]),
+        kind: z.enum(["official", "authority", "academic", "cultural", "map"]),
       }),
     )
-    .max(6)
+    .max(8)
     .default([]),
   verifiedAt: z.string().datetime().nullable().default(null),
+  researchMeta: z
+    .object({
+      provider: z.enum(["baidu_ai_search", "map", "none"]),
+      attemptedQueries: z.number().int().min(0),
+      successfulQueries: z.number().int().min(0),
+      returnedReferences: z.number().int().min(0),
+      acceptedSources: z.number().int().min(0),
+      usedSourceIds: z.array(z.string().regex(/^S\d+$/)).max(8),
+      mapIncluded: z.boolean(),
+      checkedAt: z.string().datetime(),
+    })
+    .nullable()
+    .default(null),
 });
 
 export type PlanningIntent = z.infer<typeof planningIntentSchema>;

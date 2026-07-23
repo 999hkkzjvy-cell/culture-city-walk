@@ -19,10 +19,7 @@ export function FactCheckNote({
   stop?: RouteStop;
   time?: string;
 }) {
-  const claims = content.sourceClaims
-    .map((claim) => claim.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+  const claims = content.sourceClaims.slice(0, 5);
   const profile =
     city && dateLabel && stop && time
       ? buildPlaceVerificationProfile({ city, dateLabel, stop, time })
@@ -53,14 +50,27 @@ export function FactCheckNote({
           资料检索时间：{formatCheckedAt(content.verifiedAt)}
         </p>
       ) : null}
+      {content.researchMeta ? (
+        <details className="research-meta">
+          <summary>资料与检索详情</summary>
+          <p>
+            {content.researchMeta.provider === "baidu_ai_search"
+              ? `百度 AI 搜索 ${content.researchMeta.successfulQueries}/${content.researchMeta.attemptedQueries} 次成功，返回 ${content.researchMeta.returnedReferences} 条，采用 ${content.researchMeta.acceptedSources} 条。`
+              : "本次深读未调用百度 AI 搜索，仅使用地点资料。"}
+          </p>
+          {content.researchMeta.provider === "baidu_ai_search" &&
+          content.researchMeta.successfulQueries > 0 &&
+          content.researchMeta.acceptedSources === 0 ? (
+            <p>百度检索已完成，但未形成可用资料。</p>
+          ) : null}
+        </details>
+      ) : null}
       {claims.length > 0 ? (
         claims.map((claim) => (
-          <p key={claim}>
+          <p key={`${claim.kind}-${claim.text}`}>
             <FileText size={14} />
-            {content.sourceStatus === "unverified"
-              ? "待核验线索："
-              : "本次使用的事实线索："}
-            {claim}
+            {claim.kind === "legend" ? "地方说法：" : "本次使用的事实："}
+            {claim.text}
           </p>
         ))
       ) : (

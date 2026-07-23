@@ -1,5 +1,7 @@
 # 阶段 4/5 状态
 
+> 历史快照：本文件记录 2026-07-16 的阶段状态，旧的“10–15 候选”“闯关式打卡”“AI claim 仅待核验”等描述不代表当前实现。当前事实以 `docs/ai-project-context.md` 和 `docs/next-phase-product-direction.md` 为准。
+
 日期：2026-07-16
 
 ## 范围
@@ -148,7 +150,7 @@
 - `deepseek-proxy` Edge Function 代理 DeepSeek JSON-mode 请求，用于规划 intent 解析和候选排序。
 - 当 `NEXT_PUBLIC_DEEPSEEK_PROXY_ENABLED=true` 时，规划页使用 DeepSeek；缺少配置或 provider 失败时回退本地模板。
 - 登录用户的规划 intent、候选排序和路线标题运行记录会写入 `route_ai_runs`，包括 prompt 版本、model、token、延迟、估算成本和幂等键。
-- `deepseek-proxy` 代码已支持 `AI_DAILY_USER_LIMIT` 和 `AI_PROJECT_COST_LIMIT_CNY`；新版函数仍需部署并线上验证超额、未登录和正常调用分支。
+- 当时的 `deepseek-proxy` 代码已支持 `AI_DAILY_USER_LIMIT` 和 `AI_PROJECT_COST_LIMIT_CNY`；部署与线上验证状态请以当前上下文文档为准。
 
 仍待完成：
 

@@ -128,8 +128,8 @@ export function JourneyArchiveBrowser() {
           />
           <SummaryCard
             icon={FileText}
-            label="平均分"
-            value={summary.count > 0 ? `${summary.averageScore} 分` : "-"}
+            label="最近体验"
+            value={summary.count > 0 ? "可继续回看" : "-"}
           />
         </section>
 
@@ -143,8 +143,8 @@ export function JourneyArchiveBrowser() {
               filteredArchives.map((archive) => (
                 <article className="journey-archive-item" key={archive.id}>
                   <div className="journey-archive-score">
-                    <strong>{archive.score}</strong>
-                    <span>分</span>
+                    <strong>{archive.arrivedCount}</strong>
+                    <span>站</span>
                   </div>
                   <div>
                     <p>{archive.city}</p>

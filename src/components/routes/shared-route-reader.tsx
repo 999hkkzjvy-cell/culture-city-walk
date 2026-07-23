@@ -222,8 +222,9 @@ export function SharedRouteReader() {
             <h3>{selectedStop.name}</h3>
             <p>{selectedContent.shortIntro}</p>
             {selectedContent.themeConnections.map((connection) => (
-              <p key={connection.theme}>
-                <strong>{connection.theme}</strong>：{connection.text}
+              <p key={connection.title ?? connection.theme}>
+                <strong>{connection.title ?? connection.theme}</strong>：
+                {connection.text}
               </p>
             ))}
           </article>

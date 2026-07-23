@@ -10,6 +10,10 @@ import {
 } from "./route";
 import { createRouteValidationSnapshot } from "./route-kernel";
 import type { RouteCandidate } from "./route-candidates";
+import {
+  stopThemeContentSchema,
+  type StopThemeContent,
+} from "./ai/route-collaboration";
 
 export type StoredCandidateAction = "joined" | "backup" | "ignored";
 
@@ -61,6 +65,12 @@ export type StoredJourneyArchive = {
   completedAt: string;
 };
 
+export type StoredDeepReadingState = {
+  routeId: string;
+  readings: Record<string, StopThemeContent>;
+  updatedAt: string;
+};
+
 export type PlanningImportSource = {
   routeId: string;
   originalRouteId: string;
@@ -76,6 +86,7 @@ export const journeyStateStorageKey = "cultural-citywalk:journey-state";
 export const checkInPhotosStorageKey = "cultural-citywalk:check-in-photos";
 export const journeyArchivesStorageKey =
   "cultural-citywalk:journey-archives";
+export const deepReadingsStorageKey = "cultural-citywalk:deep-readings";
 export const favoriteRoutesStorageKey = "cultural-citywalk:favorite-routes";
 export const planningImportSourceStorageKey =
   "cultural-citywalk:planning-import-source";
@@ -261,6 +272,43 @@ export function saveJourneyState(state: StoredJourneyState) {
       updatedAt: new Date().toISOString(),
     }),
   );
+}
+
+export function readDeepReadings(routeId: string): StoredDeepReadingState {
+  try {
+    const raw = window.localStorage.getItem(deepReadingsStorageKey);
+    const parsed = raw ? (JSON.parse(raw) as Partial<StoredDeepReadingState>) : {};
+
+    if (parsed.routeId !== routeId || !parsed.readings) {
+      return { routeId, readings: {}, updatedAt: new Date().toISOString() };
+    }
+
+    const readings = Object.fromEntries(
+      Object.entries(parsed.readings).flatMap(([stopId, content]) => {
+        const result = stopThemeContentSchema.safeParse(content);
+        return result.success ? [[stopId, result.data]] : [];
+      }),
+    ) as Record<string, StopThemeContent>;
+
+    return { routeId, readings, updatedAt: parsed.updatedAt ?? new Date().toISOString() };
+  } catch {
+    return { routeId, readings: {}, updatedAt: new Date().toISOString() };
+  }
+}
+
+export function saveDeepReading(
+  routeId: string,
+  stopId: string,
+  content: StopThemeContent,
+) {
+  const current = readDeepReadings(routeId);
+  const state: StoredDeepReadingState = {
+    routeId,
+    readings: { ...current.readings, [stopId]: content },
+    updatedAt: new Date().toISOString(),
+  };
+
+  window.localStorage.setItem(deepReadingsStorageKey, JSON.stringify(state));
 }
 
 export function readCheckInPhotos(

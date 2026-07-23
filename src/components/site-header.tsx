@@ -3,12 +3,9 @@ import { AuthNav } from "@/components/auth/auth-nav";
 import { libraryUrl, recommendedRoutesUrl } from "@/lib/urls";
 
 const navItems = [
-  { label: "首页", href: "/" },
-  { label: "开始规划", href: "/plan/" },
+  { label: "探索路线", href: recommendedRoutesUrl() },
+  { label: "规划路线", href: "/plan/" },
   { label: "我的路线", href: libraryUrl() },
-  { label: "推荐路线", href: recommendedRoutesUrl() },
-  { label: "关于我们", href: "/about/" },
-  { label: "如何使用", href: "/guide/" },
 ];
 
 export function SiteHeader() {

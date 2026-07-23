@@ -237,7 +237,7 @@ export function RouteReader() {
       ...current,
       [stop.id]: {
         status: "loading",
-        message: "正在检索资料并生成 DeepSeek 深读...",
+        message: "正在检索资料并生成城市导览...",
       },
     }));
 
@@ -259,7 +259,7 @@ export function RouteReader() {
           status: "error",
           message: message.includes("source_research")
             ? "未找到可用的核验资料，已保留不含事实断言的本地模板讲解。"
-            : "DeepSeek 深读暂时失败，已保留本地模板讲解。",
+            : "城市导览暂时失败，已保留本地模板讲解。",
         },
       }));
     }
@@ -500,11 +500,11 @@ export function RouteReader() {
                         <span>
                           {deepReading?.content
                             ? deepReading.content.sourceStatus === "verified"
-                              ? "DeepSeek 深读 · 已核验资料"
+                              ? "城市导览 · 已检索资料"
                               : deepReading.content.sourceStatus === "partial"
-                                ? "DeepSeek 深读 · 部分核验"
-                                : "DeepSeek 深读 · 来源待核验"
-                            : "模板讲解 · 来源待核验"}
+                                ? "城市导览 · 资料有限"
+                                : "城市导览 · 资料待补充"
+                            : "现场导览 · 资料待补充"}
                         </span>
                         <strong>{story.shortIntro}</strong>
                       </div>
@@ -517,9 +517,9 @@ export function RouteReader() {
                             </p>
                           ) : null}
                           {story.themeConnections.map((connection) => (
-                            <p key={`${stop.id}-${connection.theme}`}>
+                            <p key={`${stop.id}-${connection.title ?? connection.theme}`}>
                               <FileText size={14} />
-                              {connection.theme}：{connection.text}
+                              {connection.title ?? connection.theme}：{connection.text}
                             </p>
                           ))}
                           {story.practicalTips.map((tip) => (
@@ -538,7 +538,7 @@ export function RouteReader() {
                           {story.checkInTasks.map((task) => (
                             <p key={task}>
                               <Sparkles size={14} />
-                              闯关打卡：{task}
+                              现场任务：{task}
                             </p>
                           ))}
                         </div>

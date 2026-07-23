@@ -9,8 +9,10 @@ import {
   generateStopThemeContentWithFallback,
   parseIntentWithFallback,
   rankCandidatesWithFallback,
+  stopThemeContentSchema,
   validateRouteProposal,
 } from "./route-collaboration";
+import { recommendedRoutes } from "@/lib/recommended-routes";
 
 describe("route collaboration fallback", () => {
   it("parses natural language into a structured intent without an AI key", () => {
@@ -212,5 +214,52 @@ describe("route collaboration fallback", () => {
       /线索|核验|观察点|建议|适合作为|追问|展陈主线|立面比例|门窗尺度|侦探关/,
     );
     expect(content.checkInTasks).toHaveLength(2);
+  });
+
+  it("keeps legacy source claims readable while supporting source-linked facts", () => {
+    const parsed = stopThemeContentSchema.parse({
+      placeId: "test-stop",
+      shortIntro: "这是一段足够长的导览摘要，用于验证旧数据和新版资料字段能够一起读取。",
+      themeConnections: [
+        { theme: "历史", text: "第一段说明这处站点与城市历史的关系。" },
+        { theme: "建筑", text: "第二段说明游客在现场可以看见的空间细节。" },
+      ],
+      checkInTasks: ["找一块能够说明年代的牌子。", "和同行的人说说你注意到的变化。"],
+      sourceClaims: ["S1：这条旧格式事实仍然可以读取。"],
+      sourceStatus: "verified",
+      sourceReferences: [
+        {
+          id: "S1",
+          label: "官方资料",
+          href: "https://example.com/source",
+          kind: "official",
+        },
+      ],
+      verifiedAt: "2026-07-23T08:00:00.000Z",
+      researchMeta: {
+        provider: "baidu_ai_search",
+        attemptedQueries: 3,
+        successfulQueries: 3,
+        returnedReferences: 24,
+        acceptedSources: 4,
+        usedSourceIds: ["S1"],
+        mapIncluded: false,
+        checkedAt: "2026-07-23T08:00:00.000Z",
+      },
+    });
+
+    expect(parsed.sourceClaims[0]).toEqual({
+      text: "这条旧格式事实仍然可以读取。",
+      sourceIds: ["S1"],
+      kind: "fact",
+    });
+    expect(parsed.researchMeta?.successfulQueries).toBe(3);
+  });
+
+  it("keeps the three Nanjing theme routes as review-only editorial drafts", () => {
+    expect(recommendedRoutes).toHaveLength(3);
+    expect(recommendedRoutes.every((route) => route.city === "南京")).toBe(true);
+    expect(recommendedRoutes.every((route) => route.status === "review")).toBe(true);
+    expect(recommendedRoutes.every((route) => route.previewStops.length >= 4)).toBe(true);
   });
 });

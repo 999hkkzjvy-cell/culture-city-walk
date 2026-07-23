@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultDraft, demoRoute } from "@/lib/route";
 import { generateRouteCandidates } from "@/lib/route-candidates";
 import {
+  askStopQuestionWithDeepSeek,
   isDeepSeekProxyConfigured,
   generateStopThemeContentWithDeepSeek,
   generateRouteTitleWithDeepSeek,
@@ -255,6 +256,52 @@ describe("DeepSeek proxy client", () => {
     expect(result.data.sourceReferences[0]?.kind).toBe("official");
     expect(result.data.verifiedAt).toBe("2026-07-23T08:00:00.000Z");
     expect(result.usage.provider).toBe("deepseek");
+  });
+
+  it("asks a source-linked question for the current stop", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      data: {
+        result: {
+          answer: "现有资料把这里放在南京近代城市叙事中理解；现场可先从建筑群与街道的关系看起。",
+          sourceIds: ["S1"],
+          sourceStatus: "verified",
+          sourceReferences: [
+            {
+              id: "S1",
+              label: "官方资料",
+              href: "https://example.com/source",
+              kind: "official",
+            },
+          ],
+          verifiedAt: "2026-07-23T08:00:00.000Z",
+          researchMeta: {
+            provider: "baidu_ai_search",
+            attemptedQueries: 3,
+            successfulQueries: 3,
+            returnedReferences: 20,
+            acceptedSources: 3,
+            usedSourceIds: ["S1"],
+            mapIncluded: false,
+            checkedAt: "2026-07-23T08:00:00.000Z",
+          },
+        },
+        usage: deepSeekUsage,
+        warnings: [],
+      },
+      error: null,
+    });
+
+    const result = await askStopQuestionWithDeepSeek(
+      demoRoute.stops[2],
+      demoRoute,
+      "这里为什么重要？",
+    );
+
+    expect(mocks.invoke).toHaveBeenCalledWith("deepseek-proxy", {
+      body: expect.objectContaining({ action: "stop-question" }),
+    });
+    expect(result.data.sourceIds).toEqual(["S1"]);
+    expect(result.data.researchMeta.attemptedQueries).toBe(3);
   });
 
   it("generates a short route title through the proxy", async () => {
