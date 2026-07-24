@@ -13,6 +13,11 @@ import {
   validateRouteProposal,
 } from "./route-collaboration";
 import { recommendedRoutes } from "@/lib/recommended-routes";
+import { curatedRouteDrafts } from "@/lib/curated-route-drafts";
+import {
+  humanSmokePreloadedReadings,
+  humanSmokeRoute,
+} from "@/lib/published-curated-routes";
 
 describe("route collaboration fallback", () => {
   it("parses natural language into a structured intent without an AI key", () => {
@@ -256,10 +261,113 @@ describe("route collaboration fallback", () => {
     expect(parsed.researchMeta?.successfulQueries).toBe(3);
   });
 
-  it("keeps the three Nanjing theme routes as review-only editorial drafts", () => {
-    expect(recommendedRoutes).toHaveLength(3);
+  it("keeps cross-referenced cultural claims explicitly marked as reported", () => {
+    const parsed = stopThemeContentSchema.parse({
+      placeId: "test-stop",
+      shortIntro: "这是一段足够长的导览摘要，用于验证多源转述资料可以被明确标注并正常读取。",
+      themeConnections: [
+        { theme: "历史", text: "第一段说明这处站点与城市历史的关系。" },
+        { theme: "建筑", text: "第二段说明游客在现场可以看见的空间细节。" },
+      ],
+      checkInTasks: ["找一块能够说明年代的牌子。", "和同行的人说说你注意到的变化。"],
+      sourceClaims: [
+        {
+          text: "据多篇资料记载，这里曾是街区商业活动的一处节点。",
+          sourceIds: ["S1", "S2"],
+          kind: "reported",
+        },
+      ],
+      sourceStatus: "partial",
+      sourceReferences: [
+        {
+          id: "S1",
+          label: "文化资料一",
+          href: "https://example.com/one",
+          kind: "cultural",
+        },
+        {
+          id: "S2",
+          label: "文化资料二",
+          href: "https://example.org/two",
+          kind: "cultural",
+        },
+      ],
+    });
+
+    expect(parsed.sourceClaims[0]?.kind).toBe("reported");
+  });
+
+  it("keeps three editorial drafts and one published Nanjing route", () => {
+    expect(recommendedRoutes).toHaveLength(4);
     expect(recommendedRoutes.every((route) => route.city === "南京")).toBe(true);
-    expect(recommendedRoutes.every((route) => route.status === "review")).toBe(true);
+    expect(recommendedRoutes.filter((route) => route.status === "review")).toHaveLength(3);
+    expect(recommendedRoutes.filter((route) => route.status === "published")).toEqual([
+      expect.objectContaining({
+        id: "nanjing-watergate-to-bookstore-draft",
+        href: "/route/?id=nanjing-human-smoke",
+      }),
+    ]);
     expect(recommendedRoutes.every((route) => route.previewStops.length >= 4)).toBe(true);
+    expect(
+      curatedRouteDrafts.every((draft) =>
+        draft.stops.every((stop) =>
+          stop.sourceIds.every((sourceId) =>
+            draft.sources.some((source) => source.id === sourceId),
+          ),
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      recommendedRoutes.flatMap((route) => route.previewStops),
+    ).not.toEqual(expect.arrayContaining(["五台山体育馆旧址", "顺和路公馆区"]));
+
+    const republicanArchitecture = curatedRouteDrafts.find(
+      (draft) => draft.id === "nanjing-republican-architecture-draft",
+    );
+    expect(republicanArchitecture?.stops.map((stop) => stop.name)).toEqual(
+      expect.arrayContaining(["杨廷宝住宅（外观观察）", "童寯故居与童寯建筑馆"]),
+    );
+    expect(republicanArchitecture?.stops.map((stop) => stop.name)).not.toContain(
+      "拉贝与国际安全区纪念馆",
+    );
+
+    const literatureBookstores = curatedRouteDrafts.find(
+      (draft) => draft.id === "nanjing-literature-bookstores-draft",
+    );
+    expect(literatureBookstores?.stops.map((stop) => stop.name)).toEqual(
+      expect.arrayContaining(["朴阅书店", "先锋书店（五台山总店）"]),
+    );
+
+    const watergateToBookstore = curatedRouteDrafts.find(
+      (draft) => draft.id === "nanjing-watergate-to-bookstore-draft",
+    );
+    expect(watergateToBookstore?.stops).toHaveLength(13);
+    expect(watergateToBookstore?.stops.map((stop) => stop.name)).toEqual(
+      expect.arrayContaining(["圣保罗堂", "朴阅书店"]),
+    );
+    expect(watergateToBookstore?.stops.map((stop) => stop.name)).toEqual(
+      expect.arrayContaining([
+        "手巧馄饨（莫愁新村店）",
+        "赏心亭",
+        "水西门广场与三山门遗址碑",
+        "浙江庆和昌记支店旧址（外观）",
+        "太平商场（外观）",
+        "童寯故居与童寯建筑馆",
+        "iPHO 爱福越式食堂",
+      ]),
+    );
+    expect(
+      watergateToBookstore?.stops.filter((stop) => stop.journeyRole === "rest"),
+    ).toHaveLength(2);
+    expect(watergateToBookstore?.schedule).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "用餐", title: "iPHO 爱福越式食堂" }),
+        expect.objectContaining({ kind: "骑行", title: "骑行至中南银行旧址" }),
+      ]),
+    );
+    expect(humanSmokeRoute.stops).toHaveLength(13);
+    expect(humanSmokeRoute.themePack?.status).toBe("published");
+    expect(Object.keys(humanSmokePreloadedReadings)).toHaveLength(13);
+    expect(humanSmokePreloadedReadings["ipho-watergate-route"]?.checkInTasks).toHaveLength(2);
   });
 });

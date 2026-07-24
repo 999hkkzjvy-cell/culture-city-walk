@@ -41,7 +41,7 @@ export function FactCheckNote({
         {content.sourceStatus === "verified"
           ? "文案仅据已检索的可靠资料和站点信息写成；出发前仍请以官方公告、预约页面或现场信息为准。"
           : content.sourceStatus === "partial"
-            ? "文案只接入了部分地点资料；历史与人物信息仍需以官方或学术来源复核。"
+            ? "文案含已检索资料与多源转述；“据说/据多篇资料记载”的内容并非官方定论，开放与安全信息仍以官方或现场为准。"
             : "内容未接入可靠资料核验，仅作为现场观察线索，不应当作事实来源。"}
       </p>
       {hasVerifiedResearch && content.verifiedAt ? (
@@ -63,24 +63,34 @@ export function FactCheckNote({
           content.researchMeta.acceptedSources === 0 ? (
             <p>百度检索已完成，但未形成可用资料。</p>
           ) : null}
+          {content.researchMeta.failedQueries > 0 ? (
+            <p>
+              百度检索有 {content.researchMeta.failedQueries} 次未成功；错误码：
+              {content.researchMeta.failureCodes.join("、") || "待服务端进一步确认"}。
+            </p>
+          ) : null}
         </details>
       ) : null}
       {claims.length > 0 ? (
         claims.map((claim) => (
           <p key={`${claim.kind}-${claim.text}`}>
             <FileText size={14} />
-            {claim.kind === "legend" ? "地方说法：" : "本次使用的事实："}
+            {claim.kind === "fact"
+              ? "本次使用的事实："
+              : claim.kind === "reported"
+                ? "多源转述："
+                : "地方说法："}
             {claim.text}
           </p>
         ))
       ) : (
         <p>
           <FileText size={14} />
-          暂无官方来源引用；开放时间、门票、预约和闭馆信息需要再次确认。
+          暂无可对应的知识点引用；开放时间、门票、预约和闭馆信息需要再次确认。
         </p>
       )}
       {sources.length > 0 ? (
-        <div className="verification-links" aria-label="本次深读使用的资料来源">
+        <div className="verification-links" aria-label="本次深读使用的参考链接">
           {sources.map((source) => (
             <a
               href={source.href}

@@ -35,6 +35,10 @@ import {
   type RoutePlan,
   type RouteStop,
 } from "@/lib/route";
+import {
+  getPublishedCuratedDeepReadings,
+  getPublishedCuratedRoute,
+} from "@/lib/published-curated-routes";
 import { calculateRouteKernel } from "@/lib/route-kernel";
 import { createRouteRepository } from "@/lib/repositories/route-repository";
 import {
@@ -160,7 +164,10 @@ export function RouteJourneyMode() {
       const cachedReadings = readDeepReadings(route.id).readings;
       setDeepReadings(
         Object.fromEntries(
-          Object.entries(cachedReadings).map(([stopId, content]) => [
+          Object.entries({
+            ...getPublishedCuratedDeepReadings(route.id),
+            ...cachedReadings,
+          }).map(([stopId, content]) => [
             stopId,
             { status: "ready" as const, content },
           ]),
@@ -181,7 +188,12 @@ export function RouteJourneyMode() {
   useEffect(() => {
     const routeId = readRouteId(new URLSearchParams(window.location.search));
 
-    if (!routeId || routeId === demoRoute.id || routeId === route.id) {
+    if (
+      !routeId ||
+      routeId === demoRoute.id ||
+      routeId === route.id ||
+      getPublishedCuratedRoute(routeId)
+    ) {
       return;
     }
 
@@ -803,9 +815,11 @@ function readRoutePlanForJourney(): RoutePlan {
     return cachedJourneyRoute.route;
   }
 
+  const publishedRoute = getPublishedCuratedRoute(routeId);
   const route = readRoutePlan();
   const nextRoute =
-    !routeId || routeId === route.id || routeId === "demo" ? route : demoRoute;
+    publishedRoute ??
+    (!routeId || routeId === route.id || routeId === "demo" ? route : demoRoute);
 
   cachedJourneyRoute = {
     key: cacheKey,

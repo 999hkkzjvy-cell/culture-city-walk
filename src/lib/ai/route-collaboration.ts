@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { RouteCandidate } from "@/lib/route-candidates";
 import type { RouteDraft, RoutePlan, RouteStop, Theme } from "@/lib/route";
 
-export const promptVersion = "route-collaboration-v0.6";
+export const promptVersion = "route-collaboration-v0.8";
 
 export const planningIntentSchema = z.object({
   mode: z.enum(["discover", "complete", "refine"]).default("complete"),
@@ -42,13 +42,17 @@ const sourceClaimSchema = z.preprocess(
     return {
       text: value.replace(/^S\d+[：:]\s*/, "").trim(),
       sourceIds,
-      kind: value.includes("相传") || value.includes("一种说法") ? "legend" : "fact",
+      kind: value.includes("相传") || value.includes("一种说法")
+        ? "legend"
+        : value.includes("据说") || value.includes("据多篇资料")
+          ? "reported"
+          : "fact",
     };
   },
   z.object({
     text: z.string().min(1).max(260),
     sourceIds: z.array(z.string().regex(/^S\d+$/)).min(1).max(3),
-    kind: z.enum(["fact", "legend"]),
+    kind: z.enum(["fact", "reported", "legend"]),
   }),
 );
 
@@ -93,6 +97,8 @@ export const stopThemeContentSchema = z.object({
       acceptedSources: z.number().int().min(0),
       usedSourceIds: z.array(z.string().regex(/^S\d+$/)).max(8),
       mapIncluded: z.boolean(),
+      failedQueries: z.number().int().min(0).default(0),
+      failureCodes: z.array(z.string()).max(3).default([]),
       checkedAt: z.string().datetime(),
     })
     .nullable()

@@ -19,7 +19,7 @@
 - DeepSeek Edge Function 代理，支持规划意图解析、候选排序、资料驱动的导游式深读与现场问答
 - 顶部导航收拢为：探索路线、规划路线、我的路线；关于与使用说明位于页脚
 - 多城市规划会在切换城市时清空旧城市路线预览；本地候选种子仅用于南京，同城高德 POI 未返回时不会展示南京候选
-- 南京探索页先展示三条待人工审核的主题路线编辑稿；正式发布前必须核验站点、来源与深读文案
+- 南京探索页展示三条待人工审核的主题路线编辑稿，以及一条本地可直接开始的现场验证版“人间烟火：一座城市的日常”；后者保留 0725 的 13 个站点、固定时间与离线导览卡，部署和真实走测通过前不视为永久发布
 - 规划页已移除自由手工添加地点；出发、必去、终点都需要从高德搜索结果中选择真实 POI。默认生成 5–6 个可调整项；餐厅最多保留 3 个候选，并用绕行、时段、预算、菜系、营业状态和实际返回的高德评分解释选择
 - 开放时间提示支持多时间段、跨夜、星期规则和具体日期例外；深读会显示资料状态、来源、检索时间及百度检索统计，资料不足时不会虚构事实补足内容
 - 保存路线和候选时会将确认 POI upsert 到 `places`，并持久化路线校验快照；路线途中打卡图会先本地存档，云端路线登录后同步到 `route-media`
@@ -84,6 +84,19 @@ supabase secrets set DEEPSEEK_API_KEY=你的DeepSeekKey DEEPSEEK_MODEL=deepseek-
 ```bash
 supabase functions deploy deepseek-proxy
 ```
+
+### 精选路线深读审核稿
+
+下面的命令会使用已部署的 `deepseek-proxy` 为“人间烟火：一座城市的日常”逐站生成深读和两项现场任务，输出到 `docs/review-drafts/`。它只生成供人工审核的 JSON 与 Markdown，不替换正式路线内容、不提交也不发布。执行前确保本地 `.env.local` 中存在 Supabase 浏览器配置：
+
+```bash
+set -a; source .env.local; set +a
+npm run generate:curated-review -- --execute
+npm run generate:curated-review -- --render
+npm run audit:curated-review
+```
+
+审核清单会阻止资料不足、文化类来源被误标为事实、传说未标注或篇幅不符合要求的站点进入正式稿。
 
 账号功能：
 

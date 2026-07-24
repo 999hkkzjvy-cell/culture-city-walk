@@ -79,7 +79,11 @@ export default function Home() {
 
         <div className="theme-grid">
           {recommendedRoutes.map((theme, index) => (
-            <Link className="theme-card" href={theme.href} key={theme.title}>
+            <Link
+              className="theme-card"
+              href={theme.href}
+              key={theme.title}
+            >
               <div
                 className={`theme-image theme-image-${index + 1}`}
                 style={

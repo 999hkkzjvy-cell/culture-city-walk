@@ -24,6 +24,14 @@ export function recommendedRoutesUrl() {
   return "/recommendations/";
 }
 
+export function recommendedRouteDraftUrl(draftId: string) {
+  return `/recommendations/?draft=${encodeURIComponent(draftId)}`;
+}
+
+export function readRecommendedRouteDraftId(searchParams: URLSearchParams) {
+  return normalizeParam(searchParams.get("draft"));
+}
+
 export function readRouteId(searchParams: URLSearchParams) {
   return normalizeParam(searchParams.get("id"));
 }

@@ -47,6 +47,14 @@ export type Place = {
   providerRating?: string | null;
   providerCost?: string | null;
   journeyRole?: JourneyRole;
+  contentBrief?: {
+    deepReadingFocus?: string;
+    taskDirection?: string;
+    /** 供百度资料检索补充使用的站点专有词，不作为事实证据。 */
+    researchKeywords?: string[];
+    /** 已由路线编辑实地确认的当日性信息；生成时须标明为现场观察并复核。 */
+    editorialNotes?: string[];
+  };
 };
 
 export type RouteStop = Place & {

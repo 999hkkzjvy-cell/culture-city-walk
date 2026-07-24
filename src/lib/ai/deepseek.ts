@@ -18,7 +18,7 @@ import {
 } from "./route-collaboration";
 
 const deepSeekUsageSchema = z.object({
-  provider: z.literal("deepseek"),
+  provider: z.enum(["deepseek", "fallback"]),
   model: z.string().min(1),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -69,6 +69,8 @@ export const stopQuestionAnswerSchema = z.object({
     acceptedSources: z.number().int().min(0),
     usedSourceIds: z.array(z.string()),
     mapIncluded: z.boolean(),
+    failedQueries: z.number().int().min(0).default(0),
+    failureCodes: z.array(z.string()).max(3).default([]),
     checkedAt: z.string().datetime(),
   }),
 });
@@ -198,6 +200,7 @@ export async function generateStopThemeContentWithDeepSeek(
       openingHours: stop.openingHours,
       providerCost: stop.providerCost,
       verificationStatus: stop.verificationStatus,
+      contentBrief: stop.contentBrief,
     },
   };
   const response = await invokeDeepSeekProxy(action, payload);
@@ -285,12 +288,22 @@ async function invokeDeepSeekProxy(action: string, payload: object) {
     throw new Error("Supabase is not configured.");
   }
 
-  const { data, error } = await client.functions.invoke("deepseek-proxy", {
+  const request = {
     body: {
       action,
       ...payload,
     },
-  });
+  };
+  let response = await client.functions.invoke("deepseek-proxy", request);
+
+  // Edge Function 冷启动或瞬时网络中断不应让已生成的路线只能回退模板。
+  // 仅对浏览器没有收到函数响应的情形重试一次，业务错误仍原样交给调用方处理。
+  if (response.error?.message.includes("Failed to send a request")) {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    response = await client.functions.invoke("deepseek-proxy", request);
+  }
+
+  const { data, error } = response;
 
   if (error) {
     const context = (error as { context?: unknown }).context;

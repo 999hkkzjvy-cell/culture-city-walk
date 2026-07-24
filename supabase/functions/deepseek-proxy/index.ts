@@ -79,7 +79,7 @@ type ResearchSource = {
 type StopResearch = {
   checkedAt: string;
   status: "verified" | "partial";
-  contentDepth: "full" | "limited";
+  contentDepth: "full" | "limited" | "template";
   sources: ResearchSource[];
   meta: {
     provider: "baidu_ai_search" | "map";
@@ -89,6 +89,8 @@ type StopResearch = {
     acceptedSources: number;
     usedSourceIds: string[];
     mapIncluded: boolean;
+    failedQueries: number;
+    failureCodes: string[];
     checkedAt: string;
   };
 };
@@ -141,7 +143,9 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const limitCheck = await checkAiUsageLimits(request);
+    const limitCheck = await checkAiUsageLimits(request, {
+      requireAuthenticatedUser: body.action === "stop-question",
+    });
 
     if (!limitCheck.allowed) {
       return json({ error: limitCheck.error }, limitCheck.status);
@@ -187,7 +191,9 @@ async function handleDiagnostic(request: Request, hasApiKey: boolean) {
   const projectCostLimit = parsePositiveNumber(
     Deno.env.get("AI_PROJECT_COST_LIMIT_CNY"),
   );
-  const limitCheck = hasApiKey ? await checkAiUsageLimits(request) : null;
+  const limitCheck = hasApiKey
+    ? await checkAiUsageLimits(request, { requireAuthenticatedUser: false })
+    : null;
 
   return json({
     edgeFunctionReachable: true,
@@ -203,7 +209,10 @@ async function handleDiagnostic(request: Request, hasApiKey: boolean) {
   });
 }
 
-async function checkAiUsageLimits(request: Request) {
+async function checkAiUsageLimits(
+  request: Request,
+  { requireAuthenticatedUser }: { requireAuthenticatedUser: boolean },
+) {
   const dailyUserLimit = parsePositiveNumber(
     Deno.env.get("AI_DAILY_USER_LIMIT"),
   );
@@ -217,7 +226,7 @@ async function checkAiUsageLimits(request: Request) {
 
   const user = dailyUserLimit ? await getAuthenticatedUser(request) : null;
 
-  if (dailyUserLimit && !user) {
+  if (requireAuthenticatedUser && dailyUserLimit && !user) {
     return {
       allowed: false as const,
       status: 401,
@@ -409,16 +418,39 @@ async function handleStopDeepReading(
 ) {
   const startedAt = performance.now();
   const research = await researchStopSources(input);
+
+  if (research.contentDepth === "template") {
+    return json({
+      result: attachStopResearch(buildNoFactStopReading(input, research), research),
+      usage: {
+        provider: "fallback",
+        model: "research-template",
+        inputTokens: 0,
+        outputTokens: 0,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        estimatedCostCny: 0,
+      },
+      warnings: [
+        "未找到事实级来源，已使用不含历史断言的现场观察模板。",
+        ...(research.meta.failureCodes.length > 0
+          ? [`百度检索未成功：${research.meta.failureCodes.join("、")}。`]
+          : []),
+      ],
+    });
+  }
+
   const response = await callDeepSeek(apiKey, {
     maxTokens: research.contentDepth === "full" ? 3600 : 1800,
     systemPrompt: withRepairInstruction(
       [
         "你是一位城市文化导游。你的讲解准确、具体、有知识密度，语气亲切易懂，但不假装亲历者，也不写成闲聊、营销文或百科条目。",
-        "userPrompt.verifiedSources 是唯一可写成事实的证据包。年份、人物关系、建筑年代、文保信息、地址、开放时间、票价、预约方式和现场细节都必须被其中资料支持；没有证据就不写。禁止编造名人到访、引语、销量、称号、获奖，以及“最、唯一、第一”等绝对结论。",
-        "kind 为 official、academic、authority 的资料可支持事实。kind 为 cultural 的资料只能支持以“相传”或“一种流传说法”明确标出的地方故事，不能支持确切年代、人物关系或经营信息。kind 为 map 的资料只可支持地址、时间和价格等实用信息。",
-        "资料充足时，写给第一次到访的步行游客一篇 800-1200 字的现场导览。shortIntro 80-160 字；themeConnections 必须恰好 4 条，每条 160-260 字，并提供 2-12 字的 title。四段依次解释：历史背景与城市脉络、现场空间或实物、人物或人文故事、这座站点与今日城市和路线主题的关系。没有人物资料时，把第三段换成社会生活、文学文化或站点功能，不能补造人物故事。",
+        "userPrompt.verifiedSources 是唯一可写成事实或转述的证据包。年份、人物关系、建筑年代、文保信息、地址、开放时间、票价、预约方式和现场细节都必须被其中资料支持；没有证据就不写。禁止编造名人到访、引语、销量、称号、获奖，以及“最、唯一、第一”等绝对结论。",
+        "kind 为 official、academic、authority 的资料可支持确定事实，并在 sourceClaims 中标 fact；百度百科等经过平台审核的百科词条归为 authority。具明确发布主体、能与站点对应的 cultural 资料也可支持一般城市史、街区沿革、商号、人物生平与日常生活的正常叙述，不必为了非争议细节反复写“据说”，但必须列出实际 S 编号，不能写绝对排名或把转述包装成官方结论。战争伤亡、暴力、慰安所、强占等严重历史指控，以及动态开放、价格与安全信息仍须更严格来源；后者以官方或地图当日资料为准。kind 为 map 的资料只可支持地址、时间和价格等实用信息。",
+        "战争伤亡、暴力、慰安所等敏感历史指控，以及开放、预约、票价、安全提示，不能仅凭 cultural 资料或多源转述下确定结论；前者需档案、学术或权威资料，后者需官方或地图当日资料。",
+        "userPrompt.stop.contentBrief.editorialNotes 是路线编辑提供的实地观察。它只可用于当代菜单、口味、排队、座位、拍摄礼仪等体验提示；写入正文时必须明确为“编辑实地观察”并提示以当天为准，不得把它写成历史事实、来源知识点或 sourceClaims。",
+        "资料充足时，写给第一次到访的步行游客一篇现场导览。普通文化站为 800-1200 字；journeyRole 为 rest 且没有可核验的独立历史沿革时（如餐馆、早餐店），正文不少于 500 字即可，重点写饮食、休息和街区日常，不能硬凑成建筑史。shortIntro 80-160 字；themeConnections 必须恰好 4 条，普通文化站每条 160-260 字，餐饮休息站可适当缩短，并提供 2-12 字的 title。四段依次解释：历史背景与城市脉络、现场空间或实物、人物或人文故事、这座站点与今日城市和路线主题的关系。没有人物资料时，把第三段换成社会生活、文学文化或站点功能，不能补造人物故事。",
         "资料有限时，内容可以缩短为 400-700 字，并只讲有材料支持的部分；不要为了凑字数制造知识。专业词第一次出现时用普通游客能理解的话解释。开场可以从一个问题、物件、空间或历史反差切入，不必强行描写树影、光线或个人感受。",
-        "输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。themeConnections 项为 {theme,title,text}。sourceClaims 项为 {text,sourceIds,kind}；kind 只能是 fact 或 legend。每条事实和传说都要列出实际使用的 S 编号。",
+        "输出严格 json 对象，不要 markdown。字段：placeId, shortIntro, themeConnections, practicalTips, checkInTasks, sourceClaims, sourceStatus。themeConnections 项为 {theme,title,text}。sourceClaims 项为 {text,sourceIds,kind}；kind 只能是 fact、reported 或 legend。每条事实、转述和传说都要列出实际使用的 S 编号。reported 的 text 必须以“据说”或“据多篇资料记载”开头，legend 的 text 必须以“相传”或“一种流传说法”开头；同一限定词也必须原样出现在正文对应句中。",
         "checkInTasks 必须恰好 2 项，标题和正文都不写“闯关”。第一项为具体可见、允许拍摄的目标；第二项为观察、对比、寻找或与同行者交流。任务要呼应讲解、目标明确、不打扰他人、不要求进入非开放区域。",
       ].join(""),
       input.schemaRepair,
@@ -494,7 +526,7 @@ async function handleStopQuestion(
   const response = await callDeepSeek(apiKey, {
     maxTokens: 1000,
     systemPrompt:
-      "你是城市文化导游的现场问答助手。只能依据 userPrompt.verifiedSources 回答。事实级资料可支持确定表述；cultural 资料只能支持以“相传”或“一种流传说法”标出的故事；map 资料只支持地址、时间、价格等实用信息。资料不足时明确说“现有资料不足以确认”，不要用常识补足。回答 120-380 字，先直接回答，再解释与眼前站点的关系。输出严格 json：{answer:string,sourceIds:string[]}，不要 markdown。",
+      "你是城市文化导游的现场问答助手。只能依据 userPrompt.verifiedSources 回答。具明确发布主体的资料及经过平台审核的百科词条，可支持一般城市史、人物生平、街区沿革和建筑资料的正常表述；每个要点都需对应来源，不能写绝对排名或把转述包装成官方结论。map 资料只支持地址、时间、价格等实用信息。战争伤亡、暴力、慰安所、强占等严重指控，以及开放、预约、票价、安全提示，不能仅靠普通文化资料回答。资料不足时明确说“现有资料不足以确认”，不要用常识补足。回答 120-380 字，先直接回答，再解释与眼前站点的关系。输出严格 json：{answer:string,sourceIds:string[]}，不要 markdown。",
     userPrompt: JSON.stringify({
       question,
       route: input.route,
@@ -645,15 +677,31 @@ async function researchStopSources(
   const queries = baiduApiKey
     ? buildResearchQueries(readRouteCity(input.route), stop)
     : [];
-  const settled = await Promise.allSettled(
-    queries.map((query) =>
-      searchBaiduSources({ apiKey: baiduApiKey!, city: readRouteCity(input.route), query }),
-    ),
-  );
+  const settled: PromiseSettledResult<BaiduSearchResult>[] = [];
+
+  for (const query of queries) {
+    try {
+      settled.push({
+        status: "fulfilled",
+        value: await searchBaiduSourcesWithRetry({
+          apiKey: baiduApiKey!,
+          city: readRouteCity(input.route),
+          query,
+        }),
+      });
+    } catch (reason) {
+      settled.push({ status: "rejected", reason });
+    }
+  }
   const successful = settled.filter(
     (result): result is PromiseFulfilledResult<BaiduSearchResult> =>
       result.status === "fulfilled",
   );
+  const failureCodes = settled
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map((result) => toResearchFailureCode(result.reason))
+    .filter((code, index, codes) => code && codes.indexOf(code) === index)
+    .slice(0, 3);
   const searchSources = dedupeResearchSources(
     successful.flatMap((result) => result.value.sources),
   );
@@ -668,12 +716,27 @@ async function researchStopSources(
   const factSources = searchSources.filter((source) =>
     ["official", "academic", "authority"].includes(source.kind),
   );
+  const culturalSourceHosts = new Set(
+    searchSources
+      .filter((source) => source.kind === "cultural")
+      .flatMap((source) => {
+        try {
+          return [new URL(source.href).hostname.toLowerCase()];
+        } catch {
+          return [];
+        }
+      }),
+  );
+  const hasCrossReferencedCulturalSources = culturalSourceHosts.size >= 2;
   const nonMapSources = searchSources.length;
   const sourceTextLength = nonMapSources === 0
     ? 0
     : searchSources.reduce((sum, source) => sum + source.excerpt.length, 0);
-  const contentDepth =
-    factSources.length >= 1 && nonMapSources >= 2 && sourceTextLength >= 1200
+  const contentDepth = factSources.length === 0
+    ? hasCrossReferencedCulturalSources
+      ? "limited"
+      : "template"
+    : factSources.length >= 1 && nonMapSources >= 2 && sourceTextLength >= 1200
       ? "full"
       : "limited";
 
@@ -693,6 +756,8 @@ async function researchStopSources(
       acceptedSources: sources.length,
       usedSourceIds: sources.map((source) => source.id),
       mapIncluded: Boolean(mapSource),
+      failedQueries: settled.length - successful.length,
+      failureCodes,
       checkedAt,
     },
   };
@@ -733,7 +798,7 @@ async function searchBaiduSources({
   });
 
   if (!response.ok) {
-    throw new Error("source_research_failed");
+    throw new Error(`source_research_http_${response.status}`);
   }
 
   const data = await response.json();
@@ -790,6 +855,30 @@ async function searchBaiduSources({
   };
 }
 
+async function searchBaiduSourcesWithRetry(input: {
+  apiKey: string;
+  city: string;
+  query: string;
+}) {
+  const retryDelaysMs = [900, 1_800];
+
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    try {
+      return await searchBaiduSources(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "source_research_failed";
+
+      if (message !== "source_research_http_429" || attempt === retryDelaysMs.length) {
+        throw error;
+      }
+
+      await delay(retryDelaysMs[attempt]);
+    }
+  }
+
+  throw new Error("source_research_failed");
+}
+
 function buildResearchQueries(
   city: string,
   stop: ReturnType<typeof readStopResearchFields>,
@@ -799,11 +888,12 @@ function buildResearchQueries(
     .filter(Boolean)
     .join(" ")
     .slice(0, 48);
+  const editorialKeywords = stop.researchKeywords.join(" ").slice(0, 120);
 
   return [
     `${prefix} 官网 历史 沿革 开放`,
     `${prefix} 人物 故事 轶事 地方志`,
-    `${prefix} 建筑 文学 人文 ${thematicWords}`.trim(),
+    `${prefix} 建筑 文学 人文 ${thematicWords} ${editorialKeywords}`.trim(),
   ].filter((query) => query.trim().length > 0);
 }
 
@@ -822,6 +912,7 @@ function dedupeResearchSources(sources: ResearchSource[]) {
 
 function readStopResearchFields(stop: unknown) {
   const value = isRecord(stop) ? stop : {};
+  const contentBrief = isRecord(value.contentBrief) ? value.contentBrief : {};
 
   return {
     name: readString(value.name),
@@ -831,6 +922,20 @@ function readStopResearchFields(stop: unknown) {
     note: readString(value.note),
     themes: Array.isArray(value.themes)
       ? value.themes.filter((theme): theme is string => typeof theme === "string")
+      : [],
+    researchKeywords: Array.isArray(contentBrief.researchKeywords)
+      ? contentBrief.researchKeywords
+          .filter((keyword): keyword is string => typeof keyword === "string")
+          .map((keyword) => keyword.trim())
+          .filter(Boolean)
+          .slice(0, 8)
+      : [],
+    editorialNotes: Array.isArray(contentBrief.editorialNotes)
+      ? contentBrief.editorialNotes
+          .filter((note): note is string => typeof note === "string")
+          .map((note) => note.trim())
+          .filter(Boolean)
+          .slice(0, 6)
       : [],
   };
 }
@@ -867,6 +972,10 @@ function buildMapResearchSource(
 function classifyResearchSource(href: string): ResearchSourceKind | null {
   try {
     const hostname = new URL(href).hostname.toLowerCase();
+
+    if (hostname === "baike.baidu.com") {
+      return "authority";
+    }
 
     if (
       hostname.endsWith(".gov.cn") ||
@@ -906,7 +1015,6 @@ function classifyCulturalResearchSource(
   try {
     const hostname = new URL(href).hostname.toLowerCase();
     const blockedHosts = [
-      "baike.baidu.com",
       "tieba.baidu.com",
       "zhihu.com",
       "xiaohongshu.com",
@@ -917,9 +1025,12 @@ function classifyCulturalResearchSource(
     ];
     const publisher =
       typeof reference.website === "string" ? reference.website.trim() : "";
+    const title =
+      typeof reference.title === "string" ? reference.title.trim() : "";
 
     if (
       !publisher ||
+      /攻略|推荐|宝藏|一人食|最好吃|值得一去|不信你/.test(title) ||
       blockedHosts.some(
         (host) => hostname === host || hostname.endsWith(`.${host}`),
       )
@@ -931,6 +1042,48 @@ function classifyCulturalResearchSource(
   } catch {
     return null;
   }
+}
+
+function buildNoFactStopReading(
+  input: Extract<DeepSeekProxyRequest, { action: "stop-deep-reading" }>,
+  research: StopResearch,
+) {
+  const stop = readStopResearchFields(input.stop);
+  const placeId = isRecord(input.stop) ? readString(input.stop.id) : "";
+  const primaryTheme = stop.themes.find((theme) =>
+    ["历史", "文学", "建筑", "音乐", "书店", "美食"].includes(theme),
+  ) ?? "历史";
+  const secondaryTheme = stop.themes.find((theme) => theme !== primaryTheme) ?? primaryTheme;
+  const mapTip = research.sources.find((source) => source.kind === "map")?.excerpt;
+  const editorialTip = stop.editorialNotes[0];
+
+  return {
+    placeId: placeId || stop.name || "route-stop",
+    shortIntro: `${stop.name || "这一站"}目前缺少可用于历史断言的可靠资料。先把它作为路线中的现场观察点，并以当天地图与现场信息为准。`,
+    themeConnections: [
+      {
+        theme: primaryTheme,
+        title: "先看眼前",
+        text: `目前不宜把关于${stop.name || "此处"}的历史、人物或经营故事写成确定事实。抵达后，可以先观察入口、招牌、街道关系或人流节奏，从眼前可见的细节开始理解它在这条路线中的位置。`,
+      },
+      {
+        theme: secondaryTheme,
+        title: "留给现场确认",
+        text: "把这次停留当作一条待核验的城市笔记：记录一处具体细节，并在出发当天通过场馆公告、地图地点页或现场说明再次确认。没有可靠出处的传闻，不把它当作导览知识。",
+      },
+    ],
+    practicalTips: [
+      mapTip ? `地图资料：${mapTip}` : "请以当天地图地点页和现场公告确认开放与服务信息。",
+      ...(editorialTip ? [`编辑实地观察（以当天现场为准）：${editorialTip}`] : []),
+      "不要进入未开放区域，也不要把未经核验的说法当作历史事实。",
+    ],
+    checkInTasks: [
+      `在允许拍摄处记录${stop.name || "这一站"}的一处可见细节，并写下它与前一站有什么不同。`,
+      "和同行者各自选一个现场线索，再用一句话说明为什么它值得被记住。",
+    ],
+    sourceClaims: [],
+    sourceStatus: research.status,
+  };
 }
 
 function attachStopResearch(result: unknown, research: StopResearch) {
@@ -955,6 +1108,18 @@ function attachStopResearch(result: unknown, research: StopResearch) {
 
 function compactExcerpt(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 1_200);
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function toResearchFailureCode(error: unknown) {
+  const message = error instanceof Error ? error.message : "source_research_failed";
+
+  return /^source_research_(?:http_\d{3}|failed)$/.test(message)
+    ? message
+    : "source_research_failed";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

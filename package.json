@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "smoke:deepseek-limit": "node scripts/smoke-deepseek-usage-limit.mjs"
+    "smoke:deepseek-limit": "node scripts/smoke-deepseek-usage-limit.mjs",
+    "generate:curated-review": "node --experimental-strip-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/generate-curated-route-review.mjs",
+    "audit:curated-review": "node scripts/audit-curated-route-review.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.3",

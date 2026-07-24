@@ -41,6 +41,10 @@ import {
   type RoutePlan,
   type RouteStop,
 } from "@/lib/route";
+import {
+  getPublishedCuratedDeepReadings,
+  getPublishedCuratedRoute,
+} from "@/lib/published-curated-routes";
 import { getOpeningHoursWarning } from "@/lib/opening-hours";
 import {
   removeRouteStop,
@@ -56,6 +60,7 @@ import {
   readRoutePlan,
   routePlanStorageKey,
   saveCandidateState,
+  saveDeepReading,
   saveRoutePlan,
   isRouteFavorited,
   toggleFavoriteRoute,
@@ -103,7 +108,7 @@ export function RouteReader() {
   >({});
   const [deepReadings, setDeepReadings] = useState<
     Record<string, DeepReadingState>
-  >({});
+  >(() => toReadyDeepReadings(getPublishedCuratedDeepReadings(route.id)));
   const [isFavorited, setIsFavorited] = useState(false);
   const routeSummary = generateRouteSummaryWithFallback(route);
   const sourceLabel =
@@ -117,6 +122,14 @@ export function RouteReader() {
     queueMicrotask(() => setIsFavorited(isRouteFavorited(route.id)));
   }, [route.id]);
 
+  useEffect(() => {
+    queueMicrotask(() =>
+      setDeepReadings(
+        toReadyDeepReadings(getPublishedCuratedDeepReadings(route.id)),
+      ),
+    );
+  }, [route.id]);
+
   function toggleFavorite() {
     const next = toggleFavoriteRoute(route);
     setIsFavorited(next);
@@ -126,7 +139,12 @@ export function RouteReader() {
   useEffect(() => {
     const routeId = readRouteId(new URLSearchParams(window.location.search));
 
-    if (!routeId || routeId === demoRoute.id || routeId === route.id) {
+    if (
+      !routeId ||
+      routeId === demoRoute.id ||
+      routeId === route.id ||
+      getPublishedCuratedRoute(routeId)
+    ) {
       return;
     }
 
@@ -251,6 +269,7 @@ export function RouteReader() {
           content: result.data,
         },
       }));
+      saveDeepReading(route.id, stop.id, result.data);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       setDeepReadings((current) => ({
@@ -551,8 +570,25 @@ export function RouteReader() {
                           ? "收起深读"
                           : isDeepSeekProxyConfigured()
                             ? "生成深读"
-                            : "展开深读"}
+                          : "展开深读"}
                       </button>
+                      {isDeepSeekProxyConfigured() &&
+                      (deepReading?.content || deepReading?.status === "error") ? (
+                        <button
+                          onClick={() => {
+                            setExpandedStories((current) => ({
+                              ...current,
+                              [stop.id]: true,
+                            }));
+                            void loadDeepReading(stop);
+                          }}
+                          type="button"
+                        >
+                          {deepReading?.status === "error"
+                            ? "重试百度生成"
+                            : "用百度重新生成"}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                   {isEditing ? (
@@ -717,10 +753,12 @@ function readRoutePlanForReader(): RoutePlan {
     return cachedRouteSnapshot.route;
   }
 
+  const publishedRoute = getPublishedCuratedRoute(routeId);
   const route = readRoutePlan();
 
   const nextRoute =
-    !routeId || routeId === route.id || routeId === "demo" ? route : demoRoute;
+    publishedRoute ??
+    (!routeId || routeId === route.id || routeId === "demo" ? route : demoRoute);
 
   cachedRouteSnapshot = {
     key: cacheKey,
@@ -728,6 +766,15 @@ function readRoutePlanForReader(): RoutePlan {
   };
 
   return nextRoute;
+}
+
+function toReadyDeepReadings(readings: Record<string, StopThemeContent>) {
+  return Object.fromEntries(
+    Object.entries(readings).map(([stopId, content]) => [
+      stopId,
+      { status: "ready" as const, content },
+    ]),
+  ) as Record<string, DeepReadingState>;
 }
 
 function subscribeToLocalRoutePlan(onStoreChange: () => void) {

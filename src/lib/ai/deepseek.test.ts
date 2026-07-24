@@ -247,6 +247,9 @@ describe("DeepSeek proxy client", () => {
     expect(mocks.invoke).toHaveBeenCalledWith("deepseek-proxy", {
       body: expect.objectContaining({
         action: "stop-deep-reading",
+        stop: expect.objectContaining({
+          contentBrief: demoRoute.stops[2]?.contentBrief,
+        }),
       }),
     });
     expect(result.data.shortIntro).toContain("近代城市阅读");

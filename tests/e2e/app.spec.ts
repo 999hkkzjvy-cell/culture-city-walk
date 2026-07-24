@@ -12,7 +12,16 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await expect(page.getByRole("link", { name: /我已有路线/ })).toBeVisible();
   await expect(
     page.getByRole("link", { name: /南京 近代南京的几次转身/ }),
-  ).toHaveAttribute("href", /\/route\/\?id=demo/);
+  ).toHaveAttribute(
+    "href",
+    "/recommendations/?draft=nanjing-modern-history-draft",
+  );
+  await expect(
+    page.getByRole("link", { name: /南京 人间烟火：一座城市的日常/ }),
+  ).toHaveAttribute(
+    "href",
+    "/route/?id=nanjing-human-smoke",
+  );
   await expect(
     mainNav.getByRole("link", { name: "探索路线", exact: true }),
   ).toHaveAttribute("href", "/recommendations/");
@@ -25,6 +34,50 @@ test("home page exposes the three planning modes", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: "登录" }).first(),
   ).toHaveAttribute("href", "/login/");
+});
+
+test("selected watergate-to-bookstore draft lists meal stops and detailed cultural stops", async ({
+  page,
+}) => {
+  await page.goto(
+    "/recommendations/?draft=nanjing-watergate-to-bookstore-draft",
+  );
+
+  await expect(
+    page.getByRole("heading", { name: "人间烟火：一座城市的日常" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "当天怎么走" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "每一站在主题里承担什么" }),
+  ).toBeVisible();
+  const stopList = page.getByLabel("每一站在主题里承担什么");
+  await expect(stopList).toContainText(
+    "手巧馄饨（莫愁新村店）",
+  );
+  await expect(stopList).toContainText("iPHO 爱福越式食堂");
+  await expect(stopList).toContainText("赏心亭");
+});
+
+test("published human-smoke route opens with offline guide cards and journey mode", async ({
+  page,
+}) => {
+  await page.goto("/route/?id=nanjing-human-smoke");
+
+  await expect(
+    page.getByRole("heading", { name: "人间烟火：一座城市的日常" }),
+  ).toBeVisible();
+  await expect(page.getByText("13 个站点")).toBeVisible();
+  await expect(
+    page.locator(".timeline .stop-card").first().getByRole("heading"),
+  ).toHaveText("手巧馄饨（莫愁新村店）");
+  await page.getByRole("button", { name: "展开深读" }).first().click();
+  await expect(page.getByText("导览重点").first()).toBeVisible();
+
+  await page.getByRole("link", { name: "体验路线" }).click();
+  await expect(page).toHaveURL(/\/journey\/\?id=nanjing-human-smoke/);
+  await expect(page.getByLabel("路线概览")).toContainText("iPHO 爱福越式食堂");
 });
 
 test("planning page can save a local draft and open route reader", async ({
@@ -279,7 +332,20 @@ test("recommended routes can be filtered", async ({ page }) => {
   await page.getByRole("button", { name: "紧凑" }).click();
   await page.getByRole("button", { name: "书店" }).click();
   await expect(page.getByText("民国建筑与城市生活")).toBeVisible();
-  await expect(page.getByText(/颐和路公馆区 → 拉贝故居/)).toBeVisible();
+  await expect(page.getByText(/颐和路历史文化街区 → 颐和路数字展示馆/)).toBeVisible();
+});
+
+test("recommended route opens a review-only editorial draft with its source ledger", async ({
+  page,
+}) => {
+  await page.goto("/recommendations/");
+
+  await page.getByRole("link", { name: /查看编辑稿/ }).first().click();
+
+  await expect(page.getByRole("heading", { name: "近代南京的几次转身" })).toBeVisible();
+  await expect(page.getByText("尚不能直接开始路线")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "本稿采用的可追溯资料" })).toBeVisible();
+  await expect(page).toHaveURL(/\/recommendations\/\?draft=nanjing-modern-history-draft/);
 });
 
 test("login and profile pages expose account flows", async ({ page }) => {
